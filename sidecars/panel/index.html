@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Desktop Pet Settings</title>
+<script src="/preload.js"></script>
+<style>
+  :root {
+    --bg-1: var(--background, var(--color-background-primary, #0f172a));
+    --bg-2: var(--card, var(--color-background-secondary, #1e293b));
+    --bg-3: var(--muted, var(--color-background-tertiary, #334155));
+    --fg-1: var(--foreground, var(--color-text-primary, #f1f5f9));
+    --fg-2: var(--muted-foreground, var(--color-text-secondary, #94a3b8));
+    --bd-1: var(--border, var(--color-border-primary, rgba(148,163,184,0.22)));
+    --accent: #38bdf8;
+    --accent-bg: rgba(56,189,248,0.16);
+    --ok: #10b981;
+    --warn: #f59e0b;
+    --err: #ef4444;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 14px;
+    background: var(--bg-1);
+    color: var(--fg-1);
+    font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei UI", sans-serif;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .card {
+    background: var(--bg-2);
+    border: 1px solid var(--bd-1);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+  }
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap;
+  }
+  .title-area { display: flex; align-items: center; gap: 10px; }
+  .logo {
+    width: 36px; height: 36px; border-radius: 9px;
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+  .title { font-size: 15px; font-weight: 700; margin: 0; }
+  .sub { font-size: 11.5px; color: var(--fg-2); margin: 2px 0 0; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
+    background: var(--bg-3); border: 1px solid var(--bd-1);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fg-2); }
+  .dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .dot.hidden { background: var(--warn); }
+  .dot.off { background: var(--err); }
+
+  .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  button {
+    appearance: none;
+    border: 1px solid var(--bd-1);
+    background: var(--bg-3);
+    color: var(--fg-1);
+    border-radius: 8px;
+    padding: 6px 11px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+  }
+  button:hover { border-color: var(--accent); filter: brightness(1.08); }
+  button:active { transform: scale(0.98); }
+  button.primary { background: #0284c7; border-color: #38bdf8; color: #fff; }
+  button.danger { background: rgba(239,68,68,0.18); border-color: rgba(239,68,68,0.5); color: #ef4444; }
+  button.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .stat-box {
+    background: rgba(128,128,128,0.08); border: 1px solid var(--bd-1);
+    border-radius: 8px; padding: 7px 10px; text-align: center;
+  }
+  .stat-val { font-size: 16px; font-weight: 700; color: var(--accent); }
+  .stat-lbl { font-size: 11px; color: var(--fg-2); }
+
+  .sec-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; gap: 8px; flex-wrap: wrap; }
+  .sec-title { font-size: 13px; font-weight: 700; margin: 0; }
+  .skin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .skin-card {
+    text-align: left; padding: 9px 10px; border-radius: 9px;
+    background: rgba(128,128,128,0.08); border: 1px solid var(--bd-1);
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .skin-card.selected { background: var(--accent-bg); border-color: var(--accent); }
+  .skin-name { font-weight: 700; font-size: 12.5px; }
+  .skin-desc { font-size: 11px; color: var(--fg-2); }
+
+  .seg-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--bd-1); flex-wrap: wrap;
+  }
+  .seg-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .seg-label { font-weight: 600; font-size: 12.5px; }
+  .seg-sub { font-size: 11px; color: var(--fg-2); }
+  .seg-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+
+  .toggle-list { display: flex; flex-direction: column; }
+  .toggle-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; border-bottom: 1px solid var(--bd-1); gap: 12px;
+  }
+  .toggle-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .switch {
+    position: relative; width: 40px; height: 22px; flex-shrink: 0;
+    background: var(--bg-3); border-radius: 999px; border: 1px solid var(--bd-1);
+    cursor: pointer; transition: background 0.15s;
+  }
+  .switch.on { background: #0ea5e9; border-color: #38bdf8; }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px; border-radius: 50%; background: #fff;
+    transition: transform 0.15s;
+  }
+  .switch.on::after { transform: translateX(18px); }
+
+  .conv-list { display: flex; flex-direction: column; gap: 6px; }
+  .conv-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    background: rgba(128,128,128,0.08); border: 1px solid var(--bd-1);
+    border-radius: 8px; padding: 6px 10px;
+  }
+  .conv-meta { font-size: 11px; color: var(--fg-2); }
+  .toast {
+    position: fixed; bottom: 12px; right: 12px;
+    background: #0f172a; color: #f8fafc; border: 1px solid #38bdf8;
+    padding: 6px 12px; border-radius: 8px; font-size: 12px;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="header">
+      <div class="title-area">
+        <div class="logo">🐾</div>
+        <div>
+          <h1 class="title" data-i18n="title">Desktop Pet Settings</h1>
+          <p class="sub" data-i18n="subtitle">No taskbar/tray icon · Hotkey Win + Alt + P · Click bubble to open chat</p>
+        </div>
+      </div>
+      <div class="pill">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">Loading...</span>
+      </div>
+    </div>
+
+    <div class="seg-row" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bd-1);border-bottom:none;">
+      <div>
+        <div class="seg-label" data-i18n="langLabel">🌐 Language</div>
+        <div class="seg-sub" data-i18n="langSub">Follow Antigravity language or pick manually</div>
+      </div>
+      <div class="seg-btns" id="langBtns">
+        <button data-lang="auto" onclick="setOpt('language', 'auto')" data-i18n="langAuto">Auto (AGY)</button>
+        <button data-lang="en" onclick="setOpt('language', 'en')">English</button>
+        <button data-lang="zh" onclick="setOpt('language', 'zh')">简体中文</button>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="primary" onclick="act('start')" data-i18n="btnStart">🟢 Enable / Show</button>
+      <button onclick="act('hide')" data-i18n="btnHide">🙈 Hide</button>
+      <button class="danger" onclick="act('quit')" data-i18n="btnQuit">🔴 Quit Pet</button>
+      <button onclick="act('openConversation')" data-i18n="btnOpenChat">💬 Open Active Chat</button>
+      <button onclick="refreshStatus()" data-i18n="btnRefresh">🔄 Refresh</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat-box">
+        <div class="stat-val" id="statCompleted">0</div>
+        <div class="stat-lbl" data-i18n="statDone">Tasks Done</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="statTools">0</div>
+        <div class="stat-lbl" data-i18n="statTools">Tool Calls</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="statUptime">0m</div>
+        <div class="stat-lbl" data-i18n="statUp">Uptime</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec-head">
+      <h2 class="sec-title"><span data-i18n="skinSec">🎭 Pet Characters</span> (<span id="petCount">0</span>)</h2>
+      <button onclick="act('reload')" data-i18n="btnReload">🔄 Reload Packs</button>
+    </div>
+    <div class="skin-grid" id="skinGrid"></div>
+  </div>
+
+  <div class="card">
+    <div class="sec-head">
+      <h2 class="sec-title" data-i18n="appearSec">🎨 Appearance & Bubbles</h2>
+      <button onclick="act('resetPos')" data-i18n="btnResetPos">📍 Reset Corner</button>
+    </div>
+    <div class="seg-row">
+      <div>
+        <div class="seg-label" data-i18n="sizeLabel">Pet Size</div>
+        <div class="seg-sub" data-i18n="sizeSub">Scale the floating pet window</div>
+      </div>
+      <div class="seg-btns" id="scaleBtns">
+        <button data-scale="0.75" onclick="setOpt('scale', '0.75')" data-i18n="szS">Small (0.75x)</button>
+        <button data-scale="1" onclick="setOpt('scale', '1')" data-i18n="szM">Normal (1.0x)</button>
+        <button data-scale="1.3" onclick="setOpt('scale', '1.3')" data-i18n="szL">Large (1.3x)</button>
+        <button data-scale="1.5" onclick="setOpt('scale', '1.5')" data-i18n="szXL">XL (1.5x)</button>
+      </div>
+    </div>
+    <div class="seg-row">
+      <div>
+        <div class="seg-label" data-i18n="bubbleLabel">Bubble Mode</div>
+        <div class="seg-sub" data-i18n="bubbleSub">Click the bubble anytime to open that conversation</div>
+      </div>
+      <div class="seg-btns" id="bubbleBtns">
+        <button data-bubble="always" onclick="setOpt('bubbleMode', 'always')" data-i18n="bmAlways">Always</button>
+        <button data-bubble="alerts" onclick="setOpt('bubbleMode', 'alerts')" data-i18n="bmAlerts">Alerts Only</button>
+        <button data-bubble="off" onclick="setOpt('bubbleMode', 'off')" data-i18n="bmOff">Off</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec-head">
+      <h2 class="sec-title" data-i18n="miscSec">⚙️ Behavior & System</h2>
+    </div>
+    <div class="toggle-list">
+      <div class="toggle-item">
+        <div>
+          <div class="seg-label" data-i18n="tBoot">🚀 Launch with Antigravity</div>
+          <div class="seg-sub" data-i18n="tBootSub">Auto-start when Antigravity opens and exit when it closes</div>
+        </div>
+        <div class="switch" id="swAutoStart" onclick="toggleOpt('autoStartOnBoot')"></div>
+      </div>
+      <div class="toggle-item">
+        <div>
+          <div class="seg-label" data-i18n="tWalk">🐾 Idle Roaming</div>
+          <div class="seg-sub" data-i18n="tWalkSub">Walk left and right along the taskbar when idle</div>
+        </div>
+        <div class="switch" id="swAutoWalk" onclick="toggleOpt('autoWalk')"></div>
+      </div>
+      <div class="toggle-item">
+        <div>
+          <div class="seg-label" data-i18n="tEye">👀 16-Direction Eye Follow</div>
+          <div class="seg-sub" data-i18n="tEyeSub">Pupils track your mouse cursor nearby</div>
+        </div>
+        <div class="switch" id="swEyeFollow" onclick="toggleOpt('eyeFollow')"></div>
+      </div>
+      <div class="toggle-item">
+        <div>
+          <div class="seg-label" data-i18n="tTop">📌 Always on Top</div>
+          <div class="seg-sub" data-i18n="tTopSub">Keep the pet floating above other windows</div>
+        </div>
+        <div class="switch" id="swTopmost" onclick="toggleOpt('topmost')"></div>
+      </div>
+      <div class="toggle-item">
+        <div>
+          <div class="seg-label" data-i18n="tSound">🔔 Completion Sound Alert</div>
+          <div class="seg-sub" data-i18n="tSoundSub">Play subtle chime on Ready or Needs Input</div>
+        </div>
+        <div class="switch" id="swSound" onclick="toggleOpt('soundAlert')"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec-head">
+      <h2 class="sec-title" data-i18n="recentSec">💬 Recent Conversations (Click to Open)</h2>
+    </div>
+    <div class="conv-list" id="convList"></div>
+  </div>
+
+  <div class="card">
+    <div class="sec-head">
+      <h2 class="sec-title" data-i18n="previewSec">🧪 Preview States & Actions</h2>
+    </div>
+    <div class="btn-row" style="margin-top:0">
+      <button onclick="previewState('running', 'Writing code...')" data-i18n="pvRun">⚡ Running</button>
+      <button onclick="previewState('needs_input', 'Needs your input!')" data-i18n="pvWait">! Needs Input</button>
+      <button onclick="previewState('ready', '✓ Task Ready · Click')" data-i18n="pvReady">✓ Ready</button>
+      <button onclick="previewState('blocked', 'Blocked · Click to view')" data-i18n="pvErr">✕ Blocked</button>
+      <button onclick="previewState('idle', '')" data-i18n="pvIdle">💤 Idle</button>
+      <button onclick="act('wave')" data-i18n="pvWave">👋 Wave</button>
+      <button onclick="act('jump')" data-i18n="pvJump">🦘 Jump</button>
+      <button onclick="act('walk')" data-i18n="pvWalk">🐾 Walk</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">Saved</div>
+
+<script>
+(function () {
+  var currentData = null;
+
+  var I18N = {
+    en: {
+      title: 'Desktop Pet Settings',
+      subtitle: 'No taskbar/tray icon · Hotkey Win + Alt + P · Click bubble to open chat',
+      langLabel: '🌐 Language',
+      langSub: 'Follow Antigravity language or switch manually',
+      langAuto: 'Auto (AGY)',
+      btnStart: '🟢 Enable / Show',
+      btnHide: '🙈 Hide',
+      btnQuit: '🔴 Quit Pet',
+      btnOpenChat: '💬 Open Active Chat',
+      btnRefresh: '🔄 Refresh',
+      statDone: 'Tasks Done',
+      statTools: 'Tool Calls',
+      statUp: 'Uptime',
+      skinSec: '🎭 Pet Characters',
+      btnReload: '🔄 Reload Packs',
+      appearSec: '🎨 Appearance & Bubbles',
+      btnResetPos: '📍 Reset Corner',
+      sizeLabel: 'Pet Size',
+      sizeSub: 'Scale the floating pet window',
+      szS: 'Small (0.75x)',
+      szM: 'Normal (1.0x)',
+      szL: 'Large (1.3x)',
+      szXL: 'XL (1.5x)',
+      bubbleLabel: 'Bubble Mode',
+      bubbleSub: 'Click the bubble anytime to open that conversation',
+      bmAlways: 'Always',
+      bmAlerts: 'Alerts Only',
+      bmOff: 'Off',
+      miscSec: '⚙️ Behavior & System',
+      tBoot: '🚀 Launch with Antigravity',
+      tBootSub: 'Auto-start when Antigravity opens and exit when it closes',
+      tWalk: '🐾 Idle Roaming',
+      tWalkSub: 'Walk left and right along the taskbar when idle',
+      tEye: '👀 16-Direction Eye Follow',
+      tEyeSub: 'Pupils track your mouse cursor nearby',
+      tTop: '📌 Always on Top',
+      tTopSub: 'Keep the pet floating above other windows',
+      tSound: '🔔 Completion Sound Alert',
+      tSoundSub: 'Play subtle chime on Ready or Needs Input',
+      recentSec: '💬 Recent Conversations (Click to Open)',
+      noRecent: 'No recent chats yet',
+      openBtn: 'Open Chat',
+      previewSec: '🧪 Preview States & Actions',
+      pvRun: '⚡ Running',
+      pvWait: '! Needs Input',
+      pvReady: '✓ Ready',
+      pvErr: '✕ Blocked',
+      pvIdle: '💤 Idle',
+      pvWave: '👋 Wave',
+      pvJump: '🦘 Jump',
+      pvWalk: '🐾 Walk',
+      stOff: 'Stopped (Disabled)',
+      stHidden: 'Running · Hidden',
+      stPrefix: 'Running · ',
+      states: { idle: 'Idle', running: 'Running', needs_input: 'Needs Input', ready: 'Ready', blocked: 'Blocked' },
+      upUnit: 'm',
+      toastOk: 'Saved'
+    },
+    zh: {
+      title: '桌面宠物设置',
+      subtitle: '不在系统任务栏/托盘驻留 · 热键 Win + Alt + P · 点击气泡直达对话',
+      langLabel: '🌐 语言 / Language',
+      langSub: '默认自动跟随 Antigravity 语言，也可手动切换',
+      langAuto: '跟随 AGY (自动)',
+      btnStart: '🟢 开启 / 显示桌宠',
+      btnHide: '🙈 隐藏桌宠',
+      btnQuit: '🔴 关闭退出桌宠',
+      btnOpenChat: '💬 打开当前对话',
+      btnRefresh: '🔄 刷新状态',
+      statDone: '累计完成任务',
+      statTools: '累计工具调用',
+      statUp: '本次陪伴时长',
+      skinSec: '🎭 宠物角色皮肤',
+      btnReload: '🔄 刷新列表',
+      appearSec: '🎨 外观与气泡设置',
+      btnResetPos: '📍 重置到右下角',
+      sizeLabel: '宠物尺寸',
+      sizeSub: '调整桌面悬浮宠物窗口大小',
+      szS: '小 (0.75x)',
+      szM: '标准 (1.0x)',
+      szL: '大 (1.3x)',
+      szXL: '特大 (1.5x)',
+      bubbleLabel: '气泡显示模式',
+      bubbleSub: '点击头顶气泡可随时跳转到对应 Antigravity 对话',
+      bmAlways: '始终显示',
+      bmAlerts: '仅重要提醒',
+      bmOff: '关闭气泡',
+      miscSec: '⚙️ 杂项与行为设置',
+      tBoot: '🚀 随 Antigravity 启动',
+      tBootSub: '打开 Antigravity 时自动启动，关闭客户端时自动退出',
+      tWalk: '🐾 待机桌面散步',
+      tWalkSub: '空闲时每隔十几秒在工作区底部左右小跑散步',
+      tEye: '👀 16 方向眼神跟随鼠标',
+      tEyeSub: '鼠标靠近时，宠物瞳孔实时注视光标位置',
+      tTop: '📌 窗口始终置顶',
+      tTopSub: '保持桌宠悬浮在其他窗口最上方',
+      tSound: '🔔 任务完成 / 需要确认提示音',
+      tSoundSub: '状态变为 Ready 或 Needs Input 时播放轻柔系统提示音',
+      recentSec: '💬 最近关联对话 (点击直达)',
+      noRecent: '暂无会话记录',
+      openBtn: '打开对话',
+      previewSec: '🧪 状态与动作实时预览',
+      pvRun: '⚡ 运行中',
+      pvWait: '! 需要确认',
+      pvReady: '✓ 任务完成',
+      pvErr: '✕ 报错阻断',
+      pvIdle: '💤 恢复待机',
+      pvWave: '👋 挥手',
+      pvJump: '🦘 跳跃',
+      pvWalk: '🐾 散步',
+      stOff: '未运行（已关闭）',
+      stHidden: '运行中 · 已隐藏',
+      stPrefix: '运行中 · ',
+      states: { idle: '待机中', running: '执行中', needs_input: '待确认', ready: '已完成', blocked: '出错阻断' },
+      upUnit: ' 分',
+      toastOk: '已同步生效'
+    }
+  };
+
+  var ICON_MAP = {
+    'cyber-fox': '🦊',
+    'astro-bot': '👩‍🚀',
+    'shadow-cat': '🐱',
+    'byte-ghost': '👻',
+    'shiba-dog': '🐶',
+    'pixel-dragon': '🐉'
+  };
+
+  function getLangPack(data) {
+    var eff = (data && data.effectiveLanguage) ? data.effectiveLanguage : 'en';
+    return eff === 'zh' ? I18N.zh : I18N.en;
+  }
+
+  function applyTranslations(L) {
+    document.querySelectorAll('[data-i18n]').forEach(function (el) {
+      var k = el.getAttribute('data-i18n');
+      if (L[k]) el.textContent = L[k];
+    });
+  }
+
+  function showToast(text) {
+    var el = document.getElementById('toast');
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(function () { el.classList.remove('show'); }, 1800);
+  }
+
+  function apiCall(endpoint, bodyObj) {
+    var opts = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyObj || {})
+    };
+    if (window.sidecar && typeof window.sidecar.fetch === 'function') {
+      return window.sidecar.fetch(endpoint, opts).then(function (r) { return r.json(); });
+    }
+    return fetch(endpoint, opts).then(function (r) { return r.json(); });
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  function setSw(id, on) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle('on', !!on);
+  }
+
+  function render(data) {
+    if (!data) return;
+    currentData = data;
+    var L = getLangPack(data);
+    applyTranslations(L);
+
+    var dot = document.getElementById('statusDot');
+    var stTxt = document.getElementById('statusText');
+    dot.className = 'dot ' + (!data.running ? 'off' : (data.visible ? 'on' : 'hidden'));
+    if (!data.running) {
+      stTxt.textContent = L.stOff;
+    } else if (!data.visible) {
+      stTxt.textContent = L.stHidden;
+    } else {
+      stTxt.textContent = L.stPrefix + (L.states[data.state] || data.state || 'Idle');
+    }
+
+    document.getElementById('statCompleted').textContent = String(data.completedTasksCount || 0);
+    document.getElementById('statTools').textContent = String(data.toolCallsCount || 0);
+    document.getElementById('statUptime').textContent = String(data.uptimeMinutes || 0) + L.upUnit;
+
+    var langMode = data.language || 'auto';
+    document.querySelectorAll('#langBtns button').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-lang') === langMode);
+    });
+
+    var pets = Array.isArray(data.availablePets) ? data.availablePets : [];
+    document.getElementById('petCount').textContent = String(pets.length);
+    var grid = document.getElementById('skinGrid');
+    grid.innerHTML = '';
+    pets.forEach(function (p) {
+      var btn = document.createElement('button');
+      btn.className = 'skin-card' + (p.id === data.skin ? ' selected' : '');
+      var icon = ICON_MAP[p.id] || '🐾';
+      btn.innerHTML = '<div class="skin-name">' + icon + ' ' + escapeHtml(p.displayName || p.id) + '</div>' +
+                      '<div class="skin-desc">' + escapeHtml(p.description || ('Codex v' + (p.version || 2))) + '</div>';
+      btn.onclick = function () { setOpt('skin', p.id); };
+      grid.appendChild(btn);
+    });
+
+    var sc = Number(data.scale || 1);
+    document.querySelectorAll('#scaleBtns button').forEach(function (b) {
+      var val = Number(b.getAttribute('data-scale'));
+      b.classList.toggle('active', Math.abs(val - sc) < 0.05);
+    });
+
+    var bm = data.bubbleMode || 'always';
+    document.querySelectorAll('#bubbleBtns button').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-bubble') === bm);
+    });
+
+    setSw('swAutoStart', data.autoStartOnBoot !== false);
+    setSw('swAutoWalk', data.autoWalk !== false);
+    setSw('swEyeFollow', data.eyeFollow !== false);
+    setSw('swTopmost', data.topmost !== false);
+    setSw('swSound', !!data.soundAlert);
+
+    var convList = document.getElementById('convList');
+    var recent = Array.isArray(data.recentConversations) ? data.recentConversations : [];
+    if (recent.length === 0) {
+      convList.innerHTML = '<div class="conv-meta">' + escapeHtml(L.noRecent) + '</div>';
+    } else {
+      convList.innerHTML = '';
+      recent.forEach(function (rc) {
+        var row = document.createElement('div');
+        row.className = 'conv-item';
+        row.innerHTML = '<div><div class="seg-label">' + escapeHtml(rc.title || rc.conversationId) + '</div>' +
+          '<div class="conv-meta">' + escapeHtml(L.states[rc.state] || rc.state || '') + ' · ' + escapeHtml(rc.updatedAt || '') + '</div></div>';
+        var b = document.createElement('button');
+        b.textContent = L.openBtn;
+        b.onclick = function () {
+          if (window.sidecar && window.sidecar.ui && typeof window.sidecar.ui.toggleConversation === 'function') {
+            window.sidecar.ui.toggleConversation(rc.conversationId);
+          }
+          apiCall('/api/apply', { action: 'openConversation', value: rc.conversationId }).then(render);
+        };
+        row.appendChild(b);
+        convList.appendChild(row);
+      });
+    }
+  }
+
+  window.refreshStatus = function () {
+    return apiCall('/api/status', {}).then(render);
+  };
+
+  window.act = function (action) {
+    return apiCall('/api/apply', { action: action }).then(function (data) {
+      render(data);
+      showToast(getLangPack(data).toastOk);
+    });
+  };
+
+  window.setOpt = function (key, value) {
+    return apiCall('/api/apply', { action: key, value: String(value) }).then(function (data) {
+      render(data);
+      showToast(getLangPack(data).toastOk);
+    });
+  };
+
+  window.toggleOpt = function (key) {
+    var cur = currentData ? currentData[key] : true;
+    return setOpt(key, !cur);
+  };
+
+  window.previewState = function (st, msg) {
+    return apiCall('/api/apply', { action: 'testState', state: st, message: msg }).then(function (data) {
+      render(data);
+      showToast(getLangPack(data).toastOk);
+    });
+  };
+
+  refreshStatus();
+  setInterval(refreshStatus, 5000);
+})();
+</script>
+</body>
+</html>

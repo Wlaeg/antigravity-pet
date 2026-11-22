@@ -1,0 +1,21 @@
+{
+  "command": "node",
+  "args": ["server.mjs"],
+  "restart_policy": "always",
+  "display_name": "桌面宠物设置",
+  "description": "在客户端内手动开启或关闭桌面宠物，切换 6 款像素角色，配置尺寸、气泡模式、随 Antigravity 启动、桌面散步、眼神跟随及会话跳转。",
+  "has_web_ui": true,
+  "agent_permissions": {
+    "allows_user_interactions": true
+  },
+  "ui_config": {
+    "display_name": "桌面宠物设置",
+    "views": [
+      {
+        "path": "/",
+        "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE",
+        "title": "桌面宠物设置"
+      }
+    ]
+  }
+}

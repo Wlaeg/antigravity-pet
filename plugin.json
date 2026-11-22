@@ -1,0 +1,14 @@
+{
+  "name": "antigravity-pet",
+  "displayName": "桌面宠物 (Antigravity Pet)",
+  "description": "Antigravity 原生 Codex 规范兼容桌面宠物插件：6款像素风宠物、状态联动、点击气泡打开对应对话、右上角插件目录内置设置面板。",
+  "logo": "assets/logo.svg",
+  "author": {
+    "name": "Antigravity Local"
+  },
+  "suggestedPrompts": [
+    "打开桌面宠物设置面板",
+    "把桌宠换成像素柴犬",
+    "帮我孵化一只赛博小熊猫桌面宠物"
+  ]
+}
