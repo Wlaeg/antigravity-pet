@@ -300,3 +300,8 @@ Each custom pet pack only requires two files: `pet.json` and `spritesheet.png` (
 ### 📄 开源协议
 
 本项目基于 [MIT License](LICENSE) 开源。
+
+---
+### 🙏 致谢
+
+感谢 [LINUX DO](https://linux.do) 社区对开源项目的支持。
