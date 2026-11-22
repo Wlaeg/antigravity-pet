@@ -10,7 +10,7 @@ const PLUGIN_ROOT = path.resolve(__dirname, '..');
 const EXE_PATH = path.join(PLUGIN_ROOT, 'app', 'AntigravityPet.exe');
 const UI_HTML_PATH = path.join(PLUGIN_ROOT, 'ui', 'settings.html');
 const PETS_DIR = path.join(PLUGIN_ROOT, 'pets');
-const CODEX_PETS_DIR = path.join(os.homedir(), '.codex', 'pets');
+const USER_PETS_DIR = path.join(os.homedir(), '.antigravity-pet', 'pets');
 const PORT = 47821;
 const TASK_NAME = 'AntigravityPetLauncher';
 const RESOURCE_URI = 'ui://antigravity-pet/settings.html';
@@ -98,7 +98,7 @@ const EN_PET_META = {
 
 function scanPetPacks(lang = 'zh') {
   const map = new Map();
-  for (const root of [PETS_DIR, CODEX_PETS_DIR]) {
+  for (const root of [PETS_DIR, USER_PETS_DIR]) {
     try {
       if (!fs.existsSync(root)) continue;
       for (const entry of fs.readdirSync(root, { withFileTypes: true })) {

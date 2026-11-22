@@ -11,7 +11,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Text;
 
-public static class CodexPetGenerator
+public static class PixelPetGenerator
 {
     private const int GridW = 36;
     private const int GridH = 39;
@@ -513,5 +513,5 @@ public static class CodexPetGenerator
 }
 "@
 
-[CodexPetGenerator]::GenerateAll($OutRoot)
-Write-Host "All 6 balanced (36x39) Codex v2 pets generated in $OutRoot"
+[PixelPetGenerator]::GenerateAll($OutRoot)
+Write-Host "All 6 balanced (36x39) pixel pets generated in $OutRoot"

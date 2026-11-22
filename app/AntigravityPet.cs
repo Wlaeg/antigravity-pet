@@ -182,7 +182,7 @@ namespace AntigravityPet
         private PetConfig _config;
         private readonly string _configPath;
         private readonly string _pluginPetsDir;
-        private readonly string _codexPetsDir;
+        private readonly string _userPetsDir;
         private readonly string _exePath;
 
         private PetPack _currentPack;
@@ -219,7 +219,7 @@ namespace AntigravityPet
             _exePath = Process.GetCurrentProcess().MainModule.FileName;
             string exeDir = AppDomain.CurrentDomain.BaseDirectory;
             _pluginPetsDir = System.IO.Path.GetFullPath(System.IO.Path.Combine(exeDir, "..", "pets"));
-            _codexPetsDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "pets");
+            _userPetsDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".antigravity-pet", "pets");
 
             SyncAutoStartRegistry(_config.AutoStartOnBoot);
             SaveConfig();
@@ -498,7 +498,7 @@ namespace AntigravityPet
         {
             _packs.Clear();
             LoadPacksFromDir(_pluginPetsDir);
-            LoadPacksFromDir(_codexPetsDir);
+            LoadPacksFromDir(_userPetsDir);
 
             string desired = ResolveSkinAlias(_config.Skin);
             if (_packs.ContainsKey(desired))

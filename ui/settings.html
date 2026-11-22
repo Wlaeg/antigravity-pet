@@ -352,7 +352,7 @@
       var btn = document.createElement('button');
       btn.className = 'skin-card' + (p.id === data.skin ? ' selected' : '');
       btn.innerHTML = '<div class="skin-name">' + (ICON_MAP[p.id] || '🐾') + ' ' + escapeHtml(p.displayName || p.id) + '</div>' +
-                      '<div class="skin-desc">' + escapeHtml(p.description || ('Codex v' + (p.version || 2))) + '</div>';
+                      '<div class="skin-desc">' + escapeHtml(p.description || ('Sprite v' + (p.version || 2))) + '</div>';
       btn.onclick = function () { setOpt('skin', p.id); };
       grid.appendChild(btn);
     });

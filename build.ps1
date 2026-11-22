@@ -10,7 +10,7 @@ $GenScript = Join-Path $Root "scripts\generate-default-pets.ps1"
 $ExePath = Join-Path $AppDir "AntigravityPet.exe"
 $CsPath = Join-Path $AppDir "AntigravityPet.cs"
 
-Write-Host "[1/4] 正在生成 6 套 Codex v2 像素风宠物图集 (1536x2288)..." -ForegroundColor Cyan
+Write-Host "[1/4] 正在生成 6 套 8x11 像素风宠物图集 (1536x2288)..." -ForegroundColor Cyan
 & powershell -NoProfile -ExecutionPolicy Bypass -File $GenScript -OutRoot $PetsDir
 
 Write-Host "[2/4] 检查并关闭旧进程..." -ForegroundColor Cyan

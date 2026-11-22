@@ -1,20 +1,20 @@
 ---
 name: hatch-pet
 description: >-
-  孵化自定义 Codex 兼容桌面宠物（对应 Codex 的 hatch-pet 技能）。
+  孵化自定义 Antigravity 桌面宠物（hatch-pet 技能）。
   当用户想用描述文字或参考图定制一只专属的桌面宠物角色、生成像素雪碧图与 pet.json
   并立即换上时使用。
 ---
 
 # 孵化自定义桌面宠物（Hatch Pet）
 
-遵循标准 **Codex Pet v2 规范** 为用户生成并装载专属桌面宠物。
+遵循 **Antigravity Pet v2 像素雪碧图规范** 为用户生成并装载专属桌面宠物。
 
 ## 宠物包结构与位置
 
 保存到以下任一目录（推荐写入插件目录以便立即加载）：
 - `C:\Users\Nelson\.gemini\config\plugins\antigravity-pet\pets\<pet-id>\`
-- 或 `%USERPROFILE%\.codex\pets\<pet-id>\`
+- 或 `%USERPROFILE%\.antigravity-pet\pets\<pet-id>\`
 
 每个宠物包仅需两个文件：
 
@@ -29,7 +29,7 @@ description: >-
 }
 ```
 
-### 2. `spritesheet.png`（Codex v2 严格网格规范）
+### 2. `spritesheet.png`（8×11 精灵图网格规范）
 - 透明背景 PNG（32 位 RGBA）
 - **网格尺寸**：`8 列 × 11 行`（共 88 格）
 - **单格尺寸**：`192 × 208 px`

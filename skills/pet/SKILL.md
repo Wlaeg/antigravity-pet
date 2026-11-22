@@ -1,7 +1,7 @@
 ---
 name: pet
 description: >-
-  控制 Antigravity 桌面宠物（Codex 兼容版星灵桌宠）。当用户要求打开、召唤、隐藏、关闭桌面宠物，
+  控制 Antigravity 桌面宠物（Antigravity Pet）。当用户要求打开、召唤、隐藏、关闭桌面宠物，
   打开设置面板，切换宠物皮肤（cyber-fox / astro-bot / shadow-cat / byte-ghost / shiba-dog / pixel-dragon），
   调整尺寸/气泡模式/随 Antigravity 启停/提示音、刷新宠物列表、或查看/测试桌宠状态时使用。
 ---
@@ -11,7 +11,7 @@ description: >-
 - 程序路径：`C:\Users\Nelson\.gemini\config\plugins\antigravity-pet\app\AntigravityPet.exe`
 - 宠物包扫描目录：
   1. `C:\Users\Nelson\.gemini\config\plugins\antigravity-pet\pets\`
-  2. `%USERPROFILE%\.codex\pets\`（直接兼容 Codex Pets 社区资料包）
+  2. `%USERPROFILE%\.antigravity-pet\pets\`（自定义扩展宠物包目录）
 - 本地控制端口：`http://127.0.0.1:47821`
 - 全局显隐快捷键：**`Win + Alt + P`**（不占 Windows 任务栏与系统托盘图标）
 - 客户端内设置面板：已集成至 Antigravity 右上角三个点（`...`）插件目录「桌面宠物设置」（`sidecar://antigravity-pet/panel/`），亦可调用 MCP 工具 `antigravity-pet_pet:pet_settings`。
