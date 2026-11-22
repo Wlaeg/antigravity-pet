@@ -6,7 +6,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const EXE_PATH = path.resolve(__dirname, '..', 'app', 'AntigravityPet.exe');
+const PLUGIN_ROOT = path.resolve(__dirname, '..');
+const IS_WIN = process.platform === 'win32';
+const IS_MAC = process.platform === 'darwin';
+const EXE_PATH = path.join(PLUGIN_ROOT, 'app', 'AntigravityPet.exe');
+const MAC_APP_BUNDLE = path.join(PLUGIN_ROOT, 'app', 'AntigravityPet.app');
+const MAC_BIN_PATH = path.join(MAC_APP_BUNDLE, 'Contents', 'MacOS', 'AntigravityPet');
+const MAC_BUILD_SH = path.join(PLUGIN_ROOT, 'build.sh');
 const PORT = 47821;
 const TASK_NAME = 'AntigravityPetLauncher';
 
@@ -76,10 +82,20 @@ function checkHealth(timeoutMs = 200) {
   });
 }
 
+function getConfigPath() {
+  if (IS_MAC) {
+    return path.join(os.homedir(), 'Library', 'Application Support', 'AntigravityPet', 'config.json');
+  }
+  if (IS_WIN) {
+    const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+    return path.join(localAppData, 'AntigravityPet', 'config.json');
+  }
+  return path.join(os.homedir(), '.config', 'AntigravityPet', 'config.json');
+}
+
 function isPetEnabledInConfig() {
   try {
-    const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-    const cfgPath = path.join(localAppData, 'AntigravityPet', 'config.json');
+    const cfgPath = getConfigPath();
     if (!fs.existsSync(cfgPath)) return true;
     const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8').replace(/^\uFEFF/, ''));
     return cfg.Enabled !== false && cfg.AutoStartOnBoot !== false;
@@ -90,6 +106,25 @@ function isPetEnabledInConfig() {
 
 function launchPetInRealDesktop() {
   return new Promise((resolve) => {
+    if (IS_MAC) {
+      if (fs.existsSync(MAC_BIN_PATH)) {
+        execFile('open', ['-g', '-a', MAC_APP_BUNDLE], { timeout: 1200 }, (err) => {
+          if (err) {
+            try {
+              const child = spawn(MAC_BIN_PATH, [], { detached: true, stdio: 'ignore' });
+              child.unref();
+            } catch {}
+          }
+          resolve();
+        });
+      } else if (fs.existsSync(MAC_BUILD_SH)) {
+        execFile('bash', [MAC_BUILD_SH, '--launch'], { timeout: 25000 }, () => resolve());
+      } else {
+        resolve();
+      }
+      return;
+    }
+
     execFile('schtasks', ['/Run', '/TN', TASK_NAME], { timeout: 600, windowsHide: true }, (err) => {
       if (err) {
         try {

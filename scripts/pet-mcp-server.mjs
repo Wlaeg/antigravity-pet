@@ -7,7 +7,12 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = path.resolve(__dirname, '..');
+const IS_WIN = process.platform === 'win32';
+const IS_MAC = process.platform === 'darwin';
 const EXE_PATH = path.join(PLUGIN_ROOT, 'app', 'AntigravityPet.exe');
+const MAC_APP_BUNDLE = path.join(PLUGIN_ROOT, 'app', 'AntigravityPet.app');
+const MAC_BIN_PATH = path.join(MAC_APP_BUNDLE, 'Contents', 'MacOS', 'AntigravityPet');
+const MAC_BUILD_SH = path.join(PLUGIN_ROOT, 'build.sh');
 const UI_HTML_PATH = path.join(PLUGIN_ROOT, 'ui', 'settings.html');
 const PETS_DIR = path.join(PLUGIN_ROOT, 'pets');
 const USER_PETS_DIR = path.join(os.homedir(), '.antigravity-pet', 'pets');
@@ -16,8 +21,15 @@ const TASK_NAME = 'AntigravityPetLauncher';
 const RESOURCE_URI = 'ui://antigravity-pet/settings.html';
 
 function getConfigPath() {
-  const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-  const dir = path.join(localAppData, 'AntigravityPet');
+  let dir;
+  if (IS_MAC) {
+    dir = path.join(os.homedir(), 'Library', 'Application Support', 'AntigravityPet');
+  } else if (IS_WIN) {
+    const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+    dir = path.join(localAppData, 'AntigravityPet');
+  } else {
+    dir = path.join(os.homedir(), '.config', 'AntigravityPet');
+  }
   fs.mkdirSync(dir, { recursive: true });
   return path.join(dir, 'config.json');
 }
@@ -70,14 +82,16 @@ function detectEffectiveLang(cfg) {
   if (agy.startsWith('en')) return 'en';
   if (agy.startsWith('zh')) return 'zh';
   try {
-    const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-    const sp = path.join(appData, 'Antigravity', 'app_storage.json');
+    const agyDataDir = IS_MAC
+      ? path.join(os.homedir(), 'Library', 'Application Support', 'Antigravity')
+      : path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Antigravity');
+    const sp = path.join(agyDataDir, 'app_storage.json');
     if (fs.existsSync(sp)) {
       const raw = fs.readFileSync(sp, 'utf8');
       if (/"(?:locale|language)":"zh/i.test(raw)) return 'zh';
       if (/"(?:locale|language)":"en/i.test(raw)) return 'en';
     }
-    const lp = path.join(appData, 'Antigravity', 'localization-prefs.json');
+    const lp = path.join(agyDataDir, 'localization-prefs.json');
     if (fs.existsSync(lp)) {
       const raw = fs.readFileSync(lp, 'utf8');
       if (/"useTw"\s*:\s*true/i.test(raw) || /chinese/i.test(raw)) return 'zh';
@@ -167,6 +181,7 @@ function httpRequest(method, urlPath, bodyObj = null, timeoutMs = 800) {
 }
 
 function syncRegistryAutoStart() {
+  if (!IS_WIN) return Promise.resolve();
   return new Promise((resolve) => {
     const key = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
     execFile('reg.exe', ['DELETE', key, '/v', 'AntigravityPet', '/f'], { timeout: 1500, windowsHide: true }, () => resolve());
@@ -188,6 +203,25 @@ async function ensurePetLaunchedWithAgy() {
 
 function launchPetOnRealDesktop() {
   return new Promise((resolve) => {
+    if (IS_MAC) {
+      if (fs.existsSync(MAC_BIN_PATH)) {
+        execFile('open', ['-g', '-a', MAC_APP_BUNDLE], { timeout: 1500 }, (err) => {
+          if (err) {
+            try {
+              const child = spawn(MAC_BIN_PATH, [], { detached: true, stdio: 'ignore' });
+              child.unref();
+            } catch {}
+          }
+          resolve();
+        });
+      } else if (fs.existsSync(MAC_BUILD_SH)) {
+        execFile('bash', [MAC_BUILD_SH, '--launch'], { timeout: 30000 }, () => resolve());
+      } else {
+        resolve();
+      }
+      return;
+    }
+
     execFile('schtasks', ['/Run', '/TN', TASK_NAME], { timeout: 1500, windowsHide: true }, (err) => {
       if (err) {
         try {
