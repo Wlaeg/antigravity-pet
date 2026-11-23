@@ -331,6 +331,93 @@ public static class PixelPetGenerator
             SetPix(grid, cx - 2, cy - 2, jade);
             SetPix(grid, cx + 1, cy - 2, jade);
         }
+        else if (skin == "android-bugdroid")
+        {
+            Color droid = Color.FromArgb(255, 61, 220, 132);      // Android #3DDC84
+            Color droidShade = Color.FromArgb(255, 34, 177, 102);
+            Color droidHi = Color.FromArgb(255, 134, 239, 172);
+
+            // 两根斜向小天线
+            SetPix(grid, cx - 6, cy - 13, droid);
+            SetPix(grid, cx - 5, cy - 12, droid);
+            SetPix(grid, cx - 4, cy - 11, droid);
+            SetPix(grid, cx + 5, cy - 13, droid);
+            SetPix(grid, cx + 4, cy - 12, droid);
+            SetPix(grid, cx + 3, cy - 11, droid);
+
+            // 半圆圆顶头部（与身体之间留 1px 深色缝隙）
+            FillRect(grid, cx - 7, cy - 10, 14, 9, droid);
+            FillRect(grid, cx - 8, cy - 7, 16, 6, droid);
+            FillRect(grid, cx - 5, cy - 11, 10, 1, droid);
+            FillRect(grid, cx - 4, cy - 10, 8, 1, droidHi);
+            ClearPix(grid, cx - 7, cy - 10);
+            ClearPix(grid, cx + 6, cy - 10);
+
+            // 头部与身体分隔线
+            FillRect(grid, cx - 8, cy - 1, 16, 1, outline);
+
+            // 圆柱形身体
+            FillRect(grid, cx - 7, cy, 14, 10, droid);
+            FillRect(grid, cx - 7, cy + 8, 14, 2, droidShade);
+
+            // 两侧圆润小手臂（挥手时右手抬起）
+            FillRect(grid, cx - 10, cy + 1, 2, 6, droid);
+            if (!waveArm)
+            {
+                FillRect(grid, cx + 8, cy + 1, 2, 6, droid);
+            }
+
+            // 两条小短腿
+            int lf = cy + 10, rf = cy + 10;
+            if (pose == "run") { if (legStep == 0) lf -= 2; else if (legStep == 2) rf -= 2; }
+            FillRect(grid, cx - 5, lf, 3, 3, droidShade);
+            FillRect(grid, cx + 2, rf, 3, 3, droidShade);
+        }
+        else if (skin == "flutter-dash")
+        {
+            Color dashBlue = Color.FromArgb(255, 84, 197, 248);    // Flutter #54C5F8
+            Color dashDark = Color.FromArgb(255, 1, 117, 194);     // Flutter #0175C2
+            Color dashBelly = Color.FromArgb(255, 224, 242, 254);  // 浅蓝白肚皮
+            Color beak = Color.FromArgb(255, 250, 204, 21);        // 亮黄小嘴
+
+            // 标志性头顶三根呆毛/羽冠
+            FillRect(grid, cx - 1, cy - 14, 2, 3, dashDark);
+            SetPix(grid, cx - 3, cy - 13, dashBlue);
+            SetPix(grid, cx + 2, cy - 13, dashBlue);
+
+            // 圆滚滚一体式胖小鸟身躯 + 头部
+            FillRect(grid, cx - 8, cy - 10, 16, 19, dashBlue);
+            FillRect(grid, cx - 9, cy - 7, 18, 14, dashBlue);
+            FillRect(grid, cx - 6, cy - 11, 12, 1, dashBlue);
+            ClearPix(grid, cx - 8, cy - 10);
+            ClearPix(grid, cx + 7, cy - 10);
+            ClearPix(grid, cx - 8, cy + 8);
+            ClearPix(grid, cx + 7, cy + 8);
+
+            // 浅色圆肚皮
+            FillRect(grid, cx - 5, cy, 10, 8, dashBelly);
+            FillRect(grid, cx - 4, cy + 8, 8, 1, dashBelly);
+
+            // 两侧深蓝小翅膀（跳跃/跑步/挥手时拍动）
+            int wingY = (pose == "jump" || pose == "review" || (pose == "run" && frame % 2 == 0)) ? cy - 2 : cy + 1;
+            FillRect(grid, cx - 11, wingY, 3, 6, dashDark);
+            if (!waveArm)
+            {
+                FillRect(grid, cx + 8, wingY, 3, 6, dashDark);
+            }
+
+            // 橙黄色小鸟爪
+            int lf = cy + 10, rf = cy + 10;
+            if (pose == "run") { if (legStep == 0) lf -= 2; else if (legStep == 2) rf -= 2; }
+            FillRect(grid, cx - 5, lf, 3, 2, amber);
+            FillRect(grid, cx + 2, rf, 3, 2, amber);
+
+            // 亮黄色小尖嘴 + 腮红
+            FillRect(grid, cx - 2, cy - 3, 4, 2, beak);
+            FillRect(grid, cx - 1, cy - 1, 2, 1, amber);
+            FillRect(grid, cx - 7, cy - 3, 2, 1, blush);
+            FillRect(grid, cx + 5, cy - 3, 2, 1, blush);
+        }
         else // byte-ghost
         {
             Color gBody = Color.FromArgb(255, 238, 242, 255);
@@ -387,6 +474,17 @@ public static class PixelPetGenerator
             SetPix(grid, cx - 6, ey, white);
             SetPix(grid, cx + 2, ey, white);
         }
+        else if (skin == "android-bugdroid")
+        {
+            // Android Bugdroid 标志性纯白圆眼（眼动时保留深绿小瞳孔）
+            FillRect(grid, cx - 5, ey + 1, 3, 3, white);
+            FillRect(grid, cx + 2, ey + 1, 3, 3, white);
+            if (eyeDx != 0 || eyeDy != 0)
+            {
+                SetPix(grid, cx - 4 + eyeDx, ey + 2 + eyeDy, outline);
+                SetPix(grid, cx + 3 + eyeDx, ey + 2 + eyeDy, outline);
+            }
+        }
         else
         {
             FillRect(grid, cx - 6, ey, 4, 4, eyeBg);
@@ -400,7 +498,10 @@ public static class PixelPetGenerator
         if (waveArm)
         {
             int armLift = (frame % 2 == 0) ? -1 : -4;
-            FillRect(grid, cx + 8, cy + armLift, 3, 4, cream);
+            Color armColor = (skin == "android-bugdroid") ? Color.FromArgb(255, 61, 220, 132)
+                           : (skin == "flutter-dash") ? Color.FromArgb(255, 1, 117, 194)
+                           : cream;
+            FillRect(grid, cx + 8, cy + armLift, 3, 4, armColor);
         }
 
         AddOutline(grid, outline);
@@ -470,7 +571,9 @@ public static class PixelPetGenerator
             { "shadow-cat", "小黑猫 ShadowCat", "金色大眼的灵动黑猫" },
             { "byte-ghost", "电子幽灵 ByteGhost", "呆萌漂浮的霓虹小幽灵" },
             { "shiba-dog", "像素柴犬 Shiba", "暖黄卷尾的豆豆眉小柴犬" },
-            { "pixel-dragon", "像素小青龙 Dragon", "长着金角小翅膀的翡翠青龙" }
+            { "pixel-dragon", "像素小青龙 Dragon", "长着金角小翅膀的翡翠青龙" },
+            { "android-bugdroid", "安卓小绿人 Bugdroid", "Google Android 官方经典绿色小机器人" },
+            { "flutter-dash", "Flutter 小蓝鸟 Dash", "Google Flutter & Dart 官方吉祥物小蓝鸟" }
         };
 
         for (int i = 0; i < defs.GetLength(0); i++)
@@ -514,4 +617,4 @@ public static class PixelPetGenerator
 "@
 
 [PixelPetGenerator]::GenerateAll($OutRoot)
-Write-Host "All 6 balanced (36x39) pixel pets generated in $OutRoot"
+Write-Host "All 8 balanced (36x39) pixel pets generated in $OutRoot"

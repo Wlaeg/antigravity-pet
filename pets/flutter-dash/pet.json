@@ -1,0 +1,7 @@
+{
+  "id": "flutter-dash",
+  "displayName": "Flutter 小蓝鸟 Dash",
+  "description": "Google Flutter & Dart 官方吉祥物小蓝鸟",
+  "spriteVersionNumber": 2,
+  "spritesheetPath": "spritesheet.png"
+}

@@ -63,7 +63,9 @@ final class I18n {
         "shadow-cat": ("ShadowCat", "Golden-eyed nimble black cat"),
         "byte-ghost": ("ByteGhost", "Cute floating neon ghost"),
         "shiba-dog": ("ShibaDog", "Warm fluffy Shiba Inu"),
-        "pixel-dragon": ("PixelDragon", "Emerald mini dragon with golden horns")
+        "pixel-dragon": ("PixelDragon", "Emerald mini dragon with golden horns"),
+        "android-bugdroid": ("Android Bugdroid", "Classic Google Android green robot mascot"),
+        "flutter-dash": ("Flutter Dash", "Official Google Flutter & Dart blue bird mascot")
     ]
 
     static func detectAgyLocale() -> String {

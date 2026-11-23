@@ -107,7 +107,9 @@ const EN_PET_META = {
   'shadow-cat': { name: 'ShadowCat', desc: 'Golden-eyed nimble black cat' },
   'byte-ghost': { name: 'ByteGhost', desc: 'Cute floating neon ghost' },
   'shiba-dog': { name: 'ShibaDog', desc: 'Warm fluffy Shiba Inu' },
-  'pixel-dragon': { name: 'PixelDragon', desc: 'Emerald mini dragon with golden horns' }
+  'pixel-dragon': { name: 'PixelDragon', desc: 'Emerald mini dragon with golden horns' },
+  'android-bugdroid': { name: 'Android Bugdroid', desc: 'Classic Google Android green robot mascot' },
+  'flutter-dash': { name: 'Flutter Dash', desc: 'Official Google Flutter & Dart blue bird mascot' }
 };
 
 function scanPetPacks(lang = 'zh') {
@@ -425,7 +427,7 @@ const TOOLS = [
       type: 'object',
       properties: {
         action: { type: 'string', description: 'Optional: start/show/hide/quit/toggle/status/resetPos/openConversation' },
-        skin: { type: 'string', description: 'Pet ID: cyber-fox/astro-bot/shadow-cat/byte-ghost/shiba-dog/pixel-dragon' },
+        skin: { type: 'string', description: 'Pet ID: cyber-fox/astro-bot/shadow-cat/byte-ghost/shiba-dog/pixel-dragon/android-bugdroid/flutter-dash' },
         scale: { type: 'number', description: 'Scale: 0.75/1.0/1.3/1.5' },
         bubbleMode: { type: 'string', description: 'Bubble mode: always/alerts/off' },
         language: { type: 'string', description: 'Language: auto/en/zh' },

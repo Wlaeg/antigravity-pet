@@ -8,7 +8,7 @@
 
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20%7C%20macOS%2012%2B-0078D6?style=flat-square)](https://github.com/Wlaeg/antigravity-pet)
 [![Engine](https://img.shields.io/badge/Engine-C%23%20WPF%20%7C%20Swift%20AppKit-38BDF8?style=flat-square)](app)
-[![Characters](https://img.shields.io/badge/Pixel%20Pets-6%20Built--in-F59E0B?style=flat-square)](pets)
+[![Characters](https://img.shields.io/badge/Pixel%20Pets-8%20Built--in-F59E0B?style=flat-square)](pets)
 [![i18n](https://img.shields.io/badge/i18n-English%20%2F%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-10B981?style=flat-square)](#english)
 [![License](https://img.shields.io/badge/License-MIT-A855F7?style=flat-square)](LICENSE)
 
@@ -52,6 +52,8 @@
 | `byte-ghost` | **ByteGhost** | Playful floating pixel spirit | [`pets/byte-ghost`](pets/byte-ghost) |
 | `shiba-dog` | **ShibaDog** | Warm golden Shiba Inu companion | [`pets/shiba-dog`](pets/shiba-dog) |
 | `pixel-dragon` | **PixelDragon** | Emerald mini dragon with golden horns | [`pets/pixel-dragon`](pets/pixel-dragon) |
+| `android-bugdroid` | **Android Bugdroid** | Classic Google Android green robot mascot | [`pets/android-bugdroid`](pets/android-bugdroid) |
+| `flutter-dash` | **Flutter Dash** | Official Google Flutter & Dart blue bird mascot | [`pets/flutter-dash`](pets/flutter-dash) |
 
 > Custom pet packs placed inside `%USERPROFILE%\.antigravity-pet\pets\<pet-id>\` or `pets\<pet-id>\` are loaded automatically and can be hot-reloaded without restarting.
 
@@ -214,7 +216,7 @@ Each custom pet pack only requires two files: `pet.json` and `spritesheet.png` (
 
 ---
 
-### 🎭 内置 6 款像素角色图鉴
+### 🎭 内置 8 款像素角色图鉴
 
 | 皮肤 ID | 角色名称 | 外观特色 | 目录位置 |
 | :--- | :--- | :--- | :--- |
@@ -224,6 +226,8 @@ Each custom pet pack only requires two files: `pet.json` and `spritesheet.png` (
 | `byte-ghost` | **电子幽灵 ByteGhost** | 半透明霓虹飘浮小幽灵 | [`pets/byte-ghost`](pets/byte-ghost) |
 | `shiba-dog` | **像素柴犬 ShibaDog** | 暖黄色蓬松柴犬伙伴 | [`pets/shiba-dog`](pets/shiba-dog) |
 | `pixel-dragon` | **像素小青龙 PixelDragon** | 翡翠绿身躯配金色小龙角 | [`pets/pixel-dragon`](pets/pixel-dragon) |
+| `android-bugdroid` | **安卓小绿人 Bugdroid** | Google Android 官方经典绿色小机器人 | [`pets/android-bugdroid`](pets/android-bugdroid) |
+| `flutter-dash` | **Flutter 小蓝鸟 Dash** | Google Flutter & Dart 官方吉祥物小蓝鸟 | [`pets/flutter-dash`](pets/flutter-dash) |
 
 > 将自制宠物包放入 `%USERPROFILE%\.antigravity-pet\pets\<pet-id>\` 或插件 `pets\<pet-id>\` 目录，点击「刷新列表」即可热重载启用。
 

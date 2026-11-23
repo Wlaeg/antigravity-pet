@@ -2,7 +2,7 @@
 name: pet
 description: >-
   控制 Antigravity 桌面宠物（Antigravity Pet）。当用户要求打开、召唤、隐藏、关闭桌面宠物，
-  打开设置面板，切换宠物皮肤（cyber-fox / astro-bot / shadow-cat / byte-ghost / shiba-dog / pixel-dragon），
+  打开设置面板，切换宠物皮肤（cyber-fox / astro-bot / shadow-cat / byte-ghost / shiba-dog / pixel-dragon / android-bugdroid / flutter-dash），
   调整尺寸/气泡模式/随 Antigravity 启停/提示音、刷新宠物列表、或查看/测试桌宠状态时使用。
 ---
 
@@ -29,7 +29,7 @@ description: >-
      ```
      若计划任务未注册，改用 `windows-mcp_windows-mcp` 的 `App` 工具（`mode: "launch_executable"`, `executable: "C:\\Users\\Nelson\\.gemini\\config\\plugins\\antigravity-pet\\app\\AntigravityPet.exe"`）。
 
-2. **切换宠物皮肤**（内置 6 款：`cyber-fox`、`astro-bot`、`shadow-cat`、`byte-ghost`、`shiba-dog`、`pixel-dragon`）：
+2. **切换宠物皮肤**（内置 8 款：`cyber-fox`、`astro-bot`、`shadow-cat`、`byte-ghost`、`shiba-dog`、`pixel-dragon`、`android-bugdroid`、`flutter-dash`）：
    ```powershell
    Invoke-RestMethod -Uri "http://127.0.0.1:47821/skin" -Method Post -Body '{"skin":"shiba-dog"}' -ContentType "application/json"
    ```

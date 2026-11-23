@@ -654,6 +654,10 @@ namespace AntigravityPet
                 case "ghost": return "byte-ghost";
                 case "shiba": return "shiba-dog";
                 case "dragon": return "pixel-dragon";
+                case "android":
+                case "bugdroid": return "android-bugdroid";
+                case "dash":
+                case "flutter": return "flutter-dash";
                 case "": return "cyber-fox";
                 default: return skin.Trim();
             }
@@ -1184,6 +1188,8 @@ namespace AntigravityPet
                 case "byte-ghost": return "ByteGhost";
                 case "shiba-dog": return "ShibaDog";
                 case "pixel-dragon": return "PixelDragon";
+                case "android-bugdroid": return "Android Bugdroid";
+                case "flutter-dash": return "Flutter Dash";
                 default: return p.DisplayName;
             }
         }
@@ -1200,6 +1206,8 @@ namespace AntigravityPet
                 case "byte-ghost": return "Cute floating neon ghost";
                 case "shiba-dog": return "Warm fluffy Shiba Inu";
                 case "pixel-dragon": return "Emerald mini dragon with golden horns";
+                case "android-bugdroid": return "Classic Google Android green robot mascot";
+                case "flutter-dash": return "Official Google Flutter & Dart blue bird mascot";
                 default: return p.Description;
             }
         }

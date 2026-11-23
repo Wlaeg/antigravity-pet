@@ -1,0 +1,7 @@
+{
+  "id": "android-bugdroid",
+  "displayName": "安卓小绿人 Bugdroid",
+  "description": "Google Android 官方经典绿色小机器人",
+  "spriteVersionNumber": 2,
+  "spritesheetPath": "spritesheet.png"
+}
