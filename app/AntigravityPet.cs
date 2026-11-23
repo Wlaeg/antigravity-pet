@@ -156,6 +156,11 @@ namespace AntigravityPet
         private readonly Ellipse _statusHalo;
         private readonly Ellipse _floorShadow;
         private readonly Image _spriteImage;
+        private readonly RotateTransform _dragRotate;
+        private readonly ScaleTransform _dragScale;
+        private double _dragTargetAngle = 0;
+        private double _dragCurrentAngle = 0;
+        private double _lastDragScreenX = 0;
         private readonly TextBlock _fallbackLabel;
         private readonly Border _badgeBorder;
         private readonly TextBlock _badgeText;
@@ -303,13 +308,21 @@ namespace AntigravityPet
             };
             _stageGrid.Children.Add(_floorShadow);
 
+            _dragScale = new ScaleTransform(1.0, 1.0);
+            _dragRotate = new RotateTransform(0.0);
+            var spriteTransforms = new TransformGroup();
+            spriteTransforms.Children.Add(_dragScale);
+            spriteTransforms.Children.Add(_dragRotate);
+
             _spriteImage = new Image
             {
                 Width = BaseSpriteBox,
                 Height = BaseSpriteBox,
                 Stretch = Stretch.Uniform,
                 HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                RenderTransformOrigin = new Point(0.5, 0.22),
+                RenderTransform = spriteTransforms
             };
             RenderOptions.SetBitmapScalingMode(_spriteImage, BitmapScalingMode.NearestNeighbor);
             _stageGrid.Children.Add(_spriteImage);
@@ -722,7 +735,9 @@ namespace AntigravityPet
                 if (_transient == TransientAction.Walk) CancelWalk();
                 _isDragging = true;
                 _movedDuringDrag = false;
-                _dragStartScreen = PointToScreen(e.GetPosition(this));
+                _dragStartScreen = GetCursorLogicalPos(e);
+                _lastDragScreenX = _dragStartScreen.X;
+                _dragTargetAngle = 0;
                 _dragStartWindow = new Point(Left, Top);
                 _stageGrid.CaptureMouse();
             };
@@ -730,14 +745,20 @@ namespace AntigravityPet
             _stageGrid.MouseMove += (s, e) =>
             {
                 if (!_isDragging) return;
-                Point current = PointToScreen(e.GetPosition(this));
+                Point current = GetCursorLogicalPos(e);
                 double dx = current.X - _dragStartScreen.X;
                 double dy = current.Y - _dragStartScreen.Y;
-                if (Math.Abs(dx) > 5 || Math.Abs(dy) > 5)
+                double vx = current.X - _lastDragScreenX;
+                _lastDragScreenX = current.X;
+
+                if (_movedDuringDrag || Math.Abs(dx) > 4 || Math.Abs(dy) > 4)
                 {
                     _movedDuringDrag = true;
                     Left = _dragStartWindow.X + dx;
                     Top = _dragStartWindow.Y + dy;
+                    _dragTargetAngle = Math.Max(-22.0, Math.Min(22.0, -vx * 0.85));
+                    _floorShadow.Opacity = 0.08;
+                    RenderCurrentFrame();
                 }
             };
 
@@ -745,6 +766,8 @@ namespace AntigravityPet
             {
                 if (!_isDragging) return;
                 _isDragging = false;
+                _dragTargetAngle = 0;
+                _floorShadow.Opacity = 0.22;
                 _stageGrid.ReleaseMouseCapture();
 
                 if (_movedDuringDrag)
@@ -765,6 +788,21 @@ namespace AntigravityPet
                     OpenAntigravityConversation(convId, title);
                 }
             };
+        }
+
+        private Point GetCursorLogicalPos(MouseEventArgs fallbackArgs)
+        {
+            POINT pt;
+            if (GetCursorPos(out pt))
+            {
+                var src = PresentationSource.FromVisual(this);
+                if (src != null && src.CompositionTarget != null)
+                {
+                    return src.CompositionTarget.TransformFromDevice.Transform(new Point(pt.X, pt.Y));
+                }
+                return new Point(pt.X, pt.Y);
+            }
+            return PointToScreen(fallbackArgs.GetPosition(this));
         }
 
         private void StartTransient(TransientAction action, int frameCount)
@@ -879,7 +917,26 @@ namespace AntigravityPet
                 }
             }
 
-            double frameInterval = (_state == PetState.Idle && _transient == TransientAction.None) ? 0.22 : 0.14;
+            if (_isDragging && _movedDuringDrag)
+            {
+                double dangle = Math.Sin(Environment.TickCount / 140.0) * 3.5;
+                double target = _dragTargetAngle + dangle;
+                _dragCurrentAngle += (target - _dragCurrentAngle) * 0.35;
+                _dragTargetAngle *= 0.78;
+                _dragRotate.Angle = _dragCurrentAngle;
+                _dragScale.ScaleX += (0.94 - _dragScale.ScaleX) * 0.35;
+                _dragScale.ScaleY += (1.07 - _dragScale.ScaleY) * 0.35;
+            }
+            else if (Math.Abs(_dragCurrentAngle) > 0.1 || Math.Abs(_dragScale.ScaleX - 1.0) > 0.005)
+            {
+                _dragCurrentAngle *= 0.65;
+                _dragRotate.Angle = Math.Abs(_dragCurrentAngle) < 0.1 ? 0.0 : _dragCurrentAngle;
+                _dragScale.ScaleX += (1.0 - _dragScale.ScaleX) * 0.35;
+                _dragScale.ScaleY += (1.0 - _dragScale.ScaleY) * 0.35;
+            }
+
+            double frameInterval = (_isDragging && _movedDuringDrag) ? 0.09
+                : ((_state == PetState.Idle && _transient == TransientAction.None) ? 0.22 : 0.14);
             _animTickAcc += 0.04;
             if (_animTickAcc >= frameInterval)
             {
@@ -917,6 +974,7 @@ namespace AntigravityPet
         {
             if (_currentPack == null) return;
 
+            if (_isDragging && _movedDuringDrag) { SetRowFrame(4); return; }
             if (_transient == TransientAction.Wave) { SetRowFrame(3); return; }
             if (_transient == TransientAction.Jump) { SetRowFrame(4); return; }
             if (_transient == TransientAction.Walk) { SetRowFrame(_walkDir >= 0 ? 1 : 2); return; }

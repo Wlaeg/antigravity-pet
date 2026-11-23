@@ -202,8 +202,15 @@ final class PetCanvasView: NSView {
             if let cropped = cgImg.cropping(to: cropRect) {
                 ctx.saveGState()
                 ctx.interpolationQuality = .none
-                // CoreGraphics draw(in:) 在 flipped NSView 上会倒置，手动翻转 Y
                 let destRect = NSRect(x: spriteX, y: spriteY, width: spriteW, height: spriteH)
+                let pivotX = destRect.midX
+                let pivotY = destRect.minY + destRect.height * 0.22
+                let angleRad = ctrl.dragCurrentAngle * .pi / 180.0
+                ctx.translateBy(x: pivotX, y: pivotY)
+                ctx.rotate(by: angleRad)
+                ctx.scaleBy(x: ctrl.dragScaleX, y: ctrl.dragScaleY)
+                ctx.translateBy(x: -pivotX, y: -pivotY)
+                // CoreGraphics draw(in:) 在 flipped NSView 上会倒置，手动翻转 Y
                 ctx.translateBy(x: destRect.minX, y: destRect.maxY)
                 ctx.scaleBy(x: 1.0, y: -1.0)
                 ctx.draw(cropped, in: CGRect(x: 0, y: 0, width: destRect.width, height: destRect.height))
@@ -254,12 +261,14 @@ final class PetCanvasView: NSView {
 
     // 鼠标拖拽与点击跳转
     private var dragStartScreen: NSPoint = .zero
+    private var lastDragScreenX: CGFloat = 0
     private var windowStartOrigin: NSPoint = .zero
     private var didDrag: Bool = false
 
     override func mouseDown(with event: NSEvent) {
         guard let win = window else { return }
         dragStartScreen = NSEvent.mouseLocation
+        lastDragScreenX = dragStartScreen.x
         windowStartOrigin = win.frame.origin
         didDrag = false
     }
@@ -269,15 +278,24 @@ final class PetCanvasView: NSView {
         let cur = NSEvent.mouseLocation
         let dx = cur.x - dragStartScreen.x
         let dy = cur.y - dragStartScreen.y
-        if abs(dx) > 4 || abs(dy) > 4 {
+        let vx = cur.x - lastDragScreenX
+        lastDragScreenX = cur.x
+        if didDrag || abs(dx) > 4 || abs(dy) > 4 {
             didDrag = true
             win.setFrameOrigin(NSPoint(x: windowStartOrigin.x + dx, y: windowStartOrigin.y + dy))
+            controller?.isDragging = true
+            controller?.dragTargetAngle = max(-22.0, min(22.0, -vx * 0.85))
+            needsDisplay = true
         }
     }
 
     override func mouseUp(with event: NSEvent) {
+        controller?.isDragging = false
+        controller?.dragTargetAngle = 0
         if didDrag {
             controller?.saveWindowPosition()
+            controller?.overrideRow = PetAnimRow.jump.rawValue
+            controller?.overrideUntil = Date().addingTimeInterval(0.6)
         } else {
             controller?.handleLeftClick()
         }
@@ -323,6 +341,11 @@ final class PetController: NSObject, NSApplicationDelegate {
     var lastSoundState: String = "idle"
     var lastSoundAt: Date = .distantPast
     var visible: Bool = true
+    var isDragging: Bool = false
+    var dragTargetAngle: CGFloat = 0
+    var dragCurrentAngle: CGFloat = 0
+    var dragScaleX: CGFloat = 1.0
+    var dragScaleY: CGFloat = 1.0
 
     let port: UInt16 = 47821
     var serverSocket: Int32 = -1
@@ -618,6 +641,11 @@ final class PetController: NSObject, NSApplicationDelegate {
         let rowFrames = [6, 8, 8, 4, 5, 8, 6, 6, 6, 8, 8]
         let now = Date()
         var row = 0
+        if isDragging {
+            let maxF = rowFrames[PetAnimRow.jump.rawValue]
+            let frame = Int(animTime * 12.0) % max(1, maxF)
+            return (PetAnimRow.jump.rawValue, frame)
+        }
         if now < overrideUntil, let ov = overrideRow {
             row = ov
         } else {
@@ -649,6 +677,20 @@ final class PetController: NSObject, NSApplicationDelegate {
         let dt = min(0.2, now.timeIntervalSince(lastTick))
         lastTick = now
         animTime += dt
+
+        if isDragging {
+            let dangle = CGFloat(sin(animTime * 7.0) * 3.5)
+            let target = dragTargetAngle + dangle
+            dragCurrentAngle += (target - dragCurrentAngle) * 0.35
+            dragTargetAngle *= 0.78
+            dragScaleX += (0.94 - dragScaleX) * 0.35
+            dragScaleY += (1.07 - dragScaleY) * 0.35
+        } else if abs(dragCurrentAngle) > 0.1 || abs(dragScaleX - 1.0) > 0.005 {
+            dragCurrentAngle *= 0.65
+            if abs(dragCurrentAngle) < 0.1 { dragCurrentAngle = 0 }
+            dragScaleX += (1.0 - dragScaleX) * 0.35
+            dragScaleY += (1.0 - dragScaleY) * 0.35
+        }
 
         let st = currentEffectiveState()
         if st == "idle" {

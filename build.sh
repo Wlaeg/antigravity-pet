@@ -38,9 +38,9 @@ cat > "$PLIST_PATH" <<'EOF'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>3.2.0</string>
+  <string>3.2.1</string>
   <key>CFBundleVersion</key>
-  <string>3.2.0</string>
+  <string>3.2.1</string>
   <key>LSUIElement</key>
   <true/>
   <key>NSHighResolutionCapable</key>
