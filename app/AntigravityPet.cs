@@ -126,6 +126,7 @@ namespace AntigravityPet
         [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
         [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
         [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+        [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT { public int X; public int Y; }
@@ -133,8 +134,16 @@ namespace AntigravityPet
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT { public int Left, Top, Right, Bottom; }
 
+        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
         private const int GWL_EXSTYLE = -20;
         private const int WS_EX_TOOLWINDOW = 0x00000080;
+        private const int WS_EX_TOPMOST = 0x00000008;
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOMOVE = 0x0002;
+        private const uint SWP_NOACTIVATE = 0x0010;
+        private const uint SWP_FRAMECHANGED = 0x0020;
+        private const uint SWP_SHOWWINDOW = 0x0040;
         private const int SW_RESTORE = 9;
         private const int SW_SHOW = 5;
         private const int PORT = 47821;
@@ -226,9 +235,6 @@ namespace AntigravityPet
             _pluginPetsDir = System.IO.Path.GetFullPath(System.IO.Path.Combine(exeDir, "..", "pets"));
             _userPetsDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".antigravity-pet", "pets");
 
-            SyncAutoStartRegistry(_config.AutoStartOnBoot);
-            SaveConfig();
-
             Title = "Antigravity Pet";
             WindowStyle = WindowStyle.None;
             AllowsTransparency = true;
@@ -236,6 +242,9 @@ namespace AntigravityPet
             Topmost = _config.Topmost;
             ShowInTaskbar = false;
             ResizeMode = ResizeMode.NoResize;
+
+            SyncAutoStartRegistry(_config.AutoStartOnBoot);
+            SaveConfig();
 
             _rootGrid = new Grid { Background = Brushes.Transparent };
             _rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -404,6 +413,7 @@ namespace AntigravityPet
             {
                 int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
                 SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_TOOLWINDOW);
+                ApplyTopmost(_config.Topmost, true);
             }
             _hwndSource = HwndSource.FromHwnd(hwnd);
             if (_hwndSource != null)
@@ -413,6 +423,24 @@ namespace AntigravityPet
                 {
                     RegisterHotKey(hwnd, HOTKEY_ID, MOD_WIN | MOD_ALT, VK_P);
                 }
+            }
+        }
+
+        private void ApplyTopmost(bool topmost, bool frameChanged = false)
+        {
+            _config.Topmost = topmost;
+            if (topmost && Topmost)
+            {
+                Topmost = false;
+            }
+            Topmost = topmost;
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero)
+            {
+                uint flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE;
+                if (frameChanged) flags |= SWP_FRAMECHANGED;
+                if (IsVisible) flags |= SWP_SHOWWINDOW;
+                SetWindowPos(hwnd, topmost ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, flags);
             }
         }
 
@@ -458,9 +486,12 @@ namespace AntigravityPet
 
         private void RestoreWindowPosition()
         {
-            var wa = SystemParameters.WorkArea;
-            if (_config.Left >= wa.Left && _config.Top >= wa.Top &&
-                _config.Left < wa.Right - 40 && _config.Top < wa.Bottom - 40)
+            double vsLeft = SystemParameters.VirtualScreenLeft;
+            double vsTop = SystemParameters.VirtualScreenTop;
+            double vsRight = vsLeft + SystemParameters.VirtualScreenWidth;
+            double vsBottom = vsTop + SystemParameters.VirtualScreenHeight;
+            if (_config.Left >= vsLeft && _config.Top >= vsTop &&
+                _config.Left < vsRight - 40 && _config.Top < vsBottom - 40)
             {
                 Left = _config.Left;
                 Top = _config.Top;
@@ -500,11 +531,14 @@ namespace AntigravityPet
 
         private void ClampToWorkArea()
         {
-            var wa = SystemParameters.WorkArea;
-            if (Left < wa.Left) Left = wa.Left;
-            if (Top < wa.Top) Top = wa.Top;
-            if (Left > wa.Right - Width) Left = Math.Max(wa.Left, wa.Right - Width);
-            if (Top > wa.Bottom - Height) Top = Math.Max(wa.Top, wa.Bottom - Height);
+            double vsLeft = SystemParameters.VirtualScreenLeft;
+            double vsTop = SystemParameters.VirtualScreenTop;
+            double vsRight = vsLeft + SystemParameters.VirtualScreenWidth;
+            double vsBottom = vsTop + SystemParameters.VirtualScreenHeight;
+            if (Left < vsLeft) Left = vsLeft;
+            if (Top < vsTop) Top = vsTop;
+            if (Left > vsRight - Width) Left = Math.Max(vsLeft, vsRight - Width);
+            if (Top > vsBottom - Height) Top = Math.Max(vsTop, vsBottom - Height);
         }
 
         private void ReloadPetPacks()
@@ -879,6 +913,15 @@ namespace AntigravityPet
             else
             {
                 _agyMissingTicks = 0;
+            }
+
+            if (_config.Topmost && IsVisible && !_isClosing)
+            {
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                }
             }
 
             var now = DateTime.Now;
@@ -1586,8 +1629,7 @@ namespace AntigravityPet
 
             menu.Items.Add(MakeCheckItem(T("📌 始终置顶", "📌 Always on Top"), _config.Topmost, () =>
             {
-                _config.Topmost = !_config.Topmost;
-                Topmost = _config.Topmost;
+                ApplyTopmost(!_config.Topmost);
                 SaveConfig();
                 RebuildContextMenu();
             }));
@@ -1717,6 +1759,7 @@ namespace AntigravityPet
                     Dispatcher.Invoke(() =>
                     {
                         var hwnd = new WindowInteropHelper(this).Handle;
+                        bool win32Topmost = hwnd != IntPtr.Zero && ((GetWindowLong(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0);
                         info = new
                         {
                             ok = true,
@@ -1731,6 +1774,7 @@ namespace AntigravityPet
                             autoWalk = _config.AutoWalk,
                             eyeFollow = _config.EyeFollow,
                             topmost = _config.Topmost,
+                            win32Topmost = win32Topmost,
                             autoStartOnBoot = _config.AutoStartOnBoot,
                             soundAlert = _config.SoundAlert,
                             language = string.IsNullOrWhiteSpace(_config.Language) ? "auto" : _config.Language,
@@ -1789,7 +1833,7 @@ namespace AntigravityPet
                     string val = GetStr(data, "value", "");
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        if (action == "show") { _config.Enabled = true; SaveConfig(); Show(); StartTransient(TransientAction.Wave, 8); }
+                        if (action == "show") { _config.Enabled = true; SaveConfig(); Show(); if (_config.Topmost) ApplyTopmost(true); StartTransient(TransientAction.Wave, 8); }
                         else if (action == "hide") Hide();
                         else if (action == "toggle") ToggleVisibility();
                         else if (action == "focus" || action == "open")
@@ -1831,8 +1875,7 @@ namespace AntigravityPet
                         }
                         else if (action == "topmost")
                         {
-                            _config.Topmost = ParseBoolStr(val, !_config.Topmost);
-                            Topmost = _config.Topmost;
+                            ApplyTopmost(ParseBoolStr(val, !_config.Topmost));
                             SaveConfig();
                             RebuildContextMenu();
                         }
@@ -1918,7 +1961,7 @@ namespace AntigravityPet
             }
             if (data.ContainsKey("autoWalk")) { _config.AutoWalk = GetBool(data, "autoWalk", _config.AutoWalk); if (!_config.AutoWalk) CancelWalk(); }
             if (data.ContainsKey("eyeFollow")) _config.EyeFollow = GetBool(data, "eyeFollow", _config.EyeFollow);
-            if (data.ContainsKey("topmost")) { _config.Topmost = GetBool(data, "topmost", _config.Topmost); Topmost = _config.Topmost; }
+            if (data.ContainsKey("topmost")) ApplyTopmost(GetBool(data, "topmost", _config.Topmost));
             if (data.ContainsKey("autoStartOnBoot")) { _config.AutoStartOnBoot = GetBool(data, "autoStartOnBoot", _config.AutoStartOnBoot); SyncAutoStartRegistry(_config.AutoStartOnBoot); }
             if (data.ContainsKey("soundAlert")) _config.SoundAlert = GetBool(data, "soundAlert", _config.SoundAlert);
 
@@ -2024,7 +2067,6 @@ namespace AntigravityPet
                 if (!double.IsNaN(Top) && !double.IsInfinity(Top)) _config.Top = Top;
                 else if (double.IsNaN(_config.Top) || double.IsInfinity(_config.Top)) _config.Top = -1;
 
-                _config.Topmost = Topmost;
                 if (_currentPack != null) _config.Skin = _currentPack.Id;
                 File.WriteAllText(_configPath, _json.Serialize(_config), new UTF8Encoding(false));
             }
