@@ -233,6 +233,16 @@
         <button data-bubble="off" onclick="setOpt('bubbleMode', 'off')" data-i18n="bmOff">Off</button>
       </div>
     </div>
+    <div class="seg-row">
+      <div>
+        <div class="seg-label" data-i18n="styleLabel">Bubble Style</div>
+        <div class="seg-sub" data-i18n="styleSub">Detailed mode stacks multi-chat bubbles (Task - State) and expands on hover</div>
+      </div>
+      <div class="seg-btns" id="styleBtns">
+        <button data-style="simple" onclick="setOpt('bubbleStyle', 'simple')" data-i18n="bsSimple">Simple</button>
+        <button data-style="detailed" onclick="setOpt('bubbleStyle', 'detailed')" data-i18n="bsDetailed">Detailed (Stacked)</button>
+      </div>
+    </div>
   </div>
 
   <div class="card">
@@ -338,6 +348,12 @@
       bmAlways: 'Always',
       bmAlerts: 'Alerts Only',
       bmOff: 'Off',
+      styleLabel: 'Bubble Style',
+      styleSub: 'Detailed mode stacks multi-chat bubbles (Task - State) and expands on hover',
+      bsSimple: 'Simple',
+      bsDetailed: 'Detailed (Stacked)',
+      pinBtn: 'Pin',
+      pinnedBtn: '📌 Pinned',
       miscSec: '⚙️ Behavior & System',
       tBoot: '🚀 Launch with Antigravity',
       tBootSub: 'Auto-start when Antigravity opens and exit when it closes',
@@ -397,6 +413,12 @@
       bmAlways: '始终显示',
       bmAlerts: '仅重要提醒',
       bmOff: '关闭气泡',
+      styleLabel: '气泡展示风格',
+      styleSub: '详细模式下多任务气泡可堆叠，鼠标移上自动展开为「任务名称 - 状态」',
+      bsSimple: '简易模式',
+      bsDetailed: '详细模式 (堆叠展开)',
+      pinBtn: '固定',
+      pinnedBtn: '📌 已固定',
       miscSec: '⚙️ 杂项与行为设置',
       tBoot: '🚀 随 Antigravity 启动',
       tBootSub: '打开 Antigravity 时自动启动，关闭客户端时自动退出',
@@ -534,6 +556,11 @@
       b.classList.toggle('active', b.getAttribute('data-bubble') === bm);
     });
 
+    var bs = data.bubbleStyle || 'simple';
+    document.querySelectorAll('#styleBtns button').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-style') === bs);
+    });
+
     setSw('swAutoStart', data.autoStartOnBoot !== false);
     setSw('swAutoWalk', data.autoWalk !== false);
     setSw('swEyeFollow', data.eyeFollow !== false);
@@ -551,6 +578,16 @@
         row.className = 'conv-item';
         row.innerHTML = '<div><div class="seg-label">' + escapeHtml(rc.title || rc.conversationId) + '</div>' +
           '<div class="conv-meta">' + escapeHtml(L.states[rc.state] || rc.state || '') + ' · ' + escapeHtml(rc.updatedAt || '') + '</div></div>';
+        var isPinned = !!(data.pinnedConversationId && data.pinnedConversationId === rc.conversationId);
+        var actBox = document.createElement('div');
+        actBox.style.display = 'flex';
+        actBox.style.gap = '6px';
+        var pb = document.createElement('button');
+        pb.textContent = isPinned ? L.pinnedBtn : L.pinBtn;
+        if (isPinned) pb.className = 'primary';
+        pb.onclick = function () {
+          setOpt('pinConversation', isPinned ? '' : rc.conversationId);
+        };
         var b = document.createElement('button');
         b.textContent = L.openBtn;
         b.onclick = function () {
@@ -559,7 +596,9 @@
           }
           apiCall('/api/apply', { action: 'openConversation', value: rc.conversationId }).then(render);
         };
-        row.appendChild(b);
+        actBox.appendChild(pb);
+        actBox.appendChild(b);
+        row.appendChild(actBox);
         convList.appendChild(row);
       });
     }

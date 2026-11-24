@@ -11,7 +11,6 @@
 [![Characters](https://img.shields.io/badge/Pixel%20Pets-8%20Built--in-F59E0B?style=flat-square)](pets)
 [![i18n](https://img.shields.io/badge/i18n-English%20%2F%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-10B981?style=flat-square)](#english)
 [![License](https://img.shields.io/badge/License-MIT-A855F7?style=flat-square)](LICENSE)
-[![HOL trust score](https://img.shields.io/endpoint?url=https%3A%2F%2Fhol.org%2Fapi%2Fregistry%2Fbadges%2Fplugin%3Fslug%3Dwlaeg%252Fantigravity-pet%26metric%3Dtrust)](https://hol.org/registry/plugins/wlaeg%2Fantigravity-pet)
 
 [English](#english) · [简体中文](#简体中文)
 
@@ -35,7 +34,7 @@
 - **Launch & Exit with Antigravity**
   - No OS login/startup clutter. When **Launch with Antigravity** is enabled, the pet starts automatically alongside Antigravity and exits gracefully shortly after Antigravity closes.
 - **Built-in Settings Panel (`...` Menu & MCP App)**
-  - Manage everything inside Antigravity's top-right `...` plugin menu (**Desktop Pet Settings**): enable/hide/quit pet, switch characters, adjust scale (`0.75x / 1.0x / 1.3x / 1.5x`), bubble mode (`always / alerts / off`), launch with Antigravity, idle roaming, 16-direction eye tracking, always-on-top, sound alerts, and quick links to recent conversations.
+  - Manage everything inside Antigravity's top-right `...` plugin menu (**Desktop Pet Settings**): enable/hide/quit pet, switch characters, adjust scale (`0.75x / 1.0x / 1.3x / 1.5x`), bubble mode (`always / alerts / off`), **bubble style (`Simple` vs `Detailed Stacked` with hover-to-expand `Task - State` cards & `📌 Pin`)**, launch with Antigravity, idle roaming, 16-direction eye tracking, always-on-top, sound alerts, and quick links to recent conversations.
 - **EN / ZH Bilingual UI (Auto-Follows Antigravity)**
   - Automatically detects your Antigravity locale or lets you switch instantly between **Auto (Follow Antigravity)**, **English**, and **简体中文**.
 - **Crisp `36×39` Pixel-Art Engine**
@@ -209,7 +208,7 @@ Each custom pet pack only requires two files: `pet.json` and `spritesheet.png` (
 - **随 Antigravity 启动与退出**
   - 不写入开机自启项、不占开机资源；开启 **「随 Antigravity 启动」** 后，打开 Antigravity 时自动拉起桌宠，关闭客户端时自动退出并保留配置。
 - **客户端内全量设置面板（右上角 `...` 插件目录）**
-  - 直接在 Antigravity 右上角三个点（`...`）选择 **「桌面宠物设置」**，即可手动开启/隐藏/退出桌宠、切换 6 款像素角色、调整窗口尺寸（`0.75x / 1.0x / 1.3x / 1.5x`）、配置气泡模式、开启待机散步、16 方向眼神跟随鼠标、置顶、提示音，以及查看最近对话并一键跳转。
+  - 直接在 Antigravity 右上角三个点（`...`）选择 **「桌面宠物设置」**，即可手动开启/隐藏/退出桌宠、切换 8 款像素角色、调整窗口尺寸（`0.75x / 1.0x / 1.3x / 1.5x`）、配置气泡显示模式与 **气泡展示风格（简易模式 / 详细堆叠展开模式：显示「任务名称 - 状态」，悬停展开全部并发会话并支持 `📌` 固定跟踪）**、开启待机散步、16 方向眼神跟随鼠标、置顶、提示音，以及查看最近对话并一键跳转。
 - **内置中英文双语切换（自动跟随 Antigravity 语言）**
   - 支持 **跟随 Antigravity (自动)**、**English** 与 **简体中文** 实时切换，气泡提示与设置面板同步更新。
 - **精致 `36×39` 像素动画引擎**

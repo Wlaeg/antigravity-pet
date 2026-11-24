@@ -42,6 +42,8 @@ function readOfflineConfig() {
     Top: -1,
     Topmost: true,
     BubbleMode: 'always',
+    BubbleStyle: 'simple',
+    PinnedConversationId: '',
     Scale: 1.0,
     AutoWalk: true,
     EyeFollow: true,
@@ -265,6 +267,8 @@ async function getSnapshot() {
     visible: false,
     scale: cfg.Scale || 1.0,
     bubbleMode: cfg.BubbleMode || 'always',
+    bubbleStyle: cfg.BubbleStyle || 'simple',
+    pinnedConversationId: cfg.PinnedConversationId || '',
     autoWalk: cfg.AutoWalk !== false,
     eyeFollow: cfg.EyeFollow !== false,
     topmost: cfg.Topmost !== false,
@@ -334,6 +338,14 @@ async function applySetting(args = {}) {
     const bm = String(value || args.bubbleMode || 'always');
     writeOfflineConfig({ BubbleMode: bm });
     if (isRunning) await httpRequest('POST', '/control', { action: 'bubbleMode', value: bm });
+  } else if (action === 'bubbleStyle') {
+    const bs = String(value || args.bubbleStyle || 'simple').toLowerCase();
+    writeOfflineConfig({ BubbleStyle: bs });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'bubbleStyle', value: bs });
+  } else if (action === 'pinConversation') {
+    const cid = String(value ?? '');
+    writeOfflineConfig({ PinnedConversationId: cid });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'pinConversation', value: cid });
   } else if (action === 'autoWalk') {
     const b = parseBool(value, true);
     writeOfflineConfig({ AutoWalk: b });

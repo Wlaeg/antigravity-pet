@@ -12,6 +12,8 @@ struct PetConfig: Codable {
     var Top: Double = -1
     var Topmost: Bool = true
     var BubbleMode: String = "always"
+    var BubbleStyle: String = "simple"
+    var PinnedConversationId: String = ""
     var Scale: Double = 1.0
     var AutoWalk: Bool = true
     var EyeFollow: Bool = true
@@ -218,7 +220,99 @@ final class PetCanvasView: NSView {
             }
         }
 
-        // 绘制头顶气泡
+        // 绘制头顶气泡（支持简易模式 & 详细堆叠展开模式）
+        bubbleHitRects.removeAll()
+        if ctrl.config.BubbleMode == "off" { return }
+
+        if ctrl.isDetailedStyle() {
+            let tasks = ctrl.orderedVisibleTasks()
+            if tasks.isEmpty { return }
+            let font = NSFont.systemFont(ofSize: 11.5, weight: .bold)
+
+            if ctrl.bubbleExpanded {
+                let showCount = min(5, tasks.count)
+                var curBottom = spriteY - 10.0
+                for i in 0..<showCount {
+                    let t = tasks[i]
+                    let isPinned = !ctrl.config.PinnedConversationId.isEmpty && t.conversationId == ctrl.config.PinnedConversationId
+                    let label = (isPinned ? "📌 " : "") + ctrl.formatDetailedTaskLabel(t)
+                    let accent = isPinned ? NSColor.systemYellow : ctrl.accentColor(for: t.state)
+                    let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+                    let attrStr = NSAttributedString(string: label, attributes: attrs)
+                    let textSize = attrStr.size()
+                    let padX: CGFloat = 12.0
+                    let bh: CGFloat = 26.0
+                    let bw = min(bounds.width - 10.0, max(96.0, textSize.width + padX * 2.0 + 12.0))
+                    let bx = (bounds.width - bw) / 2.0
+                    let by = curBottom - bh
+                    if by < 2.0 { break }
+
+                    let rect = NSRect(x: bx, y: by, width: bw, height: bh)
+                    let path = NSBezierPath(roundedRect: rect, xRadius: 9.0, yRadius: 9.0)
+                    NSColor(calibratedRed: 0.08, green: 0.10, blue: 0.16, alpha: 0.95).setFill()
+                    path.fill()
+                    accent.setStroke()
+                    path.lineWidth = isPinned ? 1.8 : 1.3
+                    path.stroke()
+
+                    // 状态圆点
+                    let dotRect = NSRect(x: bx + 9.0, y: by + (bh - 7.0) / 2.0, width: 7.0, height: 7.0)
+                    accent.setFill()
+                    NSBezierPath(ovalIn: dotRect).fill()
+
+                    let tx = bx + 21.0
+                    let ty = by + (bh - textSize.height) / 2.0
+                    attrStr.draw(in: NSRect(x: tx, y: ty, width: bw - 28.0, height: textSize.height))
+                    bubbleHitRects.append((rect, t.conversationId))
+                    curBottom = by - 5.0
+                }
+                return
+            }
+
+            // 详细模式收起态（多会话时显示堆叠阴影背板 + +N 角标）
+            let top = tasks[0]
+            let isPinned = !ctrl.config.PinnedConversationId.isEmpty && top.conversationId == ctrl.config.PinnedConversationId
+            var label = (isPinned ? "📌 " : "") + ctrl.formatDetailedTaskLabel(top)
+            if tasks.count > 1 { label += " (+\(tasks.count - 1))" }
+            let accent = isPinned ? NSColor.systemYellow : ctrl.accentColor(for: top.state)
+            let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+            let attrStr = NSAttributedString(string: label, attributes: attrs)
+            let textSize = attrStr.size()
+            let padX: CGFloat = 12.0
+            let padY: CGFloat = 6.5
+            let bw = min(bounds.width - 14.0, max(64.0, textSize.width + padX * 2.0))
+            let bh = textSize.height + padY * 2.0
+            let bx = (bounds.width - bw) / 2.0
+            let by = max(10.0, spriteY - bh - 12.0)
+
+            if tasks.count >= 3 {
+                let b2 = NSRect(x: bx + 6.0, y: by - 6.0, width: bw - 6.0, height: bh)
+                let p2 = NSBezierPath(roundedRect: b2, xRadius: bh / 2.0, yRadius: bh / 2.0)
+                NSColor(calibratedRed: 0.08, green: 0.10, blue: 0.16, alpha: 0.65).setFill()
+                p2.fill()
+            }
+            if tasks.count >= 2 {
+                let b1 = NSRect(x: bx + 3.0, y: by - 3.0, width: bw - 3.0, height: bh)
+                let p1 = NSBezierPath(roundedRect: b1, xRadius: bh / 2.0, yRadius: bh / 2.0)
+                NSColor(calibratedRed: 0.08, green: 0.10, blue: 0.16, alpha: 0.80).setFill()
+                p1.fill()
+            }
+
+            let bubbleRect = NSRect(x: bx, y: by, width: bw, height: bh)
+            let path = NSBezierPath(roundedRect: bubbleRect, xRadius: bh / 2.0, yRadius: bh / 2.0)
+            NSColor(calibratedRed: 0.09, green: 0.09, blue: 0.13, alpha: 0.95).setFill()
+            path.fill()
+            accent.setStroke()
+            path.lineWidth = isPinned ? 2.2 : 1.8
+            path.stroke()
+
+            let tx = bx + (bw - min(textSize.width, bw - padX * 2)) / 2.0
+            let ty = by + (bh - textSize.height) / 2.0
+            attrStr.draw(in: NSRect(x: tx, y: ty, width: bw - padX * 2, height: textSize.height))
+            bubbleHitRects.append((bubbleRect, top.conversationId))
+            return
+        }
+
         if let bubbleText = ctrl.currentBubbleText(), !bubbleText.isEmpty {
             let accent = ctrl.accentColor(for: effState)
             let font = NSFont.systemFont(ofSize: 12.5, weight: .bold)
@@ -259,11 +353,36 @@ final class PetCanvasView: NSView {
         }
     }
 
-    // 鼠标拖拽与点击跳转
+    // 鼠标拖拽、气泡悬停展开与点击跳转
     private var dragStartScreen: NSPoint = .zero
     private var lastDragScreenX: CGFloat = 0
     private var windowStartOrigin: NSPoint = .zero
     private var didDrag: Bool = false
+    private var bubbleHitRects: [(NSRect, String)] = []
+    private var trackingAreaRef: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let old = trackingAreaRef { removeTrackingArea(old) }
+        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways], owner: self, userInfo: nil)
+        addTrackingArea(area)
+        trackingAreaRef = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        guard let ctrl = controller, ctrl.isDetailedStyle() else { return }
+        let pt = convert(event.locationInWindow, from: nil)
+        let inBubble = bubbleHitRects.contains { $0.0.insetBy(dx: -8, dy: -8).contains(pt) }
+        if inBubble && !ctrl.bubbleExpanded && !ctrl.orderedVisibleTasks().isEmpty {
+            ctrl.setBubbleExpanded(true)
+        } else if !inBubble && ctrl.bubbleExpanded && pt.y > bounds.height - 150.0 * CGFloat(ctrl.config.Scale) {
+            ctrl.setBubbleExpanded(false)
+        }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        controller?.setBubbleExpanded(false)
+    }
 
     override func mouseDown(with event: NSEvent) {
         guard let win = window else { return }
@@ -297,7 +416,12 @@ final class PetCanvasView: NSView {
             controller?.overrideRow = PetAnimRow.jump.rawValue
             controller?.overrideUntil = Date().addingTimeInterval(0.6)
         } else {
-            controller?.handleLeftClick()
+            let pt = convert(event.locationInWindow, from: nil)
+            if let hit = bubbleHitRects.first(where: { $0.0.contains(pt) }) {
+                controller?.openConversation(hit.1)
+            } else {
+                controller?.handleLeftClick()
+            }
         }
     }
 
@@ -346,6 +470,7 @@ final class PetController: NSObject, NSApplicationDelegate {
     var dragCurrentAngle: CGFloat = 0
     var dragScaleX: CGFloat = 1.0
     var dragScaleY: CGFloat = 1.0
+    var bubbleExpanded: Bool = false
 
     let port: UInt16 = 47821
     var serverSocket: Int32 = -1
@@ -592,8 +717,70 @@ final class PetController: NSObject, NSApplicationDelegate {
         }
     }
 
+    func isDetailedStyle() -> Bool {
+        return config.BubbleStyle.lowercased() == "detailed"
+    }
+
+    func setBubbleExpanded(_ expand: Bool) {
+        if bubbleExpanded == expand { return }
+        bubbleExpanded = expand
+        let baseSz = windowSizeForScale(config.Scale)
+        let tasks = orderedVisibleTasks()
+        let showCount = expand ? min(5, tasks.count) : 1
+        let extraH = expand && showCount > 1 ? CGFloat(showCount - 1) * 31.0 : 0.0
+        var f = window.frame
+        let newH = baseSz.height + extraH
+        f.size.height = newH
+        window.setFrame(f, display: true)
+        canvasView.frame = NSRect(origin: .zero, size: f.size)
+        canvasView.needsDisplay = true
+    }
+
+    func orderedVisibleTasks() -> [ConvState] {
+        let now = Date()
+        var list: [ConvState] = []
+        for (cid, var cs) in conversations {
+            let age = now.timeIntervalSince(cs.updatedAt)
+            if cs.state == "running" && age > 45 { cs.state = "idle"; conversations[cid] = cs }
+            if cs.state == "ready" && age > 25 { cs.state = "idle"; conversations[cid] = cs }
+            if cs.state == "idle" { continue }
+            if config.BubbleMode == "alerts" && cs.state != "needs_input" && cs.state != "blocked" && cs.state != "ready" { continue }
+            list.append(cs)
+        }
+        return list.sorted { a, b in
+            let pa = (!config.PinnedConversationId.isEmpty && a.conversationId == config.PinnedConversationId) ? 0 : 1
+            let pb = (!config.PinnedConversationId.isEmpty && b.conversationId == config.PinnedConversationId) ? 0 : 1
+            if pa != pb { return pa < pb }
+            let sa = priorityScore(a.state)
+            let sb = priorityScore(b.state)
+            if sa != sb { return sa < sb }
+            return a.updatedAt > b.updatedAt
+        }
+    }
+
+    func formatDetailedTaskLabel(_ cs: ConvState) -> String {
+        let lang = I18n.effectiveLanguage(config: config)
+        let rawTitle = cs.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let taskName: String
+        if !rawTitle.isEmpty {
+            taskName = rawTitle.count > 12 ? String(rawTitle.prefix(12)) + "…" : rawTitle
+        } else if cs.conversationId == "default" || cs.conversationId.isEmpty {
+            taskName = "Antigravity"
+        } else {
+            taskName = String(cs.conversationId.prefix(8))
+        }
+        let stLabel = I18n.translateBubble(state: cs.state, rawMessage: cs.message, lang: lang)
+        return "\(taskName) - \(stLabel)"
+    }
+
     func currentTopConversation() -> ConvState? {
         let now = Date()
+        if !config.PinnedConversationId.isEmpty, var pinned = conversations[config.PinnedConversationId] {
+            let age = now.timeIntervalSince(pinned.updatedAt)
+            if pinned.state == "running" && age > 45 { pinned.state = "idle"; conversations[config.PinnedConversationId] = pinned }
+            if pinned.state == "ready" && age > 25 { pinned.state = "idle"; conversations[config.PinnedConversationId] = pinned }
+            if pinned.state != "idle" { return pinned }
+        }
         var best: ConvState?
         for (cid, var cs) in conversations {
             let age = now.timeIntervalSince(cs.updatedAt)
@@ -975,6 +1162,14 @@ final class PetController: NSObject, NSApplicationDelegate {
                 if let d = Double(val) { applyScale(d); saveConfig() }
             case "bubblemode":
                 config.BubbleMode = val.isEmpty ? "always" : val; saveConfig()
+            case "bubblestyle":
+                if val == "simple" || val == "detailed" {
+                    config.BubbleStyle = val
+                    if val == "simple" { setBubbleExpanded(false) }
+                    saveConfig()
+                }
+            case "pinconversation":
+                config.PinnedConversationId = val; saveConfig()
             case "autowalk":
                 config.AutoWalk = (val.lowercased() == "true" || val == "1"); saveConfig()
             case "eyefollow":
@@ -1029,6 +1224,8 @@ final class PetController: NSObject, NSApplicationDelegate {
             "visible": visible,
             "scale": config.Scale,
             "bubbleMode": config.BubbleMode,
+            "bubbleStyle": isDetailedStyle() ? "detailed" : "simple",
+            "pinnedConversationId": config.PinnedConversationId,
             "autoWalk": config.AutoWalk,
             "eyeFollow": config.EyeFollow,
             "topmost": config.Topmost,

@@ -5,6 +5,15 @@ All notable changes to **Antigravity Pet** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-11-24
+
+### Added
+- **Bubble Style Switch: Simple Mode & Detailed Stacked Mode (`bubbleStyle: "simple" | "detailed"`)**:
+  - **Simple Mode** *(Default)*: Classic single bubble showing the highest-priority status and concurrent task count.
+  - **Detailed Mode**: Displays bubbles in **`Task Name - State`** format (e.g. `Refactor login - Editing code...`). When multiple conversations run concurrently, bubbles visually stack (`+N` badge with layered backing cards) and **automatically expand upward on mouse hover** into an interactive list where each row opens its exact conversation on click.
+- **Conversation Pinning (`pinnedConversationId`)**: Pin (`📌`) a specific conversation from the expanded bubble list or Settings Panel so the pet stays locked onto that task until unpinned.
+- Full cross-platform sync across Windows (`AntigravityPet.cs`), macOS (`AntigravityPet.swift`), Sidecar Panel (`sidecars/panel/`), and MCP App (`ui/settings.html`).
+
 ## [3.2.2] - 2026-11-24
 
 ### Fixed

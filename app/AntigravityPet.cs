@@ -47,6 +47,8 @@ namespace AntigravityPet
         public double Top { get; set; }
         public bool Topmost { get; set; }
         public string BubbleMode { get; set; } // always | alerts | off
+        public string BubbleStyle { get; set; } // simple | detailed
+        public string PinnedConversationId { get; set; }
         public double Scale { get; set; }       // 0.75 | 1.0 | 1.3 | 1.5
         public bool AutoWalk { get; set; }
         public bool EyeFollow { get; set; }
@@ -65,6 +67,8 @@ namespace AntigravityPet
             Top = -1;
             Topmost = true;
             BubbleMode = "always";
+            BubbleStyle = "simple";
+            PinnedConversationId = "";
             Scale = 1.0;
             AutoWalk = true;
             EyeFollow = true;
@@ -159,8 +163,15 @@ namespace AntigravityPet
         private const double BaseSpriteBox = 136.0;
 
         private readonly Grid _rootGrid;
+        private readonly Grid _bubbleHost;
+        private readonly Border _stackBack2;
+        private readonly Border _stackBack1;
         private readonly Border _bubbleBorder;
         private readonly TextBlock _bubbleText;
+        private readonly StackPanel _expandedStackPanel;
+        private readonly DispatcherTimer _bubbleCollapseTimer;
+        private bool _bubbleExpanded = false;
+        private double _baseWindowHeight = BaseHeight;
         private readonly Grid _stageGrid;
         private readonly Ellipse _statusHalo;
         private readonly Ellipse _floorShadow;
@@ -251,7 +262,49 @@ namespace AntigravityPet
             _rootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             Content = _rootGrid;
 
-            // 顶部可点击居中聊天框气泡
+            // 顶部可点击居中聊天框气泡（支持简易单气泡 & 详细堆叠展开模式）
+            _bubbleHost = new Grid
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Background = Brushes.Transparent,
+                Margin = new Thickness(4, 4, 4, 2)
+            };
+            Grid.SetRow(_bubbleHost, 0);
+            _rootGrid.Children.Add(_bubbleHost);
+
+            _stackBack2 = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(180, 15, 23, 42)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(120, 148, 163, 184)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Height = 24,
+                MinWidth = 110,
+                Margin = new Thickness(10, 0, 0, 8),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Visibility = Visibility.Collapsed,
+                IsHitTestVisible = false
+            };
+            _bubbleHost.Children.Add(_stackBack2);
+
+            _stackBack1 = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(205, 15, 23, 42)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(150, 148, 163, 184)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Height = 24,
+                MinWidth = 118,
+                Margin = new Thickness(5, 0, 0, 4),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Visibility = Visibility.Collapsed,
+                IsHitTestVisible = false
+            };
+            _bubbleHost.Children.Add(_stackBack1);
+
             _bubbleText = new TextBlock
             {
                 Text = "",
@@ -269,7 +322,6 @@ namespace AntigravityPet
                 BorderThickness = new Thickness(1.2),
                 CornerRadius = new CornerRadius(11),
                 Padding = new Thickness(10, 5, 10, 5),
-                Margin = new Thickness(4, 4, 4, 2),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Bottom,
                 Child = _bubbleText,
@@ -279,8 +331,44 @@ namespace AntigravityPet
                 ToolTip = "点击打开对应 Antigravity 对话",
                 Effect = new DropShadowEffect { BlurRadius = 10, ShadowDepth = 2, Opacity = 0.42 }
             };
-            Grid.SetRow(_bubbleBorder, 0);
-            _rootGrid.Children.Add(_bubbleBorder);
+            _bubbleHost.Children.Add(_bubbleBorder);
+
+            _expandedStackPanel = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Visibility = Visibility.Collapsed
+            };
+            _bubbleHost.Children.Add(_expandedStackPanel);
+
+            _bubbleCollapseTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(220) };
+            _bubbleCollapseTimer.Tick += (s, e) =>
+            {
+                _bubbleCollapseTimer.Stop();
+                if (_bubbleExpanded && !_bubbleHost.IsMouseOver)
+                {
+                    _bubbleExpanded = false;
+                    UpdateVisualState();
+                }
+            };
+            _bubbleHost.MouseEnter += (s, e) =>
+            {
+                _bubbleCollapseTimer.Stop();
+                if (IsDetailedStyle() && _tasks.Count > 0 && !_bubbleExpanded)
+                {
+                    _bubbleExpanded = true;
+                    UpdateVisualState();
+                }
+            };
+            _bubbleHost.MouseLeave += (s, e) =>
+            {
+                if (_bubbleExpanded)
+                {
+                    _bubbleCollapseTimer.Stop();
+                    _bubbleCollapseTimer.Start();
+                }
+            };
 
             // 下方角色舞台
             _stageGrid = new Grid
@@ -514,8 +602,12 @@ namespace AntigravityPet
         {
             if (scale < 0.5 || scale > 2.0) scale = 1.0;
             _config.Scale = scale;
+            _baseWindowHeight = Math.Round(BaseHeight * scale);
             Width = Math.Round(BaseWidth * scale);
-            Height = Math.Round(BaseHeight * scale);
+            if (!_bubbleExpanded)
+            {
+                Height = _baseWindowHeight;
+            }
             _stageGrid.Width = Math.Round(BaseSpriteBox * scale);
             _stageGrid.Height = Math.Round(BaseSpriteBox * scale);
             _spriteImage.Width = Math.Round(BaseSpriteBox * scale);
@@ -1183,7 +1275,13 @@ namespace AntigravityPet
             }
             else
             {
-                var top = _tasks.Values
+                TaskItem pinnedTask = null;
+                if (!string.IsNullOrWhiteSpace(_config.PinnedConversationId))
+                {
+                    _tasks.TryGetValue(_config.PinnedConversationId, out pinnedTask);
+                }
+
+                var top = pinnedTask ?? _tasks.Values
                     .OrderByDescending(t => (int)t.State)
                     .ThenByDescending(t => t.UpdatedAt)
                     .First();
@@ -1356,6 +1454,245 @@ namespace AntigravityPet
             }
         }
 
+        private bool IsDetailedStyle()
+        {
+            return string.Equals(_config.BubbleStyle, "detailed", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void SetWindowHeightKeepingBottom(double targetHeight)
+        {
+            if (targetHeight < _baseWindowHeight) targetHeight = _baseWindowHeight;
+            if (Math.Abs(Height - targetHeight) < 0.5) return;
+            double bottom = Top + Height;
+            Height = targetHeight;
+            double vsTop = SystemParameters.VirtualScreenTop;
+            Top = Math.Max(vsTop, bottom - Height);
+        }
+
+        private Color GetStateAccentColor(PetState st)
+        {
+            switch (st)
+            {
+                case PetState.Running: return Color.FromRgb(56, 189, 248);
+                case PetState.NeedsInput: return Color.FromRgb(245, 158, 11);
+                case PetState.Ready: return Color.FromRgb(16, 185, 129);
+                case PetState.Blocked: return Color.FromRgb(239, 68, 68);
+                default: return Color.FromRgb(148, 163, 184);
+            }
+        }
+
+        private string FormatDetailedTaskLabel(TaskItem t)
+        {
+            if (t == null) return "";
+            string taskName = !string.IsNullOrWhiteSpace(t.Title)
+                ? Shorten(t.Title, 12)
+                : (t.ConversationId == "default" || string.IsNullOrWhiteSpace(t.ConversationId)
+                    ? "Antigravity"
+                    : Shorten(t.ConversationId, 8));
+
+            string stLabel;
+            if (!string.IsNullOrWhiteSpace(t.Message))
+            {
+                stLabel = LocalizeBubbleMessage(t.Message);
+            }
+            else
+            {
+                switch (t.State)
+                {
+                    case PetState.NeedsInput: stLabel = T("待确认!", "Needs input!"); break;
+                    case PetState.Blocked: stLabel = T("出错", "Blocked"); break;
+                    case PetState.Ready: stLabel = T("已完成", "Ready"); break;
+                    case PetState.Running: stLabel = T("运行中...", "Running..."); break;
+                    default: stLabel = T("空闲", "Idle"); break;
+                }
+            }
+            return taskName + " - " + stLabel;
+        }
+
+        private List<TaskItem> GetOrderedActiveTasks()
+        {
+            return _tasks.Values
+                .OrderByDescending(t => string.Equals(t.ConversationId, _config.PinnedConversationId ?? "", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+                .ThenByDescending(t => (int)t.State)
+                .ThenByDescending(t => t.UpdatedAt)
+                .ToList();
+        }
+
+        private UIElement BuildExpandedTaskRow(TaskItem item)
+        {
+            Color accent = GetStateAccentColor(item.State);
+            bool isPinned = !string.IsNullOrWhiteSpace(_config.PinnedConversationId) &&
+                string.Equals(item.ConversationId, _config.PinnedConversationId, StringComparison.OrdinalIgnoreCase);
+
+            var rowPanel = new DockPanel { LastChildFill = true };
+            var dot = new Ellipse
+            {
+                Width = 7,
+                Height = 7,
+                Fill = new SolidColorBrush(accent),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0)
+            };
+            DockPanel.SetDock(dot, Dock.Left);
+            rowPanel.Children.Add(dot);
+
+            var pinBtn = new TextBlock
+            {
+                Text = isPinned ? "📌" : "📍",
+                FontSize = 10.5,
+                Opacity = isPinned ? 1.0 : 0.45,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = isPinned ? T("取消固定", "Unpin chat") : T("固定跟踪此对话", "Pin this chat")
+            };
+            DockPanel.SetDock(pinBtn, Dock.Right);
+            rowPanel.Children.Add(pinBtn);
+
+            var txt = new TextBlock
+            {
+                Text = FormatDetailedTaskLabel(item),
+                Foreground = new SolidColorBrush(Color.FromRgb(241, 245, 249)),
+                FontSize = 11.0,
+                FontWeight = FontWeights.SemiBold,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center,
+                MaxWidth = Math.Max(130, Math.Round((BaseWidth - 56) * _config.Scale))
+            };
+            rowPanel.Children.Add(txt);
+
+            var card = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(242, 15, 23, 42)),
+                BorderBrush = new SolidColorBrush(isPinned ? Color.FromRgb(250, 204, 21) : accent),
+                BorderThickness = new Thickness(isPinned ? 1.5 : 1.1),
+                CornerRadius = new CornerRadius(9),
+                Padding = new Thickness(8, 4, 8, 4),
+                Margin = new Thickness(0, 0, 0, 4),
+                Cursor = Cursors.Hand,
+                Child = rowPanel,
+                Effect = new DropShadowEffect { BlurRadius = 8, ShadowDepth = 1.5, Opacity = 0.35 }
+            };
+
+            pinBtn.MouseLeftButtonUp += (s, e) =>
+            {
+                e.Handled = true;
+                _config.PinnedConversationId = isPinned ? "" : item.ConversationId;
+                RecomputeEffectiveState();
+                SaveConfig();
+            };
+
+            card.MouseEnter += (s, e) => { card.Background = new SolidColorBrush(Color.FromArgb(250, 30, 41, 59)); };
+            card.MouseLeave += (s, e) => { card.Background = new SolidColorBrush(Color.FromArgb(242, 15, 23, 42)); };
+            card.MouseLeftButtonUp += (s, e) =>
+            {
+                e.Handled = true;
+                StartTransient(TransientAction.Jump, 5);
+                if (item.State == PetState.Ready || item.State == PetState.NeedsInput || item.State == PetState.Blocked)
+                {
+                    _tasks.Remove(item.ConversationId);
+                    RecomputeEffectiveState();
+                }
+                OpenAntigravityConversation(item.ConversationId, item.Title);
+            };
+            return card;
+        }
+
+        private void UpdateBubbleDisplay(Color badgeBg, bool isAlert, string defaultMsg)
+        {
+            if (_config.BubbleMode == "off")
+            {
+                _bubbleBorder.Visibility = Visibility.Hidden;
+                _stackBack1.Visibility = Visibility.Collapsed;
+                _stackBack2.Visibility = Visibility.Collapsed;
+                _expandedStackPanel.Visibility = Visibility.Collapsed;
+                _bubbleExpanded = false;
+                SetWindowHeightKeepingBottom(_baseWindowHeight);
+                return;
+            }
+
+            if (IsDetailedStyle())
+            {
+                var tasks = GetOrderedActiveTasks();
+                var visibleTasks = _config.BubbleMode == "alerts"
+                    ? tasks.Where(t => t.State == PetState.NeedsInput || t.State == PetState.Ready || t.State == PetState.Blocked).ToList()
+                    : tasks;
+
+                if (visibleTasks.Count == 0)
+                {
+                    _bubbleBorder.Visibility = Visibility.Hidden;
+                    _stackBack1.Visibility = Visibility.Collapsed;
+                    _stackBack2.Visibility = Visibility.Collapsed;
+                    _expandedStackPanel.Visibility = Visibility.Collapsed;
+                    _bubbleExpanded = false;
+                    SetWindowHeightKeepingBottom(_baseWindowHeight);
+                    return;
+                }
+
+                if (_bubbleExpanded && visibleTasks.Count >= 1)
+                {
+                    _bubbleBorder.Visibility = Visibility.Collapsed;
+                    _stackBack1.Visibility = Visibility.Collapsed;
+                    _stackBack2.Visibility = Visibility.Collapsed;
+                    _expandedStackPanel.Children.Clear();
+
+                    int showCount = Math.Min(5, visibleTasks.Count);
+                    for (int i = 0; i < showCount; i++)
+                    {
+                        _expandedStackPanel.Children.Add(BuildExpandedTaskRow(visibleTasks[i]));
+                    }
+                    _expandedStackPanel.Visibility = Visibility.Visible;
+                    double extraH = Math.Max(0, (showCount - 1) * 30.0);
+                    SetWindowHeightKeepingBottom(_baseWindowHeight + extraH);
+                    return;
+                }
+
+                _expandedStackPanel.Visibility = Visibility.Collapsed;
+                SetWindowHeightKeepingBottom(_baseWindowHeight);
+
+                var topTask = visibleTasks[0];
+                bool isPinned = !string.IsNullOrWhiteSpace(_config.PinnedConversationId) &&
+                    string.Equals(topTask.ConversationId, _config.PinnedConversationId, StringComparison.OrdinalIgnoreCase);
+                string label = (isPinned ? "📌 " : "") + FormatDetailedTaskLabel(topTask);
+                if (visibleTasks.Count > 1) label += " (+" + (visibleTasks.Count - 1) + ")";
+
+                _bubbleText.Text = label;
+                _bubbleBorder.BorderBrush = new SolidColorBrush(isPinned ? Color.FromRgb(250, 204, 21) : GetStateAccentColor(topTask.State));
+                _bubbleBorder.ToolTip = visibleTasks.Count > 1
+                    ? T("悬停展开全部任务 · 点击打开: ", "Hover to expand all · Click to open: ") + topTask.Title
+                    : (T("点击打开对话: ", "Click to open: ") + topTask.Title);
+                _bubbleBorder.Visibility = Visibility.Visible;
+                _stackBack1.Visibility = visibleTasks.Count >= 2 ? Visibility.Visible : Visibility.Collapsed;
+                _stackBack2.Visibility = visibleTasks.Count >= 3 ? Visibility.Visible : Visibility.Collapsed;
+                return;
+            }
+
+            // 简易模式
+            _stackBack1.Visibility = Visibility.Collapsed;
+            _stackBack2.Visibility = Visibility.Collapsed;
+            _expandedStackPanel.Visibility = Visibility.Collapsed;
+            _bubbleExpanded = false;
+            SetWindowHeightKeepingBottom(_baseWindowHeight);
+
+            string msg = string.IsNullOrWhiteSpace(_statusMessage) ? defaultMsg : LocalizeBubbleMessage(_statusMessage);
+            bool shouldShowBubble = !string.IsNullOrEmpty(msg) &&
+                (_config.BubbleMode == "always" || (_config.BubbleMode == "alerts" && isAlert));
+
+            if (shouldShowBubble)
+            {
+                _bubbleText.Text = msg;
+                _bubbleBorder.BorderBrush = new SolidColorBrush(_state == PetState.Idle ? Color.FromRgb(56, 189, 248) : badgeBg);
+                _bubbleBorder.ToolTip = string.IsNullOrWhiteSpace(_activeTitle)
+                    ? T("点击打开对应 Antigravity 对话", "Click to open Antigravity conversation")
+                    : (T("点击打开对话: ", "Open conversation: ") + _activeTitle);
+                _bubbleBorder.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                _bubbleBorder.Visibility = Visibility.Hidden;
+            }
+        }
+
         private void UpdateVisualState()
         {
             Color haloColor = Colors.Transparent;
@@ -1406,23 +1743,7 @@ namespace AntigravityPet
             }
 
             bool isAlert = (_state == PetState.NeedsInput || _state == PetState.Ready || _state == PetState.Blocked);
-            string msg = string.IsNullOrWhiteSpace(_statusMessage) ? defaultMsg : LocalizeBubbleMessage(_statusMessage);
-            bool shouldShowBubble = !string.IsNullOrEmpty(msg) &&
-                (_config.BubbleMode == "always" || (_config.BubbleMode == "alerts" && isAlert));
-
-            if (shouldShowBubble)
-            {
-                _bubbleText.Text = msg;
-                _bubbleBorder.BorderBrush = new SolidColorBrush(_state == PetState.Idle ? Color.FromRgb(56, 189, 248) : badgeBg);
-                _bubbleBorder.ToolTip = string.IsNullOrWhiteSpace(_activeTitle)
-                    ? T("点击打开对应 Antigravity 对话", "Click to open Antigravity conversation")
-                    : (T("点击打开对话: ", "Open conversation: ") + _activeTitle);
-                _bubbleBorder.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                _bubbleBorder.Visibility = Visibility.Hidden;
-            }
+            UpdateBubbleDisplay(badgeBg, isAlert, defaultMsg);
         }
 
         private void OpenAntigravityConversation(string conversationId, string titleHint)
@@ -1610,6 +1931,9 @@ namespace AntigravityPet
             bubbleMenu.Items.Add(MakeCheckItem(T("始终显示", "Always Show"), _config.BubbleMode == "always", () => { _config.BubbleMode = "always"; UpdateVisualState(); SaveConfig(); RebuildContextMenu(); }));
             bubbleMenu.Items.Add(MakeCheckItem(T("仅重要提醒", "Alerts Only"), _config.BubbleMode == "alerts", () => { _config.BubbleMode = "alerts"; UpdateVisualState(); SaveConfig(); RebuildContextMenu(); }));
             bubbleMenu.Items.Add(MakeCheckItem(T("关闭气泡", "Off"), _config.BubbleMode == "off", () => { _config.BubbleMode = "off"; UpdateVisualState(); SaveConfig(); RebuildContextMenu(); }));
+            bubbleMenu.Items.Add(new Separator());
+            bubbleMenu.Items.Add(MakeCheckItem(T("简易模式", "Simple Mode"), !IsDetailedStyle(), () => { _config.BubbleStyle = "simple"; _bubbleExpanded = false; UpdateVisualState(); SaveConfig(); RebuildContextMenu(); }));
+            bubbleMenu.Items.Add(MakeCheckItem(T("详细模式 (堆叠展开)", "Detailed Mode (Stacked)"), IsDetailedStyle(), () => { _config.BubbleStyle = "detailed"; UpdateVisualState(); SaveConfig(); RebuildContextMenu(); }));
             menu.Items.Add(bubbleMenu);
 
             menu.Items.Add(MakeCheckItem(T("🐾 待机桌面散步", "🐾 Idle Roaming"), _config.AutoWalk, () =>
@@ -1771,6 +2095,8 @@ namespace AntigravityPet
                             visible = IsVisible,
                             scale = _config.Scale,
                             bubbleMode = _config.BubbleMode,
+                            bubbleStyle = IsDetailedStyle() ? "detailed" : "simple",
+                            pinnedConversationId = _config.PinnedConversationId ?? "",
                             autoWalk = _config.AutoWalk,
                             eyeFollow = _config.EyeFollow,
                             topmost = _config.Topmost,
@@ -1859,6 +2185,23 @@ namespace AntigravityPet
                                 SaveConfig();
                                 RebuildContextMenu();
                             }
+                        }
+                        else if (action == "bubblestyle")
+                        {
+                            if (val == "simple" || val == "detailed")
+                            {
+                                _config.BubbleStyle = val;
+                                if (val == "simple") _bubbleExpanded = false;
+                                UpdateVisualState();
+                                SaveConfig();
+                                RebuildContextMenu();
+                            }
+                        }
+                        else if (action == "pinconversation")
+                        {
+                            _config.PinnedConversationId = val ?? "";
+                            RecomputeEffectiveState();
+                            SaveConfig();
                         }
                         else if (action == "autowalk")
                         {
@@ -1953,6 +2296,15 @@ namespace AntigravityPet
             {
                 string bm = data["bubbleMode"].ToString();
                 if (bm == "always" || bm == "alerts" || bm == "off") _config.BubbleMode = bm;
+            }
+            if (data.ContainsKey("bubbleStyle") && data["bubbleStyle"] != null)
+            {
+                string bs = data["bubbleStyle"].ToString().Trim().ToLowerInvariant();
+                if (bs == "simple" || bs == "detailed") _config.BubbleStyle = bs;
+            }
+            if (data.ContainsKey("pinnedConversationId"))
+            {
+                _config.PinnedConversationId = data["pinnedConversationId"] != null ? data["pinnedConversationId"].ToString() : "";
             }
             if (data.ContainsKey("language") && data["language"] != null)
             {
