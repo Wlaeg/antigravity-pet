@@ -5,6 +5,18 @@ All notable changes to **Antigravity Pet** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.1] - 2026-11-25
+
+### Fixed
+- **Non-Blocking HTTP `/approval` Handling (`app/AntigravityPet.cs`)** — Reported by `dllhell`:
+  - Offloaded `HandleRequest(ctx)` in `StartHttpServer()` to `ThreadPool.QueueUserWorkItem` with request-scoped `JavaScriptSerializer` instances so concurrent `/health` and `/state` requests from subagents or other chats no longer hit timeouts while an approval bubble is open.
+- **Local `/approval` Token Lock-Down (`app/AntigravityPet.cs`, `scripts/hook-bridge.mjs`)**:
+  - Generated a per-launch 128-bit random token written to `~/.antigravity-pet/http-bridge.json` on startup and required it via `X-Pet-Token` / `token` on `POST /approval` (`403 Forbidden` when missing or mismatched).
+- **Antigravity IDE Detection (`app/AntigravityPet.cs`)**:
+  - Updated process detection (`OnBehaviorTick`, `TryGetAntigravityWindowRect`, `OpenAntigravityConversation`) and the executable launcher to match both `"Antigravity"` and `"Antigravity IDE"` (`Programs\Antigravity IDE\Antigravity IDE.exe`).
+- **MCP Server Namespace (`mcp_config.json`)**:
+  - Renamed the MCP server entry from `"pet"` to `"antigravity-pet"` to prevent global MCP server namespace collisions.
+
 ## [4.0.0] - 2026-11-24
 
 ### Added

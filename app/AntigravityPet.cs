@@ -251,6 +251,7 @@ namespace AntigravityPet
 
         private HttpListener _listener;
         private Thread _httpThread;
+        private string _httpToken = "";
         private volatile bool _isClosing = false;
         private bool _sawAntigravityProcess = false;
         private int _agyMissingTicks = 0;
@@ -1145,7 +1146,7 @@ namespace AntigravityPet
                 bool agyAlive = false;
                 try
                 {
-                    agyAlive = Process.GetProcessesByName("Antigravity").Length > 0;
+                    agyAlive = GetAntigravityProcesses().Count > 0;
                 }
                 catch { }
 
@@ -2069,7 +2070,7 @@ namespace AntigravityPet
             bool found = false;
             try
             {
-                var pids = new HashSet<int>(Process.GetProcessesByName("Antigravity").Select(p => p.Id));
+                var pids = new HashSet<int>(GetAntigravityProcesses().Select(p => p.Id));
                 if (pids.Count == 0) { foundRect = res; return false; }
                 EnumWindows((hWnd, lParam) =>
                 {
@@ -2779,7 +2780,7 @@ namespace AntigravityPet
             try
             {
                 var agyPids = new HashSet<uint>();
-                foreach (var proc in Process.GetProcessesByName("Antigravity"))
+                foreach (var proc in GetAntigravityProcesses())
                 {
                     agyPids.Add((uint)proc.Id);
                 }
@@ -2851,11 +2852,9 @@ namespace AntigravityPet
                         ? ("antigravity://conversation/" + Uri.EscapeDataString(targetId))
                         : "antigravity://open";
 
-                    string agyExe = System.IO.Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "Programs", "antigravity", "Antigravity.exe");
+                    string agyExe = FindAntigravityExePath();
 
-                    if (File.Exists(agyExe))
+                    if (!string.IsNullOrEmpty(agyExe))
                     {
                         Process.Start(new ProcessStartInfo
                         {
@@ -3114,10 +3113,74 @@ namespace AntigravityPet
             }
         }
 
+        private static readonly string[] AntigravityProcessNames = new[] { "Antigravity", "Antigravity IDE" };
+
+        private static List<Process> GetAntigravityProcesses()
+        {
+            var list = new List<Process>();
+            foreach (string name in AntigravityProcessNames)
+            {
+                try
+                {
+                    list.AddRange(Process.GetProcessesByName(name));
+                }
+                catch { }
+            }
+            return list;
+        }
+
+        private static string FindAntigravityExePath()
+        {
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string[] candidates = new[]
+            {
+                System.IO.Path.Combine(localAppData, "Programs", "antigravity", "Antigravity.exe"),
+                System.IO.Path.Combine(localAppData, "Programs", "Antigravity IDE", "Antigravity IDE.exe")
+            };
+            foreach (string p in candidates)
+            {
+                if (File.Exists(p)) return p;
+            }
+            return null;
+        }
+
+        private static string GenerateHttpToken()
+        {
+            byte[] buf = new byte[16];
+            using (var rng = new System.Security.Cryptography.RNGCryptoServiceProvider())
+            {
+                rng.GetBytes(buf);
+            }
+            var sb = new StringBuilder(32);
+            for (int i = 0; i < buf.Length; i++)
+            {
+                sb.Append(buf[i].ToString("x2"));
+            }
+            return sb.ToString();
+        }
+
+        private void WriteHttpBridgeFile()
+        {
+            try
+            {
+                string dir = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    ".antigravity-pet");
+                Directory.CreateDirectory(dir);
+                string bridgePath = System.IO.Path.Combine(dir, "http-bridge.json");
+                var json = new JavaScriptSerializer();
+                File.WriteAllText(bridgePath, json.Serialize(new { port = PORT, token = _httpToken }), new UTF8Encoding(false));
+            }
+            catch { }
+        }
+
         private void StartHttpServer()
         {
             try
             {
+                _httpToken = GenerateHttpToken();
+                WriteHttpBridgeFile();
+
                 _listener = new HttpListener();
                 _listener.Prefixes.Add("http://127.0.0.1:" + PORT + "/");
                 _listener.Start();
@@ -3129,7 +3192,7 @@ namespace AntigravityPet
                         try
                         {
                             var ctx = _listener.GetContext();
-                            HandleRequest(ctx);
+                            ThreadPool.QueueUserWorkItem(state => HandleRequest((HttpListenerContext)state), ctx);
                         }
                         catch
                         {
@@ -3156,13 +3219,15 @@ namespace AntigravityPet
             }
             catch { }
 
+            var json = new JavaScriptSerializer();
+            int statusCode = 200;
             string responseJson = "{\"ok\":true}";
 
             try
             {
                 Dictionary<string, object> data = string.IsNullOrWhiteSpace(body)
                     ? new Dictionary<string, object>()
-                    : (_json.Deserialize<Dictionary<string, object>>(body) ?? new Dictionary<string, object>());
+                    : (json.Deserialize<Dictionary<string, object>>(body) ?? new Dictionary<string, object>());
 
                 if (path == "/health")
                 {
@@ -3211,42 +3276,55 @@ namespace AntigravityPet
                             top = Top
                         };
                     });
-                    responseJson = _json.Serialize(info);
+                    responseJson = json.Serialize(info);
                 }
                 else if (path == "/approval")
                 {
-                    string convId = GetStr(data, "conversationId", "default");
-                    string toolName = GetStr(data, "toolName", "tool");
-                    string summary = GetStr(data, "summary", toolName);
-                    int waitSec = 45;
-                    int.TryParse(GetStr(data, "timeoutSec", "45"), out waitSec);
-                    if (waitSec < 5 || waitSec > 120) waitSec = 45;
-
-                    var req = new PendingApproval
+                    string reqToken = ctx.Request.Headers["X-Pet-Token"] ?? "";
+                    if (string.IsNullOrEmpty(reqToken))
                     {
-                        Id = Guid.NewGuid().ToString("N"),
-                        ConversationId = convId,
-                        ToolName = toolName,
-                        Summary = summary
-                    };
-                    lock (_approvalLock) { _pendingApprovals.Add(req); }
-
-                    Dispatcher.BeginInvoke(new Action(() =>
+                        reqToken = GetStr(data, "token", "");
+                    }
+                    if (!string.IsNullOrEmpty(_httpToken) && !string.Equals(reqToken, _httpToken, StringComparison.Ordinal))
                     {
-                        if (!IsVisible && _config.Enabled) Show();
-                        UpdateVisualState();
-                        SyncFullscreenAndEdgeState();
-                        PlayPetSound("needs_input");
-                    }));
-
-                    req.WaitHandle.Wait(TimeSpan.FromSeconds(waitSec));
-                    lock (_approvalLock) { _pendingApprovals.Remove(req); }
-                    Dispatcher.BeginInvoke(new Action(() =>
+                        statusCode = 403;
+                        responseJson = "{\"ok\":false,\"error\":\"forbidden\"}";
+                    }
+                    else
                     {
-                        UpdateVisualState();
-                        SyncFullscreenAndEdgeState();
-                    }));
-                    responseJson = _json.Serialize(new { ok = true, decision = req.Decision });
+                        string convId = GetStr(data, "conversationId", "default");
+                        string toolName = GetStr(data, "toolName", "tool");
+                        string summary = GetStr(data, "summary", toolName);
+                        int waitSec = 45;
+                        int.TryParse(GetStr(data, "timeoutSec", "45"), out waitSec);
+                        if (waitSec < 5 || waitSec > 120) waitSec = 45;
+
+                        var req = new PendingApproval
+                        {
+                            Id = Guid.NewGuid().ToString("N"),
+                            ConversationId = convId,
+                            ToolName = toolName,
+                            Summary = summary
+                        };
+                        lock (_approvalLock) { _pendingApprovals.Add(req); }
+
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            if (!IsVisible && _config.Enabled) Show();
+                            UpdateVisualState();
+                            SyncFullscreenAndEdgeState();
+                            PlayPetSound("needs_input");
+                        }));
+
+                        req.WaitHandle.Wait(TimeSpan.FromSeconds(waitSec));
+                        lock (_approvalLock) { _pendingApprovals.Remove(req); }
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            UpdateVisualState();
+                            SyncFullscreenAndEdgeState();
+                        }));
+                        responseJson = json.Serialize(new { ok = true, decision = req.Decision });
+                    }
                 }
                 else if (path == "/state")
                 {
@@ -3430,12 +3508,14 @@ namespace AntigravityPet
             }
             catch (Exception ex)
             {
-                responseJson = _json.Serialize(new { ok = false, error = ex.Message });
+                statusCode = 500;
+                responseJson = json.Serialize(new { ok = false, error = ex.Message });
             }
 
             try
             {
                 byte[] bytes = Encoding.UTF8.GetBytes(responseJson);
+                ctx.Response.StatusCode = statusCode;
                 ctx.Response.ContentType = "application/json; charset=utf-8";
                 ctx.Response.ContentLength64 = bytes.Length;
                 ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);

@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "pet": {
+    "antigravity-pet": {
       "command": "node",
       "args": [
         "${PLUGIN_ROOT}/scripts/pet-mcp-server.mjs"

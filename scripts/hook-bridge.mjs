@@ -35,7 +35,18 @@ function readStdin(timeoutMs = 200) {
   });
 }
 
-function postJson(urlPath, payload, timeoutMs = 250) {
+function readHttpToken() {
+  try {
+    const bridgePath = path.join(os.homedir(), '.antigravity-pet', 'http-bridge.json');
+    if (!fs.existsSync(bridgePath)) return '';
+    const data = JSON.parse(fs.readFileSync(bridgePath, 'utf8').replace(/^\uFEFF/, ''));
+    return typeof data?.token === 'string' ? data.token : '';
+  } catch {
+    return '';
+  }
+}
+
+function postJson(urlPath, payload, timeoutMs = 250, extraHeaders = null) {
   return new Promise((resolve) => {
     const body = JSON.stringify(payload);
     const req = http.request(
@@ -46,7 +57,8 @@ function postJson(urlPath, payload, timeoutMs = 250) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
-          'Content-Length': Buffer.byteLength(body)
+          'Content-Length': Buffer.byteLength(body),
+          ...(extraHeaders || {})
         },
         timeout: timeoutMs
       },
@@ -259,11 +271,14 @@ async function main() {
     if (isHighRisk) {
       const alive = await checkHealth(150);
       if (alive) {
+        const token = readHttpToken();
+        const headers = token ? { 'X-Pet-Token': token } : null;
         const res = await postJson('/approval', {
           conversationId,
           toolName,
-          summary: cmdLine.slice(0, 120)
-        }, 46000);
+          summary: cmdLine.slice(0, 120),
+          ...(token ? { token } : {})
+        }, 46000, headers);
         if (res && typeof res === 'object' && (res.decision === 'allow' || res.decision === 'deny' || res.decision === 'ask')) {
           const out = { decision: res.decision };
           if (res.decision === 'deny') out.reason = '用户在桌面宠物气泡上拒绝了此操作';
