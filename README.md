@@ -11,6 +11,7 @@
 [![Characters](https://img.shields.io/badge/Pixel%20Pets-8%20Built--in-F59E0B?style=flat-square)](pets)
 [![i18n](https://img.shields.io/badge/i18n-English%20%2F%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-10B981?style=flat-square)](#english)
 [![License](https://img.shields.io/badge/License-MIT-A855F7?style=flat-square)](LICENSE)
+[![HOL trust score](https://img.shields.io/endpoint?url=https%3A%2F%2Fhol.org%2Fapi%2Fregistry%2Fbadges%2Fplugin%3Fslug%3Dwlaeg%252Fantigravity-pet%26metric%3Dtrust)](https://hol.org/registry/plugins/wlaeg%2Fantigravity-pet)
 
 [English](#english) · [简体中文](#简体中文)
 
