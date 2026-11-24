@@ -54,7 +54,7 @@
 | `android-bugdroid` | **Android Bugdroid** | Classic Google Android green robot mascot | [`pets/android-bugdroid`](pets/android-bugdroid) |
 | `flutter-dash` | **Flutter Dash** | Official Google Flutter & Dart blue bird mascot | [`pets/flutter-dash`](pets/flutter-dash) |
 
-> Custom v3 pet packs (`themeColor`, custom `.wav` `sounds`, or per-action frame folders) can be imported directly via **Import .zip** in the Settings Panel, or placed inside `%USERPROFILE%\.antigravity-pet\pets\<pet-id>\`.
+> Custom v3 pet packs (`themeColor`, custom `.wav` `sounds`, or per-action frame folders) can be imported directly via **Import .zip** in the Settings Panel, or placed inside `%USERPROFILE%\.antigravity-pet\pets\<pet-id>\`. See the full **[Custom Pet Pack Specification (v3)](CUSTOM_PET_SPEC.md)** for `pet.json` fields and `1536×2288` sprite sheet row mappings.
 
 ---
 
@@ -226,7 +226,7 @@ Each custom pet pack only requires two files: `pet.json` and `spritesheet.png` (
 | `android-bugdroid` | **安卓小绿人 Bugdroid** | Google Android 官方经典绿色小机器人 | [`pets/android-bugdroid`](pets/android-bugdroid) |
 | `flutter-dash` | **Flutter 小蓝鸟 Dash** | Google Flutter & Dart 官方吉祥物小蓝鸟 | [`pets/flutter-dash`](pets/flutter-dash) |
 
-> 支持在设置面板点击 **「导入宠物包」** 一键上传 `.zip`（支持 v3 `themeColor`、自定义 `.wav` 音效与分动作序列帧目录），或直接放入 `%USERPROFILE%\.antigravity-pet\pets\<pet-id>\` 热重载启用。
+> 支持在设置面板点击 **「导入宠物包」** 一键上传 `.zip`（支持 v3 `themeColor`、自定义 `.wav` 音效与分动作序列帧目录），或直接放入 `%USERPROFILE%\.antigravity-pet\pets\<pet-id>\` 热重载启用。完整格式与行动作映射请查阅 **[自定义宠物包规范 (v3)](CUSTOM_PET_SPEC.md)**。
 
 ---
 
