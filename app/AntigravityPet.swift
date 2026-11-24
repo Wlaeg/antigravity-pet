@@ -14,6 +14,7 @@ struct PetConfig: Codable {
     var BubbleMode: String = "always"
     var BubbleStyle: String = "simple"
     var PinnedConversationId: String = ""
+    var ReadyTimeoutSec: Int = 30
     var Scale: Double = 1.0
     var AutoWalk: Bool = true
     var EyeFollow: Bool = true
@@ -286,16 +287,22 @@ final class PetCanvasView: NSView {
             let by = max(10.0, spriteY - bh - 12.0)
 
             if tasks.count >= 3 {
-                let b2 = NSRect(x: bx + 6.0, y: by - 6.0, width: bw - 6.0, height: bh)
+                let b2 = NSRect(x: bx + 14.0, y: by - 12.0, width: max(60.0, bw - 28.0), height: bh)
                 let p2 = NSBezierPath(roundedRect: b2, xRadius: bh / 2.0, yRadius: bh / 2.0)
-                NSColor(calibratedRed: 0.08, green: 0.10, blue: 0.16, alpha: 0.65).setFill()
+                NSColor(calibratedRed: 0.12, green: 0.16, blue: 0.24, alpha: 0.88).setFill()
                 p2.fill()
+                ctrl.accentColor(for: tasks[2].state).setStroke()
+                p2.lineWidth = 1.3
+                p2.stroke()
             }
             if tasks.count >= 2 {
-                let b1 = NSRect(x: bx + 3.0, y: by - 3.0, width: bw - 3.0, height: bh)
+                let b1 = NSRect(x: bx + 7.0, y: by - 6.0, width: max(68.0, bw - 14.0), height: bh)
                 let p1 = NSBezierPath(roundedRect: b1, xRadius: bh / 2.0, yRadius: bh / 2.0)
-                NSColor(calibratedRed: 0.08, green: 0.10, blue: 0.16, alpha: 0.80).setFill()
+                NSColor(calibratedRed: 0.10, green: 0.14, blue: 0.22, alpha: 0.94).setFill()
                 p1.fill()
+                ctrl.accentColor(for: tasks[1].state).setStroke()
+                p1.lineWidth = 1.4
+                p1.stroke()
             }
 
             let bubbleRect = NSRect(x: bx, y: by, width: bw, height: bh)
@@ -721,18 +728,48 @@ final class PetController: NSObject, NSApplicationDelegate {
         return config.BubbleStyle.lowercased() == "detailed"
     }
 
+    func syncWindowSizeForBubbles() {
+        let baseSz = windowSizeForScale(config.Scale)
+        if !isDetailedStyle() || config.BubbleMode == "off" {
+            if abs(window.frame.width - baseSz.width) > 0.5 || abs(window.frame.height - baseSz.height) > 0.5 {
+                var f = window.frame
+                let cx = f.midX
+                f.size = baseSz
+                f.origin.x = cx - f.size.width / 2.0
+                window.setFrame(f, display: true)
+                canvasView.frame = NSRect(origin: .zero, size: f.size)
+            }
+            return
+        }
+        let tasks = orderedVisibleTasks()
+        let font = NSFont.systemFont(ofSize: 11.5, weight: .bold)
+        var maxTextW: CGFloat = 100.0
+        let inspectCount = bubbleExpanded ? min(5, tasks.count) : min(1, tasks.count)
+        for i in 0..<inspectCount {
+            var lbl = formatDetailedTaskLabel(tasks[i])
+            if !bubbleExpanded && tasks.count > 1 { lbl += " (+\(tasks.count - 1))" }
+            let sz = NSAttributedString(string: lbl, attributes: [.font: font]).size()
+            if sz.width > maxTextW { maxTextW = sz.width }
+        }
+        let maxWinW = CGFloat(390.0 * config.Scale)
+        let targetW = min(maxWinW, max(baseSz.width, ceil(maxTextW + 58.0)))
+        let showCount = bubbleExpanded ? min(5, tasks.count) : 1
+        let extraH = bubbleExpanded && showCount > 1 ? CGFloat(showCount - 1) * 31.0 : (tasks.count >= 3 ? 12.0 : (tasks.count >= 2 ? 6.0 : 0.0))
+        let targetH = baseSz.height + extraH
+        if abs(window.frame.width - targetW) > 0.5 || abs(window.frame.height - targetH) > 0.5 {
+            var f = window.frame
+            let cx = f.midX
+            f.size = NSSize(width: targetW, height: targetH)
+            f.origin.x = cx - targetW / 2.0
+            window.setFrame(f, display: true)
+            canvasView.frame = NSRect(origin: .zero, size: f.size)
+        }
+    }
+
     func setBubbleExpanded(_ expand: Bool) {
         if bubbleExpanded == expand { return }
         bubbleExpanded = expand
-        let baseSz = windowSizeForScale(config.Scale)
-        let tasks = orderedVisibleTasks()
-        let showCount = expand ? min(5, tasks.count) : 1
-        let extraH = expand && showCount > 1 ? CGFloat(showCount - 1) * 31.0 : 0.0
-        var f = window.frame
-        let newH = baseSz.height + extraH
-        f.size.height = newH
-        window.setFrame(f, display: true)
-        canvasView.frame = NSRect(origin: .zero, size: f.size)
+        syncWindowSizeForBubbles()
         canvasView.needsDisplay = true
     }
 
@@ -742,7 +779,7 @@ final class PetController: NSObject, NSApplicationDelegate {
         for (cid, var cs) in conversations {
             let age = now.timeIntervalSince(cs.updatedAt)
             if cs.state == "running" && age > 45 { cs.state = "idle"; conversations[cid] = cs }
-            if cs.state == "ready" && age > 25 { cs.state = "idle"; conversations[cid] = cs }
+            if cs.state == "ready" && config.ReadyTimeoutSec > 0 && age >= Double(config.ReadyTimeoutSec) { cs.state = "idle"; conversations[cid] = cs }
             if cs.state == "idle" { continue }
             if config.BubbleMode == "alerts" && cs.state != "needs_input" && cs.state != "blocked" && cs.state != "ready" { continue }
             list.append(cs)
@@ -758,19 +795,41 @@ final class PetController: NSObject, NSApplicationDelegate {
         }
     }
 
+    func shortDetailedState(_ cs: ConvState, lang: String) -> String {
+        let m = cs.message.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isEn = (lang == "en")
+        if m == "思考规划中..." || m == "思考执行中..." { return isEn ? "Thinking" : "思考中" }
+        if m == "编辑代码中..." || m == "修改代码中..." || m == "快速分析代码中..." { return isEn ? "Editing" : "改代码" }
+        if m == "读取文件中..." { return isEn ? "Reading" : "读文件" }
+        if m == "编写文件中..." { return isEn ? "Writing" : "写文件" }
+        if m == "检索代码中..." { return isEn ? "Searching" : "搜代码" }
+        if m == "执行命令中..." { return isEn ? "Command" : "跑命令" }
+        if m == "运行检查中..." { return isEn ? "Checks" : "检查中" }
+        if m == "处理结果中..." { return isEn ? "Finishing" : "收尾中" }
+        if m == "查看屏幕中..." || m == "操作桌面应用中..." || m == "操控桌面中..." { return isEn ? "Screen" : "看屏幕" }
+        if m == "任务完成!" { return isEn ? "Ready" : "已完成" }
+        if m.contains("出错") { return isEn ? "Blocked" : "报错" }
+        switch cs.state {
+        case "needs_input": return isEn ? "Input" : "待确认"
+        case "blocked": return isEn ? "Blocked" : "报错"
+        case "ready": return isEn ? "Ready" : "已完成"
+        case "running": return isEn ? "Running" : "运行中"
+        default: return isEn ? "Idle" : "空闲"
+        }
+    }
+
     func formatDetailedTaskLabel(_ cs: ConvState) -> String {
         let lang = I18n.effectiveLanguage(config: config)
         let rawTitle = cs.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let taskName: String
         if !rawTitle.isEmpty {
-            taskName = rawTitle.count > 12 ? String(rawTitle.prefix(12)) + "…" : rawTitle
+            taskName = rawTitle.count > 14 ? String(rawTitle.prefix(14)) + "…" : rawTitle
         } else if cs.conversationId == "default" || cs.conversationId.isEmpty {
             taskName = "Antigravity"
         } else {
             taskName = String(cs.conversationId.prefix(8))
         }
-        let stLabel = I18n.translateBubble(state: cs.state, rawMessage: cs.message, lang: lang)
-        return "\(taskName) - \(stLabel)"
+        return "\(taskName) - \(shortDetailedState(cs, lang: lang))"
     }
 
     func currentTopConversation() -> ConvState? {
@@ -778,14 +837,14 @@ final class PetController: NSObject, NSApplicationDelegate {
         if !config.PinnedConversationId.isEmpty, var pinned = conversations[config.PinnedConversationId] {
             let age = now.timeIntervalSince(pinned.updatedAt)
             if pinned.state == "running" && age > 45 { pinned.state = "idle"; conversations[config.PinnedConversationId] = pinned }
-            if pinned.state == "ready" && age > 25 { pinned.state = "idle"; conversations[config.PinnedConversationId] = pinned }
+            if pinned.state == "ready" && config.ReadyTimeoutSec > 0 && age >= Double(config.ReadyTimeoutSec) { pinned.state = "idle"; conversations[config.PinnedConversationId] = pinned }
             if pinned.state != "idle" { return pinned }
         }
         var best: ConvState?
         for (cid, var cs) in conversations {
             let age = now.timeIntervalSince(cs.updatedAt)
             if cs.state == "running" && age > 45 { cs.state = "idle"; conversations[cid] = cs }
-            if cs.state == "ready" && age > 25 { cs.state = "idle"; conversations[cid] = cs }
+            if cs.state == "ready" && config.ReadyTimeoutSec > 0 && age >= Double(config.ReadyTimeoutSec) { cs.state = "idle"; conversations[cid] = cs }
             if cs.state == "idle" { continue }
             if let cur = best {
                 let pNew = priorityScore(cs.state)
@@ -1113,6 +1172,7 @@ final class PetController: NSObject, NSApplicationDelegate {
                 lastSoundAt = Date()
             }
             canvasView.needsDisplay = true
+            syncWindowSizeForBubbles()
             return healthSnapshot()
         }
 
@@ -1128,6 +1188,7 @@ final class PetController: NSObject, NSApplicationDelegate {
         if path == "/reload" && method == "POST" {
             loadPetPacks()
             canvasView.needsDisplay = true
+            syncWindowSizeForBubbles()
             return healthSnapshot()
         }
 
@@ -1170,6 +1231,8 @@ final class PetController: NSObject, NSApplicationDelegate {
                 }
             case "pinconversation":
                 config.PinnedConversationId = val; saveConfig()
+            case "readytimeoutsec":
+                if let sec = Int(val), sec >= 0 && sec <= 3600 { config.ReadyTimeoutSec = sec; saveConfig() }
             case "autowalk":
                 config.AutoWalk = (val.lowercased() == "true" || val == "1"); saveConfig()
             case "eyefollow":
@@ -1190,6 +1253,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             default: break
             }
             canvasView.needsDisplay = true
+            syncWindowSizeForBubbles()
             return healthSnapshot()
         }
 
@@ -1226,6 +1290,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             "bubbleMode": config.BubbleMode,
             "bubbleStyle": isDetailedStyle() ? "detailed" : "simple",
             "pinnedConversationId": config.PinnedConversationId,
+            "readyTimeoutSec": config.ReadyTimeoutSec,
             "autoWalk": config.AutoWalk,
             "eyeFollow": config.EyeFollow,
             "topmost": config.Topmost,

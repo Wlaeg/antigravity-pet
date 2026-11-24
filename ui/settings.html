@@ -175,6 +175,17 @@
         <button data-style="detailed" onclick="setOpt('bubbleStyle', 'detailed')" data-i18n="bsDetailed">Detailed (Stacked)</button>
       </div>
     </div>
+    <div class="seg-row">
+      <div><div class="seg-label" data-i18n="readyLabel">Ready Auto-Hide</div><div class="seg-sub" data-i18n="readySub">Auto-clear completed task bubbles if not clicked (default 30s)</div></div>
+      <div class="seg-btns" id="readyBtns">
+        <button data-rt="15" onclick="setOpt('readyTimeoutSec', '15')">15s</button>
+        <button data-rt="30" onclick="setOpt('readyTimeoutSec', '30')">30s</button>
+        <button data-rt="60" onclick="setOpt('readyTimeoutSec', '60')">60s</button>
+        <button data-rt="120" onclick="setOpt('readyTimeoutSec', '120')">120s</button>
+        <button data-rt="0" onclick="setOpt('readyTimeoutSec', '0')" data-i18n="rtNever">Never</button>
+        <input id="rtCustom" type="number" min="0" max="3600" placeholder="s" style="width:54px;padding:5px 6px;border-radius:7px;border:1px solid var(--border);background:var(--card-2);color:var(--text);font-size:12px" onchange="if(this.value!=='')setOpt('readyTimeoutSec',this.value)" />
+      </div>
+    </div>
   </div>
 
   <div class="card">
@@ -242,7 +253,7 @@
       bubbleSub: 'Click the bubble anytime to open that conversation',
       bmAlways: 'Always', bmAlerts: 'Alerts Only', bmOff: 'Off',
       styleLabel: 'Bubble Style', styleSub: 'Detailed mode stacks multi-chat bubbles (Task - State) and expands on hover',
-      bsSimple: 'Simple', bsDetailed: 'Detailed (Stacked)', pinBtn: 'Pin', pinnedBtn: '📌 Pinned',
+      bsSimple: 'Simple', bsDetailed: 'Detailed (Stacked)', readyLabel: 'Ready Auto-Hide', readySub: 'Auto-clear completed task bubbles if not clicked (default 30s)', rtNever: 'Never', pinBtn: 'Pin', pinnedBtn: '📌 Pinned',
       miscSec: '⚙️ Behavior & System',
       tBoot: '🚀 Launch with Antigravity', tBootSub: 'Auto-start when Antigravity opens and exit when it closes',
       tWalk: '🐾 Idle Roaming', tWalkSub: 'Walk left and right along the taskbar when idle',
@@ -278,7 +289,7 @@
       bubbleLabel: '气泡显示模式', bubbleSub: '点击头顶气泡可随时跳转到对应 Antigravity 对话',
       bmAlways: '始终显示', bmAlerts: '仅重要提醒', bmOff: '关闭气泡',
       styleLabel: '气泡展示风格', styleSub: '详细模式下多任务气泡可堆叠，鼠标移上自动展开为「任务名称 - 状态」',
-      bsSimple: '简易模式', bsDetailed: '详细模式 (堆叠展开)', pinBtn: '固定', pinnedBtn: '📌 已固定',
+      bsSimple: '简易模式', bsDetailed: '详细模式 (堆叠展开)', readyLabel: '已完成气泡消失时间', readySub: '任务完成后未点击时自动隐藏，避免一直占气泡（默认 30 秒）', rtNever: '不自动消失', pinBtn: '固定', pinnedBtn: '📌 已固定',
       miscSec: '⚙️ 杂项与行为设置',
       tBoot: '🚀 随 Antigravity 启动', tBootSub: '打开 Antigravity 时自动启动，关闭客户端时自动退出',
       tWalk: '🐾 待机桌面散步', tWalkSub: '空闲时每隔十几秒在工作区底部左右小跑散步',
@@ -376,6 +387,11 @@
 
     var bs = data.bubbleStyle || 'simple';
     document.querySelectorAll('#styleBtns button').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-style') === bs); });
+
+    var rt = typeof data.readyTimeoutSec === 'number' ? data.readyTimeoutSec : 30;
+    document.querySelectorAll('#readyBtns button').forEach(function (b) { b.classList.toggle('active', Number(b.getAttribute('data-rt')) === rt); });
+    var rtInput = document.getElementById('rtCustom');
+    if (rtInput && document.activeElement !== rtInput) rtInput.value = String(rt);
 
     setSw('swAutoStart', data.autoStartOnBoot !== false);
     setSw('swAutoWalk', data.autoWalk !== false);

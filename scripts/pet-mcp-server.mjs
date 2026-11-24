@@ -44,6 +44,7 @@ function readOfflineConfig() {
     BubbleMode: 'always',
     BubbleStyle: 'simple',
     PinnedConversationId: '',
+    ReadyTimeoutSec: 30,
     Scale: 1.0,
     AutoWalk: true,
     EyeFollow: true,
@@ -269,6 +270,7 @@ async function getSnapshot() {
     bubbleMode: cfg.BubbleMode || 'always',
     bubbleStyle: cfg.BubbleStyle || 'simple',
     pinnedConversationId: cfg.PinnedConversationId || '',
+    readyTimeoutSec: typeof cfg.ReadyTimeoutSec === 'number' ? cfg.ReadyTimeoutSec : 30,
     autoWalk: cfg.AutoWalk !== false,
     eyeFollow: cfg.EyeFollow !== false,
     topmost: cfg.Topmost !== false,
@@ -346,6 +348,10 @@ async function applySetting(args = {}) {
     const cid = String(value ?? '');
     writeOfflineConfig({ PinnedConversationId: cid });
     if (isRunning) await httpRequest('POST', '/control', { action: 'pinConversation', value: cid });
+  } else if (action === 'readyTimeoutSec') {
+    const sec = Math.max(0, Math.min(3600, Number.isFinite(Number(value)) ? Math.round(Number(value)) : 30));
+    writeOfflineConfig({ ReadyTimeoutSec: sec });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'readyTimeoutSec', value: String(sec) });
   } else if (action === 'autoWalk') {
     const b = parseBool(value, true);
     writeOfflineConfig({ AutoWalk: b });
@@ -454,11 +460,6 @@ const TOOLS = [
       ui: {
         resourceUri: RESOURCE_URI,
         visibility: ['model', 'app']
-      },
-      'com.google.antigravity/ui': {
-        entrypoints: [
-          { type: 'aux_pane', title: '🐾 Desktop Pet / 桌面宠物' }
-        ]
       }
     }
   },
