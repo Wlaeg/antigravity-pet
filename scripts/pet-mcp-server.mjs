@@ -381,6 +381,20 @@ async function applySetting(args = {}) {
     const loc = String(value || '');
     writeOfflineConfig({ AgyDetectedLocale: loc });
     if (isRunning) await httpRequest('POST', '/control', { action: 'agyLocale', value: loc });
+  } else if (action === 'snapToAgy') {
+    const b = parseBool(value, false);
+    writeOfflineConfig({ SnapToAgy: b });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'snapToAgy', value: String(b) });
+  } else if (action === 'hideOnFullscreen') {
+    const b = parseBool(value, true);
+    writeOfflineConfig({ HideOnFullscreen: b });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'hideOnFullscreen', value: String(b) });
+  } else if (action === 'accessory') {
+    const acc = String(value || args.accessory || 'auto').toLowerCase();
+    writeOfflineConfig({ Accessory: acc });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'accessory', value: acc });
+  } else if (action === 'quickDispatch') {
+    if (isRunning) await httpRequest('POST', '/control', { action: 'quickDispatch' });
   } else if (action === 'resetPos') {
     writeOfflineConfig({ Left: -1, Top: -1 });
     if (isRunning) await httpRequest('POST', '/control', { action: 'resetPos' });

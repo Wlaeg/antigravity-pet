@@ -2,6 +2,7 @@
   "id": "pixel-dragon",
   "displayName": "像素小青龙 Dragon",
   "description": "长着金角小翅膀的翡翠青龙",
-  "spriteVersionNumber": 2,
+  "themeColor": "#10B981",
+  "spriteVersionNumber": 3,
   "spritesheetPath": "spritesheet.png"
 }

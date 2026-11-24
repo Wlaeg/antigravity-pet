@@ -1,4 +1,5 @@
 import { execFile, spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -52,7 +53,10 @@ function readOfflineConfig() {
     Language: 'auto',
     AgyDetectedLocale: '',
     CompletedTasksCount: 0,
-    ToolCallsCount: 0
+    ToolCallsCount: 0,
+    SnapToAgy: false,
+    HideOnFullscreen: true,
+    Accessory: 'auto'
   };
   try {
     const p = getConfigPath();
@@ -270,6 +274,10 @@ export async function getSnapshot() {
     bubbleStyle: cfg.BubbleStyle || 'simple',
     pinnedConversationId: cfg.PinnedConversationId || '',
     readyTimeoutSec: typeof cfg.ReadyTimeoutSec === 'number' ? cfg.ReadyTimeoutSec : 30,
+    snapToAgy: !!cfg.SnapToAgy,
+    hideOnFullscreen: cfg.HideOnFullscreen !== false,
+    accessory: cfg.Accessory || 'auto',
+    effectiveAccessory: cfg.Accessory && cfg.Accessory !== 'auto' ? cfg.Accessory : (cfg.CompletedTasksCount >= 100 ? 'crown' : cfg.CompletedTasksCount >= 50 ? 'coffee' : cfg.CompletedTasksCount >= 20 ? 'cap' : cfg.CompletedTasksCount >= 5 ? 'glasses' : 'none'),
     autoWalk: cfg.AutoWalk !== false,
     eyeFollow: cfg.EyeFollow !== false,
     topmost: cfg.Topmost !== false,
@@ -380,6 +388,20 @@ export async function applySetting(args = {}) {
     const loc = String(value || '');
     writeOfflineConfig({ AgyDetectedLocale: loc });
     if (isRunning) await httpRequest('POST', '/control', { action: 'agyLocale', value: loc });
+  } else if (action === 'snapToAgy') {
+    const b = parseBool(value, false);
+    writeOfflineConfig({ SnapToAgy: b });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'snapToAgy', value: String(b) });
+  } else if (action === 'hideOnFullscreen') {
+    const b = parseBool(value, true);
+    writeOfflineConfig({ HideOnFullscreen: b });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'hideOnFullscreen', value: String(b) });
+  } else if (action === 'accessory') {
+    const acc = String(value || args.accessory || 'auto').toLowerCase();
+    writeOfflineConfig({ Accessory: acc });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'accessory', value: acc });
+  } else if (action === 'quickDispatch') {
+    if (isRunning) await httpRequest('POST', '/control', { action: 'quickDispatch' });
   } else if (action === 'resetPos') {
     writeOfflineConfig({ Left: -1, Top: -1 });
     if (isRunning) await httpRequest('POST', '/control', { action: 'resetPos' });
@@ -402,6 +424,148 @@ export async function applySetting(args = {}) {
   }
 
   return await getSnapshot();
+}
+
+function findPetManifestDir(rootDir) {
+  if (fs.existsSync(path.join(rootDir, 'pet.json'))) return rootDir;
+  for (const entry of fs.readdirSync(rootDir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      const sub = path.join(rootDir, entry.name);
+      if (fs.existsSync(path.join(sub, 'pet.json'))) return sub;
+    }
+  }
+  return null;
+}
+
+function copyDirRecursive(src, dst) {
+  fs.mkdirSync(dst, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const s = path.join(src, entry.name);
+    const d = path.join(dst, entry.name);
+    if (entry.isDirectory()) copyDirRecursive(s, d);
+    else fs.copyFileSync(s, d);
+  }
+}
+
+export async function importPetPack(args = {}) {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-pet-import-'));
+  try {
+    let sourceDir = null;
+    if (args.zipBase64) {
+      const cleanB64 = String(args.zipBase64).replace(/^data:[^;]+;base64,/, '');
+      const zipPath = path.join(tmpRoot, 'pack.zip');
+      const extractDir = path.join(tmpRoot, 'extracted');
+      fs.writeFileSync(zipPath, Buffer.from(cleanB64, 'base64'));
+      fs.mkdirSync(extractDir, { recursive: true });
+      await new Promise((resolve, reject) => {
+        if (IS_WIN) {
+          execFile('powershell.exe', ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${extractDir.replace(/'/g, "''")}' -Force`], { timeout: 15000, windowsHide: true }, (err) => (err ? reject(err) : resolve()));
+        } else {
+          execFile('unzip', ['-o', zipPath, '-d', extractDir], { timeout: 15000 }, (err) => (err ? reject(err) : resolve()));
+        }
+      });
+      sourceDir = findPetManifestDir(extractDir);
+    } else if (args.localPath) {
+      const lp = path.resolve(String(args.localPath));
+      if (fs.existsSync(lp) && fs.statSync(lp).isDirectory()) {
+        sourceDir = findPetManifestDir(lp);
+      } else if (fs.existsSync(lp) && lp.toLowerCase().endsWith('.zip')) {
+        const extractDir = path.join(tmpRoot, 'extracted');
+        fs.mkdirSync(extractDir, { recursive: true });
+        await new Promise((resolve, reject) => {
+          if (IS_WIN) {
+            execFile('powershell.exe', ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${lp.replace(/'/g, "''")}' -DestinationPath '${extractDir.replace(/'/g, "''")}' -Force`], { timeout: 15000, windowsHide: true }, (err) => (err ? reject(err) : resolve()));
+          } else {
+            execFile('unzip', ['-o', lp, '-d', extractDir], { timeout: 15000 }, (err) => (err ? reject(err) : resolve()));
+          }
+        });
+        sourceDir = findPetManifestDir(extractDir);
+      }
+    }
+
+    if (!sourceDir) {
+      return { ok: false, error: '未在宠物包中找到 pet.json 清单文件' };
+    }
+
+    const meta = JSON.parse(fs.readFileSync(path.join(sourceDir, 'pet.json'), 'utf8'));
+    const rawId = String(meta.id || path.basename(sourceDir) || 'custom-pet').toLowerCase();
+    const safeId = rawId.replace(/[^a-z0-9-_]/g, '-').replace(/^-+|-+$/g, '') || 'custom-pet';
+    const hasSheet = fs.existsSync(path.join(sourceDir, meta.spritesheetPath || 'spritesheet.png'));
+    const hasIdleFrames = fs.existsSync(path.join(sourceDir, 'idle'));
+    if (!hasSheet && !hasIdleFrames) {
+      return { ok: false, error: '宠物包缺少 spritesheet.png 或 idle/ 序列帧目录' };
+    }
+
+    const destDir = path.join(USER_PETS_DIR, safeId);
+    copyDirRecursive(sourceDir, destDir);
+
+    const health = await httpRequest('GET', '/health', null, 500);
+    if (health.ok) {
+      await httpRequest('POST', '/reload', {});
+      await httpRequest('POST', '/skin', { skin: safeId });
+    } else {
+      writeOfflineConfig({ Skin: safeId });
+    }
+    const snapshot = await getSnapshot();
+    return { ok: true, id: safeId, displayName: meta.displayName || safeId, snapshot };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  } finally {
+    try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch {}
+  }
+}
+
+function startLocalDispatchBridge(app) {
+  const token = crypto.randomBytes(16).toString('hex');
+  const bridgeFile = path.join(os.homedir(), '.antigravity-pet', 'panel-bridge.json');
+  const srv = http.createServer((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    if (req.method === 'POST' && url.pathname === '/api/dispatch') {
+      let raw = '';
+      req.on('data', (c) => (raw += c));
+      req.on('end', async () => {
+        try {
+          const data = raw ? JSON.parse(raw) : {};
+          if (data.token !== token) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'forbidden' }));
+            return;
+          }
+          const msg = String(data.message || '').trim();
+          if (!msg) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, error: 'empty_message' }));
+            return;
+          }
+          let cid = String(data.conversationId || '').trim();
+          if (!cid || cid === 'default' || cid === 'preview') {
+            if (typeof app.newConversation === 'function') {
+              const created = await app.newConversation();
+              cid = (created && (created.conversationId || created.id)) || cid;
+            }
+          }
+          if (typeof app.sendMessage === 'function') {
+            await app.sendMessage(cid, msg);
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, conversationId: cid }));
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: err?.message || String(err) }));
+        }
+      });
+      return;
+    }
+    res.writeHead(404);
+    res.end('Not Found');
+  });
+  srv.listen(0, '127.0.0.1', () => {
+    try {
+      const addr = srv.address();
+      fs.mkdirSync(path.dirname(bridgeFile), { recursive: true });
+      fs.writeFileSync(bridgeFile, JSON.stringify({ port: addr.port, token }), 'utf8');
+    } catch {}
+  });
 }
 
 async function loadSidecarSdk() {
@@ -436,9 +600,11 @@ if (isDirectRun) {
   if (hasSidecarEnv) {
     void ensurePetLaunchedWithAgy();
     const app = new SidecarApp();
+    startLocalDispatchBridge(app);
     app.page('/', () => fs.readFileSync(HTML_PATH, 'utf8'));
     app.api('/api/status', async () => await getSnapshot(), 'POST');
     app.api('/api/apply', async (data) => await applySetting(data || {}), 'POST');
+    app.api('/api/import-pet', async (data) => await importPetPack(data || {}), 'POST');
     await app.run();
     console.log('[antigravity-pet panel] sidecar registered and running');
   } else {
@@ -454,13 +620,15 @@ if (isDirectRun) {
         res.end('');
         return;
       }
-      if (req.method === 'POST' && (url.pathname === '/api/status' || url.pathname === '/api/apply')) {
+      if (req.method === 'POST' && (url.pathname === '/api/status' || url.pathname === '/api/apply' || url.pathname === '/api/import-pet')) {
         let raw = '';
         req.on('data', (c) => (raw += c));
         req.on('end', async () => {
           let data = {};
           try { if (raw) data = JSON.parse(raw); } catch {}
-          const result = url.pathname === '/api/status' ? await getSnapshot() : await applySetting(data);
+          const result = url.pathname === '/api/status'
+            ? await getSnapshot()
+            : (url.pathname === '/api/import-pet' ? await importPetPack(data) : await applySetting(data));
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify(result));
         });

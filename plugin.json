@@ -1,8 +1,8 @@
 {
   "name": "antigravity-pet",
   "displayName": "桌面宠物 (Antigravity Pet)",
-  "version": "3.3.0",
-  "description": "Antigravity 原生跨平台（Windows & macOS）像素桌面宠物插件：内置 8 款动态像素角色（含 Google 经典吉祥物 Android Bugdroid & Flutter Dash）、Agent 生命周期实时联动、点击气泡直达对话、随客户端启停与右上角内置设置面板。",
+  "version": "4.0.0",
+  "description": "Antigravity 原生跨平台（Windows & macOS）像素桌面伴侣插件：内置 8 款动态像素角色与专属工作抱物、双击快捷派活、气泡审批高危命令、左右贴边半身观察与状态色块、全屏避让与关键提醒弹出、成长像素配饰及 v3 自定义宠物包一键导入。",
   "logo": "assets/logo.svg",
   "homepage": "https://github.com/Wlaeg/antigravity-pet",
   "repository": "https://github.com/Wlaeg/antigravity-pet",

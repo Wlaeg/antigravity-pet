@@ -2,6 +2,7 @@
   "id": "cyber-fox",
   "displayName": "小蓝狐 CyberFox",
   "description": "赛博蓝色小狐狸（默认）",
-  "spriteVersionNumber": 2,
+  "themeColor": "#38BDF8",
+  "spriteVersionNumber": 3,
   "spritesheetPath": "spritesheet.png"
 }

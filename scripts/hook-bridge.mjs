@@ -51,8 +51,16 @@ function postJson(urlPath, payload, timeoutMs = 250) {
         timeout: timeoutMs
       },
       (res) => {
-        res.resume();
-        res.on('end', () => resolve(true));
+        let resp = '';
+        res.setEncoding('utf8');
+        res.on('data', (c) => { resp += c; });
+        res.on('end', () => {
+          try {
+            resolve(resp ? JSON.parse(resp) : true);
+          } catch {
+            resolve(true);
+          }
+        });
       }
     );
     req.on('timeout', () => {
@@ -244,6 +252,28 @@ async function main() {
     }
   } else if (evt === 'PostInvocation') {
     await postJson('/state', { conversationId, state: 'running', message: '处理结果中...', title });
+  } else if (evt === 'PreToolUse') {
+    const toolName = (payload.toolCall && payload.toolCall.name) || payload.toolName || 'run_command';
+    const cmdLine = String((payload.toolCall && payload.toolCall.args && (payload.toolCall.args.CommandLine || payload.toolCall.args.command)) || '');
+    const isHighRisk = /(\brm\s+-rf?\b|\bRemove-Item\b|\bdel\s+\/|\bformat\s+|\bgit\s+push\b|\bgit\s+reset\s+--hard\b|\bshutdown\b|\breg\s+delete\b)/i.test(cmdLine);
+    if (isHighRisk) {
+      const alive = await checkHealth(150);
+      if (alive) {
+        const res = await postJson('/approval', {
+          conversationId,
+          toolName,
+          summary: cmdLine.slice(0, 120)
+        }, 46000);
+        if (res && typeof res === 'object' && (res.decision === 'allow' || res.decision === 'deny' || res.decision === 'ask')) {
+          const out = { decision: res.decision };
+          if (res.decision === 'deny') out.reason = '用户在桌面宠物气泡上拒绝了此操作';
+          process.stdout.write(JSON.stringify(out));
+          return;
+        }
+      }
+    }
+    process.stdout.write(JSON.stringify({ decision: 'ask' }));
+    return;
   } else if (evt === 'Stop') {
     const reason = payload.terminationReason || '';
     if (reason === 'ERROR' || payload.error) {

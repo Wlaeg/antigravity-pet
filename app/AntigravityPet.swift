@@ -24,6 +24,9 @@ struct PetConfig: Codable {
     var AgyDetectedLocale: String = ""
     var CompletedTasksCount: Int = 0
     var ToolCallsCount: Int = 0
+    var SnapToAgy: Bool = false
+    var HideOnFullscreen: Bool = true
+    var Accessory: String = "auto"
 }
 
 struct PetPack {
@@ -33,6 +36,25 @@ struct PetPack {
     let version: Int
     let spritesheetPath: String
     var image: NSImage?
+    var themeColorHex: String = "#38BDF8"
+    var sounds: [String: String] = [:]
+    var frameMap: [Int: [CGImage]] = [:]
+}
+
+final class PendingApproval {
+    let id: String
+    let toolName: String
+    let summary: String
+    let conversationId: String
+    let semaphore = DispatchSemaphore(value: 0)
+    var decision: String = "ask"
+    var resolved: Bool = false
+    init(id: String, toolName: String, summary: String, conversationId: String) {
+        self.id = id
+        self.toolName = toolName
+        self.summary = summary
+        self.conversationId = conversationId
+    }
 }
 
 struct ConvState {
@@ -195,14 +217,19 @@ final class PetCanvasView: NSView {
             ctx.restoreGState()
         }
 
-        // 绘制精灵图（严格最近邻无插值）
-        if let pack = ctrl.activePack(), let nsImg = pack.image,
-           let cgImg = nsImg.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+        // 绘制精灵图（严格最近邻无插值，支持分动作目录序列帧回退）
+        if let pack = ctrl.activePack() {
             let (row, frame) = ctrl.currentRowAndFrame()
-            let cellW = 192
-            let cellH = 208
-            let cropRect = CGRect(x: frame * cellW, y: row * cellH, width: cellW, height: cellH)
-            if let cropped = cgImg.cropping(to: cropRect) {
+            var cropped: CGImage? = nil
+            if let seqFrames = pack.frameMap[row], !seqFrames.isEmpty {
+                cropped = seqFrames[frame % seqFrames.count]
+            } else if let nsImg = pack.image, let cgImg = nsImg.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                let cellW = 192
+                let cellH = 208
+                let cropRect = CGRect(x: frame * cellW, y: row * cellH, width: cellW, height: cellH)
+                cropped = cgImg.cropping(to: cropRect)
+            }
+            if let frameImg = cropped {
                 ctx.saveGState()
                 ctx.interpolationQuality = .none
                 let destRect = NSRect(x: spriteX, y: spriteY, width: spriteW, height: spriteH)
@@ -213,22 +240,76 @@ final class PetCanvasView: NSView {
                 ctx.rotate(by: angleRad)
                 ctx.scaleBy(x: ctrl.dragScaleX, y: ctrl.dragScaleY)
                 ctx.translateBy(x: -pivotX, y: -pivotY)
-                // CoreGraphics draw(in:) 在 flipped NSView 上会倒置，手动翻转 Y
+
+                ctx.saveGState()
                 ctx.translateBy(x: destRect.minX, y: destRect.maxY)
                 ctx.scaleBy(x: 1.0, y: -1.0)
-                ctx.draw(cropped, in: CGRect(x: 0, y: 0, width: destRect.width, height: destRect.height))
+                ctx.draw(frameImg, in: CGRect(x: 0, y: 0, width: destRect.width, height: destRect.height))
+                ctx.restoreGState()
+
+                // 轻度成长像素配饰直接融入精灵动画与变换层
+                let acc = ctrl.effectiveAccessory()
+                if acc != "none" {
+                    drawPixelAccessory(ctx: ctx, accessory: acc, skinId: pack.id, row: row, frame: frame, destRect: destRect)
+                }
                 ctx.restoreGState()
             }
         }
 
-        // 绘制头顶气泡（支持简易模式 & 详细堆叠展开模式）
+        // 绘制头顶像素风气泡 & 审批按钮
         bubbleHitRects.removeAll()
+        approvalHitRects.removeAll()
+
+        if let pending = ctrl.currentApproval {
+            let isEn = I18n.effectiveLanguage(config: ctrl.config) == "en"
+            let title = (isEn ? "⚠ Approve: " : "⚠ 审批请求: ") + pending.toolName
+            let font = NSFont.monospacedSystemFont(ofSize: 11.0, weight: .bold)
+            let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+            let attrStr = NSAttributedString(string: title, attributes: attrs)
+            let textSize = attrStr.size()
+            let bw = min(bounds.width - 10.0, max(168.0, textSize.width + 24.0))
+            let bh: CGFloat = 58.0
+            let bx = (bounds.width - bw) / 2.0
+            let by = max(6.0, spriteY - bh - 10.0)
+            let rect = NSRect(x: bx, y: by, width: bw, height: bh)
+            drawPixelBox(rect: rect, fill: NSColor(calibratedRed: 0.06, green: 0.09, blue: 0.16, alpha: 0.96), border: NSColor(calibratedRed: 0.96, green: 0.62, blue: 0.04, alpha: 1.0), lineWidth: 2.0)
+            attrStr.draw(in: NSRect(x: bx + 10.0, y: by + 6.0, width: bw - 20.0, height: 18.0))
+
+            let btnW = (bw - 28.0) / 2.0
+            let allowRect = NSRect(x: bx + 10.0, y: by + 28.0, width: btnW, height: 22.0)
+            let denyRect = NSRect(x: bx + 18.0 + btnW, y: by + 28.0, width: btnW, height: 22.0)
+            drawPixelBox(rect: allowRect, fill: NSColor(calibratedRed: 0.06, green: 0.72, blue: 0.51, alpha: 1.0), border: NSColor(calibratedRed: 0.02, green: 0.47, blue: 0.34, alpha: 1.0), lineWidth: 1.5)
+            drawPixelBox(rect: denyRect, fill: NSColor(calibratedRed: 0.94, green: 0.27, blue: 0.27, alpha: 1.0), border: NSColor(calibratedRed: 0.60, green: 0.11, blue: 0.11, alpha: 1.0), lineWidth: 1.5)
+
+            let btnFont = NSFont.monospacedSystemFont(ofSize: 10.5, weight: .bold)
+            let allowStr = NSAttributedString(string: isEn ? "✓ Allow" : "✓ 允许", attributes: [.font: btnFont, .foregroundColor: NSColor.white])
+            let denyStr = NSAttributedString(string: isEn ? "✕ Deny" : "✕ 拒绝", attributes: [.font: btnFont, .foregroundColor: NSColor.white])
+            allowStr.draw(in: NSRect(x: allowRect.minX + (btnW - allowStr.size().width) / 2.0, y: allowRect.minY + 3.0, width: btnW, height: 16.0))
+            denyStr.draw(in: NSRect(x: denyRect.minX + (btnW - denyStr.size().width) / 2.0, y: denyRect.minY + 3.0, width: btnW, height: 16.0))
+            approvalHitRects.append((allowRect, "allow"))
+            approvalHitRects.append((denyRect, "deny"))
+            return
+        }
+
         if ctrl.config.BubbleMode == "off" { return }
+
+        if !ctrl.dockSide.isEmpty && !ctrl.dockPeekOut && !ctrl.fullscreenPeekActive && !ctrl.bubbleExpanded {
+            let isAlertState = (effState == "needs_input" || effState == "ready" || effState == "blocked")
+            if effState != "idle" && (ctrl.config.BubbleMode != "alerts" || isAlertState) {
+                let bw: CGFloat = 34.0 * scale
+                let bh: CGFloat = 14.0 * scale
+                let bx = (ctrl.dockSide == "right") ? (bounds.width / 2.0 - bw - 6.0 * scale) : (bounds.width / 2.0 + 6.0 * scale)
+                let by = max(8.0, spriteY - bh - 10.0)
+                let rect = NSRect(x: bx, y: by, width: bw, height: bh)
+                drawPixelBox(rect: rect, fill: ctrl.accentColor(for: effState), border: NSColor(calibratedRed: 0.06, green: 0.09, blue: 0.16, alpha: 1.0), lineWidth: 2.0)
+            }
+            return
+        }
 
         if ctrl.isDetailedStyle() {
             let tasks = ctrl.orderedVisibleTasks()
             if tasks.isEmpty { return }
-            let font = NSFont.systemFont(ofSize: 11.5, weight: .bold)
+            let font = NSFont.monospacedSystemFont(ofSize: 11.0, weight: .bold)
 
             if ctrl.bubbleExpanded {
                 let showCount = min(5, tasks.count)
@@ -249,17 +330,11 @@ final class PetCanvasView: NSView {
                     if by < 2.0 { break }
 
                     let rect = NSRect(x: bx, y: by, width: bw, height: bh)
-                    let path = NSBezierPath(roundedRect: rect, xRadius: 9.0, yRadius: 9.0)
-                    NSColor(calibratedRed: 0.08, green: 0.10, blue: 0.16, alpha: 0.95).setFill()
-                    path.fill()
-                    accent.setStroke()
-                    path.lineWidth = isPinned ? 1.8 : 1.3
-                    path.stroke()
+                    drawPixelBox(rect: rect, fill: NSColor(calibratedRed: 0.08, green: 0.10, blue: 0.16, alpha: 0.96), border: accent, lineWidth: isPinned ? 2.0 : 1.5)
 
-                    // 状态圆点
-                    let dotRect = NSRect(x: bx + 9.0, y: by + (bh - 7.0) / 2.0, width: 7.0, height: 7.0)
+                    let dotRect = NSRect(x: bx + 9.0, y: by + (bh - 6.0) / 2.0, width: 6.0, height: 6.0)
                     accent.setFill()
-                    NSBezierPath(ovalIn: dotRect).fill()
+                    NSBezierPath(rect: dotRect).fill()
 
                     let tx = bx + 21.0
                     let ty = by + (bh - textSize.height) / 2.0
@@ -270,7 +345,6 @@ final class PetCanvasView: NSView {
                 return
             }
 
-            // 详细模式收起态（多会话时显示堆叠阴影背板 + +N 角标）
             let top = tasks[0]
             let isPinned = !ctrl.config.PinnedConversationId.isEmpty && top.conversationId == ctrl.config.PinnedConversationId
             var label = (isPinned ? "📌 " : "") + ctrl.formatDetailedTaskLabel(top)
@@ -288,30 +362,15 @@ final class PetCanvasView: NSView {
 
             if tasks.count >= 3 {
                 let b2 = NSRect(x: bx + 14.0, y: by - 12.0, width: max(60.0, bw - 28.0), height: bh)
-                let p2 = NSBezierPath(roundedRect: b2, xRadius: bh / 2.0, yRadius: bh / 2.0)
-                NSColor(calibratedRed: 0.12, green: 0.16, blue: 0.24, alpha: 0.88).setFill()
-                p2.fill()
-                ctrl.accentColor(for: tasks[2].state).setStroke()
-                p2.lineWidth = 1.3
-                p2.stroke()
+                drawPixelBox(rect: b2, fill: NSColor(calibratedRed: 0.12, green: 0.16, blue: 0.24, alpha: 0.90), border: ctrl.accentColor(for: tasks[2].state), lineWidth: 1.5)
             }
             if tasks.count >= 2 {
                 let b1 = NSRect(x: bx + 7.0, y: by - 6.0, width: max(68.0, bw - 14.0), height: bh)
-                let p1 = NSBezierPath(roundedRect: b1, xRadius: bh / 2.0, yRadius: bh / 2.0)
-                NSColor(calibratedRed: 0.10, green: 0.14, blue: 0.22, alpha: 0.94).setFill()
-                p1.fill()
-                ctrl.accentColor(for: tasks[1].state).setStroke()
-                p1.lineWidth = 1.4
-                p1.stroke()
+                drawPixelBox(rect: b1, fill: NSColor(calibratedRed: 0.10, green: 0.14, blue: 0.22, alpha: 0.94), border: ctrl.accentColor(for: tasks[1].state), lineWidth: 1.5)
             }
 
             let bubbleRect = NSRect(x: bx, y: by, width: bw, height: bh)
-            let path = NSBezierPath(roundedRect: bubbleRect, xRadius: bh / 2.0, yRadius: bh / 2.0)
-            NSColor(calibratedRed: 0.09, green: 0.09, blue: 0.13, alpha: 0.95).setFill()
-            path.fill()
-            accent.setStroke()
-            path.lineWidth = isPinned ? 2.2 : 1.8
-            path.stroke()
+            drawPixelBox(rect: bubbleRect, fill: NSColor(calibratedRed: 0.06, green: 0.09, blue: 0.16, alpha: 0.96), border: accent, lineWidth: isPinned ? 2.2 : 2.0)
 
             let tx = bx + (bw - min(textSize.width, bw - padX * 2)) / 2.0
             let ty = by + (bh - textSize.height) / 2.0
@@ -322,11 +381,8 @@ final class PetCanvasView: NSView {
 
         if let bubbleText = ctrl.currentBubbleText(), !bubbleText.isEmpty {
             let accent = ctrl.accentColor(for: effState)
-            let font = NSFont.systemFont(ofSize: 12.5, weight: .bold)
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: font,
-                .foregroundColor: NSColor.white
-            ]
+            let font = NSFont.monospacedSystemFont(ofSize: 12.0, weight: .bold)
+            let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
             let attrStr = NSAttributedString(string: bubbleText, attributes: attrs)
             let textSize = attrStr.size()
             let padX: CGFloat = 12.0
@@ -337,26 +393,147 @@ final class PetCanvasView: NSView {
             let by = max(6.0, spriteY - bh - 12.0)
 
             let bubbleRect = NSRect(x: bx, y: by, width: bw, height: bh)
-            let path = NSBezierPath(roundedRect: bubbleRect, xRadius: bh / 2.0, yRadius: bh / 2.0)
-            NSColor(calibratedRed: 0.09, green: 0.09, blue: 0.13, alpha: 0.94).setFill()
-            path.fill()
-            accent.setStroke()
-            path.lineWidth = 2.0
-            path.stroke()
+            drawPixelBox(rect: bubbleRect, fill: NSColor(calibratedRed: 0.06, green: 0.09, blue: 0.16, alpha: 0.96), border: accent, lineWidth: 2.0)
 
-            // 小三角
-            let tail = NSBezierPath()
-            let midX = bounds.width / 2.0
-            tail.move(to: NSPoint(x: midX - 6, y: by + bh - 1))
-            tail.line(to: NSPoint(x: midX, y: by + bh + 7))
-            tail.line(to: NSPoint(x: midX + 6, y: by + bh - 1))
-            tail.close()
-            NSColor(calibratedRed: 0.09, green: 0.09, blue: 0.13, alpha: 0.94).setFill()
-            tail.fill()
+            // 像素方格小三角
+            let midX = floor(bounds.width / 2.0)
+            NSColor(calibratedRed: 0.06, green: 0.09, blue: 0.16, alpha: 0.96).setFill()
+            NSBezierPath(rect: NSRect(x: midX - 4, y: by + bh - 1, width: 8, height: 4)).fill()
+            accent.setFill()
+            NSBezierPath(rect: NSRect(x: midX - 2, y: by + bh + 3, width: 4, height: 3)).fill()
 
             let tx = bx + (bw - min(textSize.width, bw - padX * 2)) / 2.0
             let ty = by + (bh - textSize.height) / 2.0
             attrStr.draw(in: NSRect(x: tx, y: ty, width: bw - padX * 2, height: textSize.height))
+        }
+    }
+
+    private func drawPixelBox(rect: NSRect, fill: NSColor, border: NSColor, lineWidth: CGFloat) {
+        NSColor(calibratedWhite: 0.0, alpha: 0.55).setFill()
+        NSBezierPath(rect: NSRect(x: rect.minX + 3.0, y: rect.minY + 3.0, width: rect.width, height: rect.height)).fill()
+        let path = NSBezierPath(roundedRect: rect, xRadius: 2.0, yRadius: 2.0)
+        fill.setFill()
+        path.fill()
+        border.setStroke()
+        path.lineWidth = lineWidth
+        path.stroke()
+    }
+
+    private func getFrameMotionOffset(row: Int, frame: Int) -> (Int, Int, Bool) {
+        switch row {
+        case 0:
+            return (0, (frame == 2 || frame == 3) ? 1 : 0, false)
+        case 1:
+            return (0, ((frame % 4) == 1 || (frame % 4) == 3) ? -1 : 0, false)
+        case 2:
+            return (0, ((frame % 4) == 1 || (frame % 4) == 3) ? -1 : 0, true)
+        case 3:
+            return (0, (frame % 2) == 1 ? -1 : 0, false)
+        case 4:
+            let jOff = [1, -2, -5, -2, 0]
+            return (0, jOff[frame % jOff.count], false)
+        case 5:
+            return ((frame % 2) == 0 ? -1 : 1, 0, false)
+        case 6:
+            return (0, (frame % 2) == 1 ? -1 : 0, false)
+        case 7:
+            let wOff = [0, 1, 0, -1, 0, 1]
+            return (0, wOff[frame % wOff.count], false)
+        case 8:
+            let rOff = [0, -2, -4, -1, 0, -2]
+            return (0, rOff[frame % rOff.count], false)
+        default:
+            return (0, 0, false)
+        }
+    }
+
+    private func drawPixelAccessory(ctx: CGContext, accessory: String, skinId: String, row: Int, frame: Int, destRect: NSRect) {
+        let gw = 36
+        let gh = 39
+        var grid = [[NSColor?]](repeating: [NSColor?](repeating: nil, count: gw), count: gh)
+        func px(_ x: Int, _ y: Int, _ color: NSColor) {
+            if x >= 0 && x < gw && y >= 0 && y < gh { grid[y][x] = color }
+        }
+
+        let (bodyX, bodyY, flipX) = getFrameMotionOffset(row: row, frame: frame)
+        let cx = 18 + bodyX
+        let cy = 22 + bodyY
+        let ey = cy - 7
+        let headOffset = skinId == "flutter-dash" ? -1 : (skinId == "android-bugdroid" ? 1 : 0)
+        let headY = cy - 11 + headOffset
+
+        switch accessory {
+        case "glasses":
+            let frameC = NSColor(calibratedRed: 0.06, green: 0.09, blue: 0.16, alpha: 0.96)
+            let glint = NSColor(calibratedRed: 0.22, green: 0.74, blue: 0.97, alpha: 1.0)
+            let gy = ey + 1
+            for x in (cx - 7)...(cx + 6) { px(x, gy, frameC) }
+            for x in (cx - 6)...(cx - 3) { for y in gy...(gy + 2) { px(x, y, frameC) } }
+            for x in (cx + 2)...(cx + 5) { for y in gy...(gy + 2) { px(x, y, frameC) } }
+            px(cx - 5, gy, glint); px(cx + 3, gy, glint)
+        case "cap":
+            let capBlue = NSColor(calibratedRed: 0.05, green: 0.65, blue: 0.91, alpha: 1.0)
+            let capHi = NSColor(calibratedRed: 0.22, green: 0.74, blue: 0.97, alpha: 1.0)
+            let capDark = NSColor(calibratedRed: 0.01, green: 0.52, blue: 0.78, alpha: 1.0)
+            for x in (cx - 7)...(cx + 6) { for y in (headY - 3)...headY { px(x, y, capBlue) } }
+            for x in (cx - 5)...(cx + 4) { px(x, headY - 4, capHi) }
+            for x in (cx - 3)...(cx + 8) { px(x, headY, capDark) }
+        case "crown":
+            let gold = NSColor(calibratedRed: 0.98, green: 0.80, blue: 0.08, alpha: 1.0)
+            let amber = NSColor(calibratedRed: 0.96, green: 0.62, blue: 0.04, alpha: 1.0)
+            let gem = NSColor(calibratedRed: 0.22, green: 0.74, blue: 0.97, alpha: 1.0)
+            for x in (cx - 5)...(cx + 4) { px(x, headY - 1, gold); px(x, headY, amber) }
+            px(cx - 5, headY - 3, gold); px(cx - 5, headY - 2, gold)
+            px(cx - 1, headY - 4, gold); px(cx, headY - 4, gold)
+            px(cx - 1, headY - 3, gold); px(cx, headY - 3, gold)
+            px(cx - 1, headY - 2, gem); px(cx, headY - 2, gem)
+            px(cx + 4, headY - 3, gold); px(cx + 4, headY - 2, gold)
+        case "coffee":
+            let cup = NSColor(calibratedRed: 0.95, green: 0.96, blue: 0.98, alpha: 1.0)
+            let coffee = NSColor(calibratedRed: 0.47, green: 0.21, blue: 0.06, alpha: 1.0)
+            let steam = NSColor(calibratedRed: 0.80, green: 0.84, blue: 0.88, alpha: 0.82)
+            let cupX = cx + 8
+            let cupY = cy + 2
+            for x in cupX...(cupX + 4) { for y in cupY...(cupY + 4) { px(x, y, cup) } }
+            for x in (cupX + 1)...(cupX + 3) { px(x, cupY, coffee) }
+            px(cupX + 5, cupY + 1, cup); px(cupX + 5, cupY + 3, cup); px(cupX + 6, cupY + 2, cup)
+            let steamOff = frame % 2
+            px(cupX + 1, cupY - 2 - steamOff, steam)
+            px(cupX + 3, cupY - 3 + steamOff, steam)
+        default:
+            return
+        }
+
+        // 添加 1px 深色轮廓像素
+        let outline = NSColor(calibratedRed: 0.06, green: 0.09, blue: 0.16, alpha: 1.0)
+        var finalGrid = grid
+        let dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        for y in 0..<gh {
+            for x in 0..<gw {
+                if grid[y][x] != nil { continue }
+                for (dx, dy) in dirs {
+                    let nx = x + dx, ny = y + dy
+                    if nx >= 0 && nx < gw && ny >= 0 && ny < gh, let nc = grid[ny][nx], nc.alphaComponent >= 0.85 {
+                        finalGrid[y][x] = outline
+                        break
+                    }
+                }
+            }
+        }
+
+        let sx = destRect.width / 192.0
+        let sy = destRect.height / 208.0
+        let ox = destRect.minX
+        let oy = destRect.minY
+        for y in 0..<gh {
+            for x in 0..<gw {
+                guard let c = finalGrid[y][x] else { continue }
+                let drawX = flipX ? (gw - 1 - x) : x
+                let rx = ox + (6.0 + CGFloat(drawX) * 5.0) * sx
+                let ry = oy + (6.0 + CGFloat(y) * 5.0) * sy
+                c.setFill()
+                ctx.fill(CGRect(x: rx, y: ry, width: 5.0 * sx, height: 5.0 * sy))
+            }
         }
     }
 
@@ -366,6 +543,7 @@ final class PetCanvasView: NSView {
     private var windowStartOrigin: NSPoint = .zero
     private var didDrag: Bool = false
     private var bubbleHitRects: [(NSRect, String)] = []
+    private var approvalHitRects: [(NSRect, String)] = []
     private var trackingAreaRef: NSTrackingArea?
 
     override func updateTrackingAreas() {
@@ -415,19 +593,39 @@ final class PetCanvasView: NSView {
         }
     }
 
+    private var pendingClickWork: DispatchWorkItem?
+
     override func mouseUp(with event: NSEvent) {
         controller?.isDragging = false
         controller?.dragTargetAngle = 0
         if didDrag {
+            pendingClickWork?.cancel()
+            pendingClickWork = nil
+            controller?.snapToScreenEdgeIfNear()
             controller?.saveWindowPosition()
             controller?.overrideRow = PetAnimRow.jump.rawValue
             controller?.overrideUntil = Date().addingTimeInterval(0.6)
         } else {
             let pt = convert(event.locationInWindow, from: nil)
-            if let hit = bubbleHitRects.first(where: { $0.0.contains(pt) }) {
+            if let appHit = approvalHitRects.first(where: { $0.0.contains(pt) }) {
+                pendingClickWork?.cancel()
+                pendingClickWork = nil
+                controller?.resolveCurrentApproval(decision: appHit.1)
+            } else if let hit = bubbleHitRects.first(where: { $0.0.contains(pt) }) {
+                pendingClickWork?.cancel()
+                pendingClickWork = nil
                 controller?.openConversation(hit.1)
+            } else if event.clickCount >= 2 {
+                pendingClickWork?.cancel()
+                pendingClickWork = nil
+                controller?.showQuickDispatchWindow()
             } else {
-                controller?.handleLeftClick()
+                pendingClickWork?.cancel()
+                let work = DispatchWorkItem { [weak self] in
+                    self?.controller?.handleLeftClick()
+                }
+                pendingClickWork = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.24, execute: work)
             }
         }
     }
@@ -478,6 +676,15 @@ final class PetController: NSObject, NSApplicationDelegate {
     var dragScaleX: CGFloat = 1.0
     var dragScaleY: CGFloat = 1.0
     var bubbleExpanded: Bool = false
+    var currentApproval: PendingApproval?
+    var approvalQueue: [PendingApproval] = []
+    var hiddenByFullscreen: Bool = false
+    var fullscreenPeekActive: Bool = false
+    var savedNormalOrigin: NSPoint? = nil
+    var dockSide: String = ""
+    var dockPeekOut: Bool = false
+    var dockHoverLastSeen: Date = .distantPast
+    var dockIgnoreHoverUntil: Date = .distantPast
 
     let port: UInt16 = 47821
     var serverSocket: Int32 = -1
@@ -571,10 +778,39 @@ final class PetController: NSObject, NSApplicationDelegate {
                 let dn = (obj["displayName"] as? String) ?? id
                 let desc = (obj["description"] as? String) ?? ""
                 let ver = (obj["spriteVersionNumber"] as? Int) ?? 2
+                let themeHex = (obj["themeColor"] as? String) ?? "#38BDF8"
+                var soundMap: [String: String] = [:]
+                if let rawSounds = obj["sounds"] as? [String: String] {
+                    for (k, v) in rawSounds {
+                        let p = item.appendingPathComponent(v).path
+                        if FileManager.default.fileExists(atPath: p) { soundMap[k.lowercased()] = p }
+                    }
+                }
                 let rel = (obj["spritesheetPath"] as? String) ?? "spritesheet.png"
                 let sheetPath = item.appendingPathComponent(rel).path
-                if let img = NSImage(contentsOfFile: sheetPath) {
-                    packs[id] = PetPack(id: id, displayName: dn, description: desc, version: ver, spritesheetPath: sheetPath, image: img)
+                let img = NSImage(contentsOfFile: sheetPath)
+                var frameMap: [Int: [CGImage]] = [:]
+                if img == nil {
+                    let actionDirs: [(Int, String)] = [
+                        (0, "idle"), (1, "walk_right"), (2, "walk_left"), (3, "wave"),
+                        (4, "jump"), (5, "blocked"), (6, "needs_input"), (7, "running"), (8, "ready")
+                    ]
+                    for (rowIdx, dirName) in actionDirs {
+                        let sub = item.appendingPathComponent(dirName)
+                        if let files = try? FileManager.default.contentsOfDirectory(at: sub, includingPropertiesForKeys: nil) {
+                            let pngs = files.filter { $0.pathExtension.lowercased() == "png" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+                            var cgs: [CGImage] = []
+                            for f in pngs {
+                                if let nsF = NSImage(contentsOf: f), let cgF = nsF.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                                    cgs.append(cgF)
+                                }
+                            }
+                            if !cgs.isEmpty { frameMap[rowIdx] = cgs }
+                        }
+                    }
+                }
+                if img != nil || !frameMap.isEmpty {
+                    packs[id] = PetPack(id: id, displayName: dn, description: desc, version: ver, spritesheetPath: sheetPath, image: img, themeColorHex: themeHex, sounds: soundMap, frameMap: frameMap)
                 }
             }
         }
@@ -873,14 +1109,48 @@ final class PetController: NSObject, NSApplicationDelegate {
         return I18n.translateBubble(state: top.state, rawMessage: top.message, lang: lang)
     }
 
+    func parseHexColor(_ hex: String) -> NSColor? {
+        var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6, let val = Int(s, radix: 16) else { return nil }
+        let r = CGFloat((val >> 16) & 0xFF) / 255.0
+        let g = CGFloat((val >> 8) & 0xFF) / 255.0
+        let b = CGFloat(val & 0xFF) / 255.0
+        return NSColor(calibratedRed: r, green: g, blue: b, alpha: 1.0)
+    }
+
     func accentColor(for state: String) -> NSColor {
         switch state {
         case "needs_input": return NSColor(calibratedRed: 1.0, green: 0.70, blue: 0.0, alpha: 1.0)
         case "blocked": return NSColor(calibratedRed: 1.0, green: 0.35, blue: 0.37, alpha: 1.0)
         case "ready": return NSColor(calibratedRed: 0.30, green: 0.85, blue: 0.39, alpha: 1.0)
-        case "running": return NSColor(calibratedRed: 0.31, green: 0.76, blue: 0.97, alpha: 1.0)
-        default: return NSColor(calibratedRed: 0.65, green: 0.55, blue: 0.98, alpha: 1.0)
+        case "running":
+            if let pack = activePack(), let c = parseHexColor(pack.themeColorHex) { return c }
+            return NSColor(calibratedRed: 0.31, green: 0.76, blue: 0.97, alpha: 1.0)
+        default:
+            if let pack = activePack(), let c = parseHexColor(pack.themeColorHex) { return c }
+            return NSColor(calibratedRed: 0.65, green: 0.55, blue: 0.98, alpha: 1.0)
         }
+    }
+
+    func effectiveAccessory() -> String {
+        let mode = config.Accessory.lowercased()
+        if mode == "none" || mode == "glasses" || mode == "cap" || mode == "coffee" || mode == "crown" { return mode }
+        let c = config.CompletedTasksCount
+        if c >= 100 { return "crown" }
+        if c >= 50 { return "coffee" }
+        if c >= 20 { return "cap" }
+        if c >= 5 { return "glasses" }
+        return "none"
+    }
+
+    func playPetSound(_ stateKey: String) {
+        if let pack = activePack(), let path = pack.sounds[stateKey.lowercased()], FileManager.default.fileExists(atPath: path) {
+            NSSound(contentsOfFile: path, byReference: true)?.play()
+            return
+        }
+        let sName = stateKey == "blocked" ? "Basso" : (stateKey == "needs_input" ? "Ping" : "Glass")
+        NSSound(named: NSSound.Name(sName))?.play()
     }
 
     func currentRowAndFrame() -> (Int, Int) {
@@ -924,6 +1194,26 @@ final class PetController: NSObject, NSApplicationDelegate {
         lastTick = now
         animTime += dt
 
+        let st = currentEffectiveState()
+        let urgentState = (st == "ready" || st == "needs_input" || st == "blocked" || currentApproval != nil)
+        var restAngle: CGFloat = 0.0
+        if !isDragging && !dockSide.isEmpty && !fullscreenPeekActive {
+            let hoverAllowed = now >= dockIgnoreHoverUntil
+            let activeHover = (hoverAllowed && isCursorInDockedZone(side: dockSide)) || bubbleExpanded || urgentState
+            if activeHover {
+                dockPeekOut = true
+                dockHoverLastSeen = now
+            } else if dockPeekOut && now.timeIntervalSince(dockHoverLastSeen) > 0.26 {
+                dockPeekOut = false
+            }
+            let targetX = dockedTargetX(side: dockSide, peekOut: dockPeekOut)
+            if abs(window.frame.origin.x - targetX) > 0.8 {
+                let nx = window.frame.origin.x + (targetX - window.frame.origin.x) * 0.25
+                window.setFrameOrigin(NSPoint(x: nx, y: window.frame.origin.y))
+            }
+            restAngle = dockPeekOut ? 0.0 : (dockSide == "right" ? -14.0 : 14.0)
+        }
+
         if isDragging {
             let dangle = CGFloat(sin(animTime * 7.0) * 3.5)
             let target = dragTargetAngle + dangle
@@ -931,17 +1221,16 @@ final class PetController: NSObject, NSApplicationDelegate {
             dragTargetAngle *= 0.78
             dragScaleX += (0.94 - dragScaleX) * 0.35
             dragScaleY += (1.07 - dragScaleY) * 0.35
-        } else if abs(dragCurrentAngle) > 0.1 || abs(dragScaleX - 1.0) > 0.005 {
-            dragCurrentAngle *= 0.65
-            if abs(dragCurrentAngle) < 0.1 { dragCurrentAngle = 0 }
+        } else if abs(dragCurrentAngle - restAngle) > 0.1 || abs(dragScaleX - 1.0) > 0.005 {
+            dragCurrentAngle += (restAngle - dragCurrentAngle) * 0.32
+            if abs(dragCurrentAngle - restAngle) < 0.1 { dragCurrentAngle = restAngle }
             dragScaleX += (1.0 - dragScaleX) * 0.35
             dragScaleY += (1.0 - dragScaleY) * 0.35
         }
 
-        let st = currentEffectiveState()
         if st == "idle" {
             // 待机散步
-            if config.AutoWalk {
+            if config.AutoWalk && !fullscreenPeekActive && !hiddenByFullscreen && dockSide.isEmpty {
                 if walkDir != 0 && now < walkUntil {
                     if let screen = NSScreen.main?.visibleFrame {
                         var f = window.frame
@@ -985,8 +1274,173 @@ final class PetController: NSObject, NSApplicationDelegate {
         }
 
         if visible {
+            // 全屏应用避让、关键提醒贴边出现与 Antigravity 窗口边缘吸附
+            if config.HideOnFullscreen {
+                let fs = isOtherAppFullscreen()
+                let urgent = (st == "ready" || st == "needs_input" || st == "blocked" || currentApproval != nil)
+                if fs {
+                    if urgent {
+                        if !fullscreenPeekActive {
+                            savedNormalOrigin = window.frame.origin
+                            fullscreenPeekActive = true
+                            hiddenByFullscreen = false
+                        }
+                        if let screen = NSScreen.main?.visibleFrame {
+                            let peekX = (dockSide == "left") ? (screen.minX - 6.0) : (screen.maxX - window.frame.width + 6.0)
+                            let peekY = max(screen.minY + 24.0, min(screen.maxY - window.frame.height - 40.0, window.frame.origin.y))
+                            if abs(window.frame.origin.x - peekX) > 1.0 || abs(window.frame.origin.y - peekY) > 1.0 {
+                                window.setFrameOrigin(NSPoint(x: peekX, y: peekY))
+                            }
+                        }
+                        window.alphaValue = 1.0
+                        window.orderFrontRegardless()
+                    } else {
+                        fullscreenPeekActive = false
+                        hiddenByFullscreen = true
+                        window.alphaValue = 0.0
+                    }
+                } else {
+                    if fullscreenPeekActive {
+                        if let saved = savedNormalOrigin { window.setFrameOrigin(saved) }
+                        fullscreenPeekActive = false
+                    }
+                    if hiddenByFullscreen {
+                        hiddenByFullscreen = false
+                    }
+                    window.alphaValue = 1.0
+                }
+            } else {
+                if fullscreenPeekActive {
+                    if let saved = savedNormalOrigin { window.setFrameOrigin(saved) }
+                    fullscreenPeekActive = false
+                }
+                if hiddenByFullscreen {
+                    hiddenByFullscreen = false
+                }
+                window.alphaValue = 1.0
+            }
+
+            if config.SnapToAgy && !isDragging && walkDir == 0 && !hiddenByFullscreen && !fullscreenPeekActive && dockSide.isEmpty {
+                if let agyRect = findAntigravityWindowRect() {
+                    let targetX = agyRect.maxX - window.frame.width - 18.0
+                    let targetY = agyRect.maxY - window.frame.height + 6.0
+                    let dx = targetX - window.frame.origin.x
+                    let dy = targetY - window.frame.origin.y
+                    if abs(dx) > 2.0 || abs(dy) > 2.0 {
+                        window.setFrameOrigin(NSPoint(x: window.frame.origin.x + dx * 0.25, y: window.frame.origin.y + dy * 0.25))
+                    }
+                }
+            }
+
             canvasView.needsDisplay = true
         }
+    }
+
+    func activeScreenVisibleFrame() -> NSRect? {
+        return window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
+    }
+
+    func isCursorInDockedZone(side: String) -> Bool {
+        guard let screen = activeScreenVisibleFrame() else { return false }
+        let m = NSEvent.mouseLocation
+        let minX: CGFloat
+        let maxX: CGFloat
+        if !dockPeekOut {
+            let narrowW = round(68.0 * CGFloat(config.Scale))
+            if side == "right" {
+                minX = screen.maxX - narrowW
+                maxX = screen.maxX + 6.0
+            } else {
+                minX = screen.minX - 6.0
+                maxX = screen.minX + narrowW
+            }
+        } else {
+            if side == "right" {
+                minX = min(window.frame.origin.x, dockedTargetX(side: "right", peekOut: true)) - 8.0
+                maxX = screen.maxX + 8.0
+            } else {
+                minX = screen.minX - 8.0
+                maxX = max(window.frame.maxX, dockedTargetX(side: "left", peekOut: true) + window.frame.width) + 8.0
+            }
+        }
+        let zone = NSRect(x: minX, y: window.frame.origin.y - 8.0, width: maxX - minX, height: window.frame.height + 16.0)
+        return zone.contains(m)
+    }
+
+    func dockedTargetX(side: String, peekOut: Bool) -> CGFloat {
+        guard let screen = activeScreenVisibleFrame() else { return window.frame.origin.x }
+        let bodyHalfW = (140.0 * CGFloat(config.Scale)) * 0.28
+        let w = window.frame.width
+        if side == "left" {
+            let halfPeek = screen.minX - w / 2.0 + bodyHalfW * 0.12
+            if peekOut {
+                return max(halfPeek, screen.minX - 14.0)
+            }
+            return halfPeek
+        } else {
+            let halfPeek = screen.maxX - w / 2.0 - bodyHalfW * 0.12
+            if peekOut {
+                return min(halfPeek, screen.maxX - w + 14.0)
+            }
+            return halfPeek
+        }
+    }
+
+    func snapToScreenEdgeIfNear() {
+        guard let screen = activeScreenVisibleFrame() else { return }
+        let f = window.frame
+        let centerX = f.origin.x + f.width / 2.0
+        let bodyHalfW = (140.0 * CGFloat(config.Scale)) * 0.28
+        let cursorX = NSEvent.mouseLocation.x
+        dockPeekOut = false
+        if (centerX - bodyHalfW <= screen.minX + 85.0) || (cursorX <= screen.minX + 60.0) {
+            dockSide = "left"
+            dockIgnoreHoverUntil = Date().addingTimeInterval(0.7)
+            window.setFrameOrigin(NSPoint(x: dockedTargetX(side: "left", peekOut: false), y: f.origin.y))
+        } else if (centerX + bodyHalfW >= screen.maxX - 85.0) || (cursorX >= screen.maxX - 60.0) {
+            dockSide = "right"
+            dockIgnoreHoverUntil = Date().addingTimeInterval(0.7)
+            window.setFrameOrigin(NSPoint(x: dockedTargetX(side: "right", peekOut: false), y: f.origin.y))
+        } else {
+            dockSide = ""
+        }
+    }
+
+    func isOtherAppFullscreen() -> Bool {
+        guard let screen = NSScreen.main?.frame else { return false }
+        guard let infoList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return false }
+        let myPid = ProcessInfo.processInfo.processIdentifier
+        for info in infoList {
+            guard let pid = info[kCGWindowOwnerPID as String] as? pid_t, pid != myPid else { continue }
+            guard let layer = info[kCGWindowLayer as String] as? Int, layer == 0 else { continue }
+            guard let owner = info[kCGWindowOwnerName as String] as? String else { continue }
+            if owner == "Dock" || owner == "Window Server" || owner == "Finder" || owner == "Antigravity" { continue }
+            if let boundsDict = info[kCGWindowBounds as String] as? [String: Any],
+               let w = boundsDict["Width"] as? CGFloat,
+               let h = boundsDict["Height"] as? CGFloat {
+                if w >= screen.width - 4 && h >= screen.height - 4 { return true }
+            }
+        }
+        return false
+    }
+
+    func findAntigravityWindowRect() -> NSRect? {
+        guard let screen = NSScreen.main?.frame else { return nil }
+        guard let infoList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
+        for info in infoList {
+            guard let owner = info[kCGWindowOwnerName as String] as? String, owner.contains("Antigravity") else { continue }
+            guard let layer = info[kCGWindowLayer as String] as? Int, layer == 0 else { continue }
+            if let boundsDict = info[kCGWindowBounds as String] as? [String: Any],
+               let x = boundsDict["X"] as? CGFloat,
+               let y = boundsDict["Y"] as? CGFloat,
+               let w = boundsDict["Width"] as? CGFloat,
+               let h = boundsDict["Height"] as? CGFloat, w >= 300 && h >= 200 {
+                // CGWindow 坐标原点在左上角，转换为 AppKit 左下角原点
+                let appKitY = screen.height - y - h
+                return NSRect(x: x, y: appKitY, width: w, height: h)
+            }
+        }
+        return nil
     }
 
     // MARK: Context Menu
@@ -1014,6 +1468,42 @@ final class PetController: NSObject, NSApplicationDelegate {
         openItem.target = self
         menu.addItem(openItem)
 
+        let dispatchItem = NSMenuItem(title: isEn ? "Quick Dispatch..." : "快捷派活...", action: #selector(menuQuickDispatch), keyEquivalent: "")
+        dispatchItem.target = self
+        menu.addItem(dispatchItem)
+
+        let accMenu = NSMenu()
+        let accOpts: [(String, String)] = [
+            ("auto", isEn ? "Auto Unlock" : "自动解锁"),
+            ("none", isEn ? "None" : "不佩戴"),
+            ("glasses", isEn ? "Pixel Glasses (5+)" : "像素墨镜 (5+)"),
+            ("cap", isEn ? "Dev Cap (20+)" : "开发者鸭舌帽 (20+)"),
+            ("coffee", isEn ? "Coffee Cup (50+)" : "咖啡杯 (50+)"),
+            ("crown", isEn ? "Gold Crown (100+)" : "黄金皇冠 (100+)")
+        ]
+        for (k, label) in accOpts {
+            let mi = NSMenuItem(title: label, action: #selector(menuSelectAccessory(_:)), keyEquivalent: "")
+            mi.representedObject = k
+            mi.state = (config.Accessory.lowercased() == k) ? .on : .off
+            mi.target = self
+            accMenu.addItem(mi)
+        }
+        let accRoot = NSMenuItem(title: isEn ? "Accessory" : "成长配饰", action: nil, keyEquivalent: "")
+        accRoot.submenu = accMenu
+        menu.addItem(accRoot)
+
+        let snapItem = NSMenuItem(title: isEn ? "Snap to Antigravity" : "吸附 Antigravity 窗口", action: #selector(menuToggleSnap), keyEquivalent: "")
+        snapItem.state = config.SnapToAgy ? .on : .off
+        snapItem.target = self
+        menu.addItem(snapItem)
+
+        let fsItem = NSMenuItem(title: isEn ? "Hide on Fullscreen" : "全屏自动隐身", action: #selector(menuToggleFullscreen), keyEquivalent: "")
+        fsItem.state = config.HideOnFullscreen ? .on : .off
+        fsItem.target = self
+        menu.addItem(fsItem)
+
+        menu.addItem(.separator())
+
         let hideItem = NSMenuItem(title: isEn ? "Hide (⌥⌘P)" : "隐藏桌宠 (⌥⌘P)", action: #selector(menuHide), keyEquivalent: "")
         hideItem.target = self
         menu.addItem(hideItem)
@@ -1035,6 +1525,18 @@ final class PetController: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc func menuSelectAccessory(_ sender: NSMenuItem) {
+        if let k = sender.representedObject as? String {
+            config.Accessory = k
+            saveConfig()
+            canvasView.needsDisplay = true
+        }
+    }
+
+    @objc func menuToggleSnap() { config.SnapToAgy.toggle(); saveConfig() }
+    @objc func menuToggleFullscreen() { config.HideOnFullscreen.toggle(); saveConfig() }
+    @objc func menuQuickDispatch() { showQuickDispatchWindow() }
+
     @objc func menuOpenChat() {
         let targetId = activeConvId != "default" ? activeConvId : lastConvId
         openConversation(targetId)
@@ -1042,6 +1544,50 @@ final class PetController: NSObject, NSApplicationDelegate {
 
     @objc func menuHide() { setPetVisible(false) }
     @objc func menuQuit() { saveConfig(); NSApp.terminate(nil) }
+
+    func resolveCurrentApproval(decision: String) {
+        guard let pending = currentApproval else { return }
+        pending.decision = decision
+        pending.resolved = true
+        pending.semaphore.signal()
+        currentApproval = approvalQueue.isEmpty ? nil : approvalQueue.removeFirst()
+        canvasView.needsDisplay = true
+    }
+
+    func showQuickDispatchWindow() {
+        let isEn = I18n.effectiveLanguage(config: config) == "en"
+        let alert = NSAlert()
+        alert.messageText = isEn ? "Quick Dispatch to Antigravity" : "快捷派活给 Antigravity"
+        alert.informativeText = isEn ? "Enter prompt or /command:" : "输入指令或 /slash 命令："
+        alert.addButton(withTitle: isEn ? "Send" : "发送")
+        alert.addButton(withTitle: isEn ? "Cancel" : "取消")
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        input.placeholderString = isEn ? "e.g. Run tests and fix errors" : "例如：运行测试并修复报错"
+        alert.accessoryView = input
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn {
+            let txt = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !txt.isEmpty { sendDispatchToPanel(txt) }
+        }
+    }
+
+    func sendDispatchToPanel(_ message: String) {
+        let bridgeUrl = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".antigravity-pet")
+            .appendingPathComponent("panel-bridge.json")
+        guard let data = try? Data(contentsOf: bridgeUrl),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let bPort = obj["port"] as? Int,
+              let token = obj["token"] as? String,
+              let url = URL(string: "http://127.0.0.1:\(bPort)/api/dispatch") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let targetConv = activeConvId != "default" ? activeConvId : lastConvId
+        let payload: [String: Any] = ["token": token, "conversationId": targetConv, "message": message]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        URLSession.shared.dataTask(with: req).resume()
+    }
 
     // MARK: HTTP Server (POSIX Socket 127.0.0.1:47821)
 
@@ -1113,6 +1659,39 @@ final class PetController: NSObject, NSApplicationDelegate {
             jsonBody = obj
         }
 
+        if path == "/approval" && method == "POST" {
+            let toolName = (jsonBody["toolName"] as? String) ?? "Tool"
+            let summary = (jsonBody["summary"] as? String) ?? ""
+            let cid = (jsonBody["conversationId"] as? String) ?? "default"
+            let pending = PendingApproval(id: UUID().uuidString, toolName: toolName, summary: summary, conversationId: cid)
+            DispatchQueue.main.async {
+                if self.currentApproval == nil {
+                    self.currentApproval = pending
+                } else {
+                    self.approvalQueue.append(pending)
+                }
+                self.playPetSound("needs_input")
+                self.canvasView.needsDisplay = true
+                self.syncWindowSizeForBubbles()
+            }
+            let waitRes = pending.semaphore.wait(timeout: .now() + .seconds(45))
+            if waitRes == .timedOut {
+                DispatchQueue.main.async {
+                    if self.currentApproval?.id == pending.id {
+                        self.currentApproval = self.approvalQueue.isEmpty ? nil : self.approvalQueue.removeFirst()
+                    } else {
+                        self.approvalQueue.removeAll { $0.id == pending.id }
+                    }
+                    self.canvasView.needsDisplay = true
+                }
+                sendHttpResponse(client, status: "200 OK", body: "{\"ok\":true,\"decision\":\"ask\",\"timeout\":true}")
+                return
+            }
+            let dec = pending.decision == "allow" || pending.decision == "deny" ? pending.decision : "ask"
+            sendHttpResponse(client, status: "200 OK", body: "{\"ok\":true,\"decision\":\"\(dec)\"}")
+            return
+        }
+
         var respObj: [String: Any] = ["ok": true]
         if method == "OPTIONS" {
             sendHttpResponse(client, status: "204 No Content", body: "")
@@ -1166,8 +1745,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             }
 
             if config.SoundAlert && (st == "needs_input" || st == "blocked" || st == "ready") && (st != lastSoundState || Date().timeIntervalSince(lastSoundAt) > 3.0) {
-                let sName = st == "blocked" ? "Basso" : (st == "needs_input" ? "Ping" : "Glass")
-                NSSound(named: NSSound.Name(sName))?.play()
+                playPetSound(st)
                 lastSoundState = st
                 lastSoundAt = Date()
             }
@@ -1250,6 +1828,14 @@ final class PetController: NSObject, NSApplicationDelegate {
                 config.Language = val.isEmpty ? "auto" : val.lowercased(); saveConfig()
             case "agylocale":
                 config.AgyDetectedLocale = val.lowercased(); saveConfig()
+            case "snaptoagy":
+                config.SnapToAgy = (val.lowercased() == "true" || val == "1"); saveConfig()
+            case "hideonfullscreen":
+                config.HideOnFullscreen = (val.lowercased() == "true" || val == "1"); saveConfig()
+            case "accessory":
+                config.Accessory = val.isEmpty ? "auto" : val.lowercased(); saveConfig()
+            case "quickdispatch":
+                DispatchQueue.main.async { self.showQuickDispatchWindow() }
             default: break
             }
             canvasView.needsDisplay = true
@@ -1291,6 +1877,10 @@ final class PetController: NSObject, NSApplicationDelegate {
             "bubbleStyle": isDetailedStyle() ? "detailed" : "simple",
             "pinnedConversationId": config.PinnedConversationId,
             "readyTimeoutSec": config.ReadyTimeoutSec,
+            "snapToAgy": config.SnapToAgy,
+            "hideOnFullscreen": config.HideOnFullscreen,
+            "accessory": config.Accessory,
+            "effectiveAccessory": effectiveAccessory(),
             "autoWalk": config.AutoWalk,
             "eyeFollow": config.EyeFollow,
             "topmost": config.Topmost,

@@ -2,6 +2,7 @@
   "id": "shiba-dog",
   "displayName": "像素柴犬 Shiba",
   "description": "暖黄卷尾的豆豆眉小柴犬",
-  "spriteVersionNumber": 2,
+  "themeColor": "#F59E0B",
+  "spriteVersionNumber": 3,
   "spritesheetPath": "spritesheet.png"
 }

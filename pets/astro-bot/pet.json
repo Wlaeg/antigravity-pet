@@ -2,6 +2,7 @@
   "id": "astro-bot",
   "displayName": "像素宇航员 Astro",
   "description": "带发光面罩的迷你太空人",
-  "spriteVersionNumber": 2,
+  "themeColor": "#93C5FD",
+  "spriteVersionNumber": 3,
   "spritesheetPath": "spritesheet.png"
 }

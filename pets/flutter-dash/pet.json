@@ -2,6 +2,7 @@
   "id": "flutter-dash",
   "displayName": "Flutter 小蓝鸟 Dash",
   "description": "Google Flutter & Dart 官方吉祥物小蓝鸟",
-  "spriteVersionNumber": 2,
+  "themeColor": "#54C5F8",
+  "spriteVersionNumber": 3,
   "spritesheetPath": "spritesheet.png"
 }

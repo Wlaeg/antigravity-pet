@@ -50,6 +50,9 @@ namespace AntigravityPet
         public string BubbleStyle { get; set; } // simple | detailed
         public string PinnedConversationId { get; set; }
         public int ReadyTimeoutSec { get; set; } // 0 = never auto-hide, default 30s
+        public bool SnapToAgy { get; set; }
+        public bool HideOnFullscreen { get; set; }
+        public string Accessory { get; set; }    // auto | none | glasses | cap | coffee | crown
         public double Scale { get; set; }       // 0.75 | 1.0 | 1.3 | 1.5
         public bool AutoWalk { get; set; }
         public bool EyeFollow { get; set; }
@@ -71,6 +74,9 @@ namespace AntigravityPet
             BubbleStyle = "simple";
             PinnedConversationId = "";
             ReadyTimeoutSec = 30;
+            SnapToAgy = false;
+            HideOnFullscreen = true;
+            Accessory = "auto";
             Scale = 1.0;
             AutoWalk = true;
             EyeFollow = true;
@@ -90,9 +96,21 @@ namespace AntigravityPet
         public string Description;
         public string FolderPath;
         public int SpriteVersion;
+        public Color ThemeColor = Color.FromRgb(56, 189, 248);
+        public Dictionary<string, string> Sounds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         public List<BitmapSource>[] Rows = new List<BitmapSource>[9];
         public List<BitmapSource> LookFrames = new List<BitmapSource>();
+    }
+
+    public class PendingApproval
+    {
+        public string Id;
+        public string ConversationId;
+        public string ToolName;
+        public string Summary;
+        public string Decision = "ask";
+        public ManualResetEventSlim WaitHandle = new ManualResetEventSlim(false);
     }
 
     public class TaskItem
@@ -133,12 +151,28 @@ namespace AntigravityPet
         [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
         [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
         [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+        [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+        [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+        [DllImport("user32.dll")] private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+        [DllImport("shell32.dll")] private static extern int SHQueryUserNotificationState(out int pquns);
+
+        private const uint MONITOR_DEFAULTTONEAREST = 2;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT { public int X; public int Y; }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT { public int Left, Top, Right, Bottom; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MONITORINFO
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public int dwFlags;
+        }
 
         private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
         private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
@@ -178,6 +212,7 @@ namespace AntigravityPet
         private readonly Ellipse _statusHalo;
         private readonly Ellipse _floorShadow;
         private readonly Image _spriteImage;
+        private readonly Dictionary<string, BitmapSource> _composedFrameCache = new Dictionary<string, BitmapSource>();
         private readonly RotateTransform _dragRotate;
         private readonly ScaleTransform _dragScale;
         private double _dragTargetAngle = 0;
@@ -197,6 +232,22 @@ namespace AntigravityPet
         private readonly Dictionary<string, PetPack> _packs = new Dictionary<string, PetPack>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, TaskItem> _tasks = new Dictionary<string, TaskItem>(StringComparer.OrdinalIgnoreCase);
         private readonly List<RecentConversation> _recentConversations = new List<RecentConversation>();
+        private readonly List<PendingApproval> _pendingApprovals = new List<PendingApproval>();
+        private readonly object _approvalLock = new object();
+        private bool _hiddenByFullscreen = false;
+        private bool _fullscreenPeekActive = false;
+        private double _savedNormalLeft = -1;
+        private double _savedNormalTop = -1;
+        private string _dockSide = "";
+        private bool _dockPeekOut = false;
+        private DateTime _dockHoverLastSeen = DateTime.MinValue;
+        private DateTime _dockIgnoreHoverUntil = DateTime.MinValue;
+        private DispatcherTimer _singleClickTimer;
+        private bool _isDoubleClickGesture = false;
+        private string _pendingSingleConvId = "";
+        private string _pendingSingleTitle = "";
+        private Border _approvalBar;
+        private StackPanel _bubbleWrapperPanel;
 
         private HttpListener _listener;
         private Thread _httpThread;
@@ -277,10 +328,11 @@ namespace AntigravityPet
 
             _stackBack2 = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(220, 30, 41, 59)),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(200, 148, 163, 184)),
-                BorderThickness = new Thickness(1.2),
-                CornerRadius = new CornerRadius(10),
+                Background = new SolidColorBrush(Color.FromArgb(228, 30, 41, 59)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(210, 148, 163, 184)),
+                BorderThickness = new Thickness(2.0),
+                CornerRadius = new CornerRadius(2),
+                SnapsToDevicePixels = true,
                 Height = 26,
                 MinWidth = 100,
                 Margin = new Thickness(0, 0, 0, 12),
@@ -293,10 +345,11 @@ namespace AntigravityPet
 
             _stackBack1 = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(232, 23, 33, 52)),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(220, 56, 189, 248)),
-                BorderThickness = new Thickness(1.2),
-                CornerRadius = new CornerRadius(10),
+                Background = new SolidColorBrush(Color.FromArgb(240, 23, 33, 52)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(230, 56, 189, 248)),
+                BorderThickness = new Thickness(2.0),
+                CornerRadius = new CornerRadius(2),
+                SnapsToDevicePixels = true,
                 Height = 26,
                 MinWidth = 114,
                 Margin = new Thickness(0, 0, 0, 6),
@@ -311,27 +364,66 @@ namespace AntigravityPet
             {
                 Text = "",
                 Foreground = new SolidColorBrush(Color.FromRgb(241, 245, 249)),
+                FontFamily = new FontFamily("Consolas, Microsoft YaHei UI"),
                 FontSize = 11.5,
-                FontWeight = FontWeights.SemiBold,
+                FontWeight = FontWeights.Bold,
                 TextWrapping = TextWrapping.NoWrap,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 MaxWidth = 208
             };
+            _bubbleWrapperPanel = new StackPanel { Orientation = Orientation.Vertical };
+            _bubbleWrapperPanel.Children.Add(_bubbleText);
+
+            _approvalBar = new Border
+            {
+                Margin = new Thickness(0, 5, 0, 0),
+                Visibility = Visibility.Collapsed
+            };
+            var appRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+            var btnAllow = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(230, 16, 185, 129)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(110, 231, 183)),
+                BorderThickness = new Thickness(1.5),
+                CornerRadius = new CornerRadius(2),
+                Padding = new Thickness(8, 2, 8, 2),
+                Margin = new Thickness(0, 0, 6, 0),
+                Cursor = Cursors.Hand,
+                Child = new TextBlock { Text = "✓ 允许", Foreground = Brushes.White, FontSize = 10.5, FontWeight = FontWeights.Bold, FontFamily = new FontFamily("Consolas, Microsoft YaHei UI") }
+            };
+            var btnDeny = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(230, 239, 68, 68)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(252, 165, 165)),
+                BorderThickness = new Thickness(1.5),
+                CornerRadius = new CornerRadius(2),
+                Padding = new Thickness(8, 2, 8, 2),
+                Cursor = Cursors.Hand,
+                Child = new TextBlock { Text = "✕ 拒绝", Foreground = Brushes.White, FontSize = 10.5, FontWeight = FontWeights.Bold, FontFamily = new FontFamily("Consolas, Microsoft YaHei UI") }
+            };
+            btnAllow.MouseLeftButtonUp += (s, e) => { e.Handled = true; ResolveCurrentApproval("allow"); };
+            btnDeny.MouseLeftButtonUp += (s, e) => { e.Handled = true; ResolveCurrentApproval("deny"); };
+            appRow.Children.Add(btnAllow);
+            appRow.Children.Add(btnDeny);
+            _approvalBar.Child = appRow;
+            _bubbleWrapperPanel.Children.Add(_approvalBar);
+
             _bubbleBorder = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(236, 15, 23, 42)),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(200, 56, 189, 248)),
-                BorderThickness = new Thickness(1.2),
-                CornerRadius = new CornerRadius(11),
+                Background = new SolidColorBrush(Color.FromArgb(245, 15, 23, 42)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(255, 56, 189, 248)),
+                BorderThickness = new Thickness(2.0),
+                CornerRadius = new CornerRadius(2),
+                SnapsToDevicePixels = true,
                 Padding = new Thickness(10, 5, 10, 5),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Bottom,
-                Child = _bubbleText,
+                Child = _bubbleWrapperPanel,
                 Visibility = Visibility.Hidden,
                 IsHitTestVisible = true,
                 Cursor = Cursors.Hand,
                 ToolTip = "点击打开对应 Antigravity 对话",
-                Effect = new DropShadowEffect { BlurRadius = 10, ShadowDepth = 2, Opacity = 0.42 }
+                Effect = new DropShadowEffect { BlurRadius = 0, ShadowDepth = 3, Direction = 315, Color = Colors.Black, Opacity = 0.85 }
             };
             _bubbleHost.Children.Add(_bubbleBorder);
 
@@ -494,6 +586,7 @@ namespace AntigravityPet
             StartHttpServer();
             UpdateVisualState();
             RenderCurrentFrame();
+            UpdateAccessoryVisual();
         }
 
         private void OnSourceInitialized(object sender, EventArgs e)
@@ -594,9 +687,13 @@ namespace AntigravityPet
 
         private void ResetToCorner(bool save)
         {
+            _dockSide = "";
+            _dockPeekOut = false;
+            _bubbleHost.HorizontalAlignment = HorizontalAlignment.Center;
             var wa = SystemParameters.WorkArea;
             Left = wa.Right - Width - 28;
             Top = wa.Bottom - Height - 24;
+            UpdateVisualState();
             if (save) SaveConfig();
         }
 
@@ -629,9 +726,12 @@ namespace AntigravityPet
             double vsTop = SystemParameters.VirtualScreenTop;
             double vsRight = vsLeft + SystemParameters.VirtualScreenWidth;
             double vsBottom = vsTop + SystemParameters.VirtualScreenHeight;
-            if (Left < vsLeft) Left = vsLeft;
+            if (string.IsNullOrEmpty(_dockSide) && !_fullscreenPeekActive)
+            {
+                if (Left < vsLeft) Left = vsLeft;
+                if (Left > vsRight - Width) Left = Math.Max(vsLeft, vsRight - Width);
+            }
             if (Top < vsTop) Top = vsTop;
-            if (Left > vsRight - Width) Left = Math.Max(vsLeft, vsRight - Width);
             if (Top > vsBottom - Height) Top = Math.Max(vsTop, vsBottom - Height);
         }
 
@@ -703,7 +803,34 @@ namespace AntigravityPet
                 {
                     int.TryParse(meta["spriteVersionNumber"].ToString(), out ver);
                 }
-                if (ver != 1 && ver != 2) ver = 2;
+                if (ver < 1 || ver > 3) ver = 2;
+
+                Color themeColor = ParseHexColor(GetStr(meta, "themeColor", ""), Color.FromRgb(56, 189, 248));
+                var soundsMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (meta.ContainsKey("sounds") && meta["sounds"] is Dictionary<string, object>)
+                {
+                    var sDict = (Dictionary<string, object>)meta["sounds"];
+                    foreach (var kv in sDict)
+                    {
+                        if (kv.Value != null)
+                        {
+                            string sp = System.IO.Path.Combine(dir, kv.Value.ToString());
+                            if (File.Exists(sp)) soundsMap[kv.Key] = sp;
+                        }
+                    }
+                }
+
+                var pack = new PetPack
+                {
+                    Id = id,
+                    DisplayName = displayName,
+                    Description = desc,
+                    FolderPath = dir,
+                    SpriteVersion = ver,
+                    ThemeColor = themeColor,
+                    Sounds = soundsMap
+                };
+                for (int r = 0; r < 9; r++) pack.Rows[r] = new List<BitmapSource>();
 
                 string sheetRel = GetStr(meta, "spritesheetPath", "spritesheet.png");
                 string sheetPath = System.IO.Path.Combine(dir, sheetRel);
@@ -713,7 +840,31 @@ namespace AntigravityPet
                     string altWebp = System.IO.Path.Combine(dir, "spritesheet.webp");
                     if (File.Exists(altPng)) sheetPath = altPng;
                     else if (File.Exists(altWebp)) sheetPath = altWebp;
-                    else return null;
+                    else sheetPath = null;
+                }
+
+                if (sheetPath == null)
+                {
+                    // 工坊 v3 序列帧文件夹回退加载（idle/, running-right/, ...）
+                    string[] rowFolders = { "idle", "running-right", "running-left", "waving", "jumping", "failed", "waiting", "running", "review" };
+                    int loadedCount = 0;
+                    for (int r = 0; r < rowFolders.Length; r++)
+                    {
+                        string subDir = System.IO.Path.Combine(dir, rowFolders[r]);
+                        if (!Directory.Exists(subDir)) continue;
+                        foreach (string png in Directory.GetFiles(subDir, "*.png").OrderBy(x => x))
+                        {
+                            using (var ms = new MemoryStream(File.ReadAllBytes(png)))
+                            {
+                                var f = BitmapFrame.Create(ms, BitmapCreateOptions.IgnoreImageCache, BitmapCacheOption.OnLoad);
+                                f.Freeze();
+                                pack.Rows[r].Add(f);
+                                loadedCount++;
+                            }
+                        }
+                    }
+                    if (loadedCount == 0) return null;
+                    return pack;
                 }
 
                 BitmapSource raw;
@@ -731,16 +882,6 @@ namespace AntigravityPet
                 int cellW = bgra.PixelWidth / cols;
                 int cellH = bgra.PixelHeight / rows;
                 if (cellW <= 0 || cellH <= 0) return null;
-
-                var pack = new PetPack
-                {
-                    Id = id,
-                    DisplayName = displayName,
-                    Description = desc,
-                    FolderPath = dir,
-                    SpriteVersion = ver
-                };
-                for (int r = 0; r < 9; r++) pack.Rows[r] = new List<BitmapSource>();
 
                 byte[] buf = new byte[cellW * cellH * 4];
                 int stride = cellW * 4;
@@ -812,6 +953,7 @@ namespace AntigravityPet
                 _currentPack = _packs[resolved];
                 _config.Skin = _currentPack.Id;
                 _animFrame = 0;
+                _composedFrameCache.Clear();
                 SaveConfig();
                 RebuildContextMenu();
                 RenderCurrentFrame();
@@ -858,9 +1000,23 @@ namespace AntigravityPet
                 }
             };
 
+            _singleClickTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(240) };
+            _singleClickTimer.Tick += (ts, te) =>
+            {
+                _singleClickTimer.Stop();
+                StartTransient(TransientAction.Jump, 5);
+                if (_state == PetState.Ready || _state == PetState.NeedsInput || _state == PetState.Blocked)
+                {
+                    ClearReminderTasks();
+                }
+                OpenAntigravityConversation(_pendingSingleConvId, _pendingSingleTitle);
+            };
+
             _stageGrid.MouseLeftButtonDown += (s, e) =>
             {
                 if (_transient == TransientAction.Walk) CancelWalk();
+                _isDoubleClickGesture = (e.ClickCount >= 2);
+                if (_isDoubleClickGesture) _singleClickTimer.Stop();
                 _isDragging = true;
                 _movedDuringDrag = false;
                 _dragStartScreen = GetCursorLogicalPos(e);
@@ -882,6 +1038,7 @@ namespace AntigravityPet
                 if (_movedDuringDrag || Math.Abs(dx) > 4 || Math.Abs(dy) > 4)
                 {
                     _movedDuringDrag = true;
+                    _singleClickTimer.Stop();
                     Left = _dragStartWindow.X + dx;
                     Top = _dragStartWindow.Y + dy;
                     _dragTargetAngle = Math.Max(-22.0, Math.Min(22.0, -vx * 0.85));
@@ -900,20 +1057,25 @@ namespace AntigravityPet
 
                 if (_movedDuringDrag)
                 {
+                    _singleClickTimer.Stop();
+                    SnapToScreenEdgeIfNear();
                     ClampToWorkArea();
                     SaveConfig();
                     StartTransient(TransientAction.Jump, 5);
                 }
+                else if (_isDoubleClickGesture || e.ClickCount >= 2)
+                {
+                    _isDoubleClickGesture = false;
+                    _singleClickTimer.Stop();
+                    StartTransient(TransientAction.Wave, 6);
+                    ShowQuickDispatchWindow();
+                }
                 else
                 {
-                    string convId = !string.IsNullOrWhiteSpace(_activeConversationId) ? _activeConversationId : _lastConversationId;
-                    string title = _activeTitle;
-                    StartTransient(TransientAction.Jump, 5);
-                    if (_state == PetState.Ready || _state == PetState.NeedsInput || _state == PetState.Blocked)
-                    {
-                        ClearReminderTasks();
-                    }
-                    OpenAntigravityConversation(convId, title);
+                    _pendingSingleConvId = !string.IsNullOrWhiteSpace(_activeConversationId) ? _activeConversationId : _lastConversationId;
+                    _pendingSingleTitle = _activeTitle;
+                    _singleClickTimer.Stop();
+                    _singleClickTimer.Start();
                 }
             };
         }
@@ -1018,6 +1180,33 @@ namespace AntigravityPet
                 }
             }
 
+            // 全屏游戏/视频避让 & 全屏关键提醒贴边出现状态机
+            SyncFullscreenAndEdgeState();
+
+            // 吸附在 Antigravity 窗口标题栏右上角边缘
+            if (_config.SnapToAgy && IsVisible && !_isDragging && _transient != TransientAction.Walk && !_bubbleExpanded && !_fullscreenPeekActive && string.IsNullOrEmpty(_dockSide))
+            {
+                RECT agyRect;
+                if (TryGetAntigravityWindowRect(out agyRect))
+                {
+                    var src = PresentationSource.FromVisual(this);
+                    double scaleX = 1.0, scaleY = 1.0;
+                    if (src != null && src.CompositionTarget != null)
+                    {
+                        scaleX = src.CompositionTarget.TransformToDevice.M11;
+                        scaleY = src.CompositionTarget.TransformToDevice.M22;
+                    }
+                    double targetLeft = Math.Round((agyRect.Right / scaleX) - Width - 18);
+                    double targetTop = Math.Round((agyRect.Top / scaleY) + 46);
+                    if (Math.Abs(Left - targetLeft) > 6 || Math.Abs(Top - targetTop) > 6)
+                    {
+                        Left = targetLeft;
+                        Top = targetTop;
+                        ClampToWorkArea();
+                    }
+                }
+            }
+
             var now = DateTime.Now;
             var stale = _tasks.Values
                 .Where(t =>
@@ -1032,7 +1221,7 @@ namespace AntigravityPet
             }
 
             if (_config.AutoWalk && IsVisible && _state == PetState.Idle &&
-                _transient == TransientAction.None && !_isDragging && !_stageGrid.IsMouseOver)
+                _transient == TransientAction.None && !_isDragging && !_stageGrid.IsMouseOver && !_fullscreenPeekActive && string.IsNullOrEmpty(_dockSide))
             {
                 if (now >= _nextWalkAt)
                 {
@@ -1059,6 +1248,46 @@ namespace AntigravityPet
                 }
             }
 
+            double restAngle = 0.0;
+            if (!_isDragging && !string.IsNullOrEmpty(_dockSide) && !_fullscreenPeekActive)
+            {
+                bool hoverAllowed = DateTime.Now >= _dockIgnoreHoverUntil;
+                bool activeHover = (hoverAllowed && IsCursorInDockedZone(_dockSide)) || _bubbleExpanded || HasUrgentNotification();
+                bool prevPeek = _dockPeekOut;
+                if (activeHover)
+                {
+                    _dockPeekOut = true;
+                    _dockHoverLastSeen = DateTime.Now;
+                }
+                else if (_dockPeekOut && (DateTime.Now - _dockHoverLastSeen).TotalMilliseconds > 260)
+                {
+                    _dockPeekOut = false;
+                }
+                if (prevPeek != _dockPeekOut)
+                {
+                    UpdateVisualState();
+                }
+
+                double targetLeft = GetDockedTargetLeft(_dockSide, _dockPeekOut);
+                if (Math.Abs(Left - targetLeft) > 0.8)
+                {
+                    Left += (targetLeft - Left) * 0.25;
+                }
+                restAngle = _dockPeekOut ? 0.0 : (_dockSide == "right" ? -14.0 : 14.0);
+                _bubbleHost.HorizontalAlignment = _dockPeekOut
+                    ? ((_dockSide == "right") ? HorizontalAlignment.Left : HorizontalAlignment.Right)
+                    : HorizontalAlignment.Center;
+                _floorShadow.Opacity = _dockPeekOut ? 0.16 : 0.0;
+            }
+            else if (!_isDragging && !_fullscreenPeekActive)
+            {
+                if (_bubbleHost.HorizontalAlignment != HorizontalAlignment.Center)
+                {
+                    _bubbleHost.HorizontalAlignment = HorizontalAlignment.Center;
+                }
+                _floorShadow.Opacity = 0.22;
+            }
+
             if (_isDragging && _movedDuringDrag)
             {
                 double dangle = Math.Sin(Environment.TickCount / 140.0) * 3.5;
@@ -1069,10 +1298,11 @@ namespace AntigravityPet
                 _dragScale.ScaleX += (0.94 - _dragScale.ScaleX) * 0.35;
                 _dragScale.ScaleY += (1.07 - _dragScale.ScaleY) * 0.35;
             }
-            else if (Math.Abs(_dragCurrentAngle) > 0.1 || Math.Abs(_dragScale.ScaleX - 1.0) > 0.005)
+            else if (Math.Abs(_dragCurrentAngle - restAngle) > 0.1 || Math.Abs(_dragScale.ScaleX - 1.0) > 0.005)
             {
-                _dragCurrentAngle *= 0.65;
-                _dragRotate.Angle = Math.Abs(_dragCurrentAngle) < 0.1 ? 0.0 : _dragCurrentAngle;
+                _dragCurrentAngle += (restAngle - _dragCurrentAngle) * 0.32;
+                if (Math.Abs(_dragCurrentAngle - restAngle) < 0.1) _dragCurrentAngle = restAngle;
+                _dragRotate.Angle = _dragCurrentAngle;
                 _dragScale.ScaleX += (1.0 - _dragScale.ScaleX) * 0.35;
                 _dragScale.ScaleY += (1.0 - _dragScale.ScaleY) * 0.35;
             }
@@ -1131,7 +1361,7 @@ namespace AntigravityPet
                     BitmapSource lookFrame;
                     if (_config.EyeFollow && TryGetMouseLookFrame(out lookFrame))
                     {
-                        _spriteImage.Source = lookFrame;
+                        _spriteImage.Source = ComposeFrameWithAccessory(lookFrame, _currentPack.Id, GetEffectiveAccessoryId(), 9, 0);
                     }
                     else
                     {
@@ -1148,7 +1378,8 @@ namespace AntigravityPet
                 ? _currentPack.Rows[rowIdx]
                 : _currentPack.Rows[0];
             if (list.Count == 0) return;
-            _spriteImage.Source = list[_animFrame % list.Count];
+            int frameIdx = _animFrame % list.Count;
+            _spriteImage.Source = ComposeFrameWithAccessory(list[frameIdx], _currentPack.Id, GetEffectiveAccessoryId(), rowIdx, frameIdx);
         }
 
         private bool TryGetMouseLookFrame(out BitmapSource frame)
@@ -1236,10 +1467,647 @@ namespace AntigravityPet
             RecomputeEffectiveState();
 
             if (_config.SoundAlert && !isPreview && newState != prevState &&
-                (newState == PetState.Ready || newState == PetState.NeedsInput))
+                (newState == PetState.Ready || newState == PetState.NeedsInput || newState == PetState.Blocked))
             {
-                try { SystemSounds.Asterisk.Play(); } catch { }
+                PlayPetSound(StateToApiString(newState));
             }
+            UpdateAccessoryVisual();
+            SyncFullscreenAndEdgeState();
+        }
+
+        private void PlayPetSound(string stateKey)
+        {
+            try
+            {
+                string wavPath;
+                if (_currentPack != null && _currentPack.Sounds != null &&
+                    _currentPack.Sounds.TryGetValue(stateKey, out wavPath) && File.Exists(wavPath))
+                {
+                    using (var sp = new SoundPlayer(wavPath))
+                    {
+                        sp.Play();
+                    }
+                    return;
+                }
+                if (stateKey == "ready" || stateKey == "needs_input") SystemSounds.Asterisk.Play();
+            }
+            catch { }
+        }
+
+        private static Color ParseHexColor(string hex, Color fallback)
+        {
+            if (string.IsNullOrWhiteSpace(hex)) return fallback;
+            try
+            {
+                object parsed = ColorConverter.ConvertFromString(hex.Trim());
+                if (parsed is Color) return (Color)parsed;
+            }
+            catch { }
+            return fallback;
+        }
+
+        private string GetEffectiveAccessoryId()
+        {
+            string pref = (_config.Accessory ?? "auto").Trim().ToLowerInvariant();
+            if (pref == "none") return "none";
+            int done = _config.CompletedTasksCount;
+            if (pref == "auto")
+            {
+                if (done >= 300) return "crown";
+                if (done >= 150) return "coffee";
+                if (done >= 50) return "cap";
+                if (done >= 10) return "glasses";
+                return "none";
+            }
+            return pref;
+        }
+
+        private void UpdateAccessoryVisual()
+        {
+            _composedFrameCache.Clear();
+            RenderCurrentFrame();
+        }
+
+        private static void GetFrameMotionOffset(int row, int frame, out int bodyX, out int bodyY, out bool flipX)
+        {
+            bodyX = 0;
+            bodyY = 0;
+            flipX = false;
+            switch (row)
+            {
+                case 0:
+                    if (frame == 2 || frame == 3) bodyY = 1;
+                    break;
+                case 1:
+                    if ((frame % 4) == 1 || (frame % 4) == 3) bodyY = -1;
+                    break;
+                case 2:
+                    flipX = true;
+                    if ((frame % 4) == 1 || (frame % 4) == 3) bodyY = -1;
+                    break;
+                case 3:
+                    if ((frame % 2) == 1) bodyY = -1;
+                    break;
+                case 4:
+                    int[] jOff = new int[] { 1, -2, -5, -2, 0 };
+                    bodyY = jOff[frame % jOff.Length];
+                    break;
+                case 5:
+                    bodyX = ((frame % 2) == 0) ? -1 : 1;
+                    break;
+                case 6:
+                    if ((frame % 2) == 1) bodyY = -1;
+                    break;
+                case 7:
+                    int[] wOff = new int[] { 0, 1, 0, -1, 0, 1 };
+                    bodyY = wOff[frame % wOff.Length];
+                    break;
+                case 8:
+                    int[] rOff = new int[] { 0, -2, -4, -1, 0, -2 };
+                    bodyY = rOff[frame % rOff.Length];
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private static int GetSkinAccessoryHeadOffset(string skinId)
+        {
+            if (skinId == "flutter-dash") return -1;
+            if (skinId == "android-bugdroid") return 1;
+            return 0;
+        }
+
+        private BitmapSource ComposeFrameWithAccessory(BitmapSource baseFrame, string skinId, string acc, int row, int frame)
+        {
+            if (baseFrame == null || string.IsNullOrEmpty(acc) || acc == "none") return baseFrame;
+            string key = skinId + "|" + acc + "|" + row + "|" + frame;
+            BitmapSource cached;
+            if (_composedFrameCache.TryGetValue(key, out cached)) return cached;
+
+            try
+            {
+                BitmapSource src = baseFrame;
+                if (src.Format != PixelFormats.Bgra32)
+                {
+                    var converted = new FormatConvertedBitmap();
+                    converted.BeginInit();
+                    converted.Source = src;
+                    converted.DestinationFormat = PixelFormats.Bgra32;
+                    converted.EndInit();
+                    src = converted;
+                }
+
+                int pw = src.PixelWidth;
+                int ph = src.PixelHeight;
+                int stride = pw * 4;
+                byte[] pixels = new byte[stride * ph];
+                src.CopyPixels(pixels, stride, 0);
+
+                int bodyX, bodyY;
+                bool flipX;
+                GetFrameMotionOffset(row, frame, out bodyX, out bodyY, out flipX);
+                int cx = 18 + bodyX;
+                int cy = 22 + bodyY;
+                int ey = cy - 7;
+                int headY = cy - 11 + GetSkinAccessoryHeadOffset(skinId);
+
+                const int gw = 36;
+                const int gh = 39;
+                byte[] ovR = new byte[gw * gh];
+                byte[] ovG = new byte[gw * gh];
+                byte[] ovB = new byte[gw * gh];
+                byte[] ovA = new byte[gw * gh];
+
+                Action<int, int, byte, byte, byte, byte> px = (x, y, r, g, b, a) =>
+                {
+                    if (x < 0 || x >= gw || y < 0 || y >= gh) return;
+                    int idx = y * gw + x;
+                    ovR[idx] = r;
+                    ovG[idx] = g;
+                    ovB[idx] = b;
+                    ovA[idx] = a;
+                };
+
+                if (acc == "glasses")
+                {
+                    int gy = ey + 1;
+                    for (int x = cx - 7; x <= cx + 6; x++) px(x, gy, 15, 23, 42, 245);
+                    for (int x = cx - 6; x <= cx - 3; x++) for (int y = gy; y <= gy + 2; y++) px(x, y, 15, 23, 42, 230);
+                    for (int x = cx + 2; x <= cx + 5; x++) for (int y = gy; y <= gy + 2; y++) px(x, y, 15, 23, 42, 230);
+                    px(cx - 5, gy, 56, 189, 248, 255);
+                    px(cx + 3, gy, 56, 189, 248, 255);
+                }
+                else if (acc == "cap")
+                {
+                    for (int x = cx - 7; x <= cx + 6; x++) for (int y = headY - 3; y <= headY; y++) px(x, y, 14, 165, 233, 255);
+                    for (int x = cx - 5; x <= cx + 4; x++) px(x, headY - 4, 56, 189, 248, 255);
+                    for (int x = cx - 3; x <= cx + 8; x++) px(x, headY, 2, 132, 199, 255);
+                }
+                else if (acc == "crown")
+                {
+                    for (int x = cx - 5; x <= cx + 4; x++) { px(x, headY - 1, 250, 204, 21, 255); px(x, headY, 245, 158, 11, 255); }
+                    px(cx - 5, headY - 3, 250, 204, 21, 255); px(cx - 5, headY - 2, 250, 204, 21, 255);
+                    px(cx - 1, headY - 4, 250, 204, 21, 255); px(cx, headY - 4, 250, 204, 21, 255);
+                    px(cx - 1, headY - 3, 250, 204, 21, 255); px(cx, headY - 3, 250, 204, 21, 255);
+                    px(cx - 1, headY - 2, 56, 189, 248, 255); px(cx, headY - 2, 56, 189, 248, 255);
+                    px(cx + 4, headY - 3, 250, 204, 21, 255); px(cx + 4, headY - 2, 250, 204, 21, 255);
+                }
+                else if (acc == "coffee")
+                {
+                    int cupX = cx + 8;
+                    int cupY = cy + 2;
+                    for (int x = cupX; x <= cupX + 4; x++) for (int y = cupY; y <= cupY + 4; y++) px(x, y, 241, 245, 249, 255);
+                    for (int x = cupX + 1; x <= cupX + 3; x++) px(x, cupY, 120, 53, 15, 255);
+                    px(cupX + 5, cupY + 1, 241, 245, 249, 255);
+                    px(cupX + 5, cupY + 3, 241, 245, 249, 255);
+                    px(cupX + 6, cupY + 2, 241, 245, 249, 255);
+                    int steamOff = frame % 2;
+                    px(cupX + 1, cupY - 2 - steamOff, 203, 213, 225, 210);
+                    px(cupX + 3, cupY - 3 + steamOff, 203, 213, 225, 210);
+                }
+
+                // 为配饰添加 1px 深色像素外轮廓（与角色本体融合）
+                byte[] outA = (byte[])ovA.Clone();
+                int[] odx = new int[] { 1, -1, 0, 0 };
+                int[] ody = new int[] { 0, 0, 1, -1 };
+                for (int y = 0; y < gh; y++)
+                {
+                    for (int x = 0; x < gw; x++)
+                    {
+                        int i = y * gw + x;
+                        if (ovA[i] > 0) continue;
+                        for (int k = 0; k < 4; k++)
+                        {
+                            int nx = x + odx[k];
+                            int ny = y + ody[k];
+                            if (nx >= 0 && nx < gw && ny >= 0 && ny < gh && ovA[ny * gw + nx] >= 220)
+                            {
+                                ovR[i] = 15; ovG[i] = 23; ovB[i] = 42; outA[i] = 255;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                double sx = pw / 192.0;
+                double sy = ph / 208.0;
+                for (int y = 0; y < gh; y++)
+                {
+                    for (int x = 0; x < gw; x++)
+                    {
+                        int i = y * gw + x;
+                        byte a = outA[i];
+                        if (a == 0) continue;
+                        int drawX = flipX ? (gw - 1 - x) : x;
+                        int px0 = (int)Math.Floor((6.0 + drawX * 5.0) * sx);
+                        int py0 = (int)Math.Floor((6.0 + y * 5.0) * sy);
+                        int px1 = (int)Math.Ceiling((6.0 + (drawX + 1) * 5.0) * sx);
+                        int py1 = (int)Math.Ceiling((6.0 + (y + 1) * 5.0) * sy);
+                        for (int pyy = Math.Max(0, py0); pyy < Math.Min(ph, py1); pyy++)
+                        {
+                            for (int pxx = Math.Max(0, px0); pxx < Math.Min(pw, px1); pxx++)
+                            {
+                                int pIdx = pyy * stride + pxx * 4;
+                                if (a >= 250)
+                                {
+                                    pixels[pIdx + 0] = ovB[i];
+                                    pixels[pIdx + 1] = ovG[i];
+                                    pixels[pIdx + 2] = ovR[i];
+                                    pixels[pIdx + 3] = a;
+                                }
+                                else
+                                {
+                                    double fa = a / 255.0;
+                                    double ia = 1.0 - fa;
+                                    pixels[pIdx + 0] = (byte)(ovB[i] * fa + pixels[pIdx + 0] * ia);
+                                    pixels[pIdx + 1] = (byte)(ovG[i] * fa + pixels[pIdx + 1] * ia);
+                                    pixels[pIdx + 2] = (byte)(ovR[i] * fa + pixels[pIdx + 2] * ia);
+                                    pixels[pIdx + 3] = (byte)Math.Min(255, (int)(a + pixels[pIdx + 3] * ia));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                var wb = new WriteableBitmap(pw, ph, 96, 96, PixelFormats.Bgra32, null);
+                wb.WritePixels(new Int32Rect(0, 0, pw, ph), pixels, stride, 0);
+                wb.Freeze();
+                _composedFrameCache[key] = wb;
+                return wb;
+            }
+            catch
+            {
+                return baseFrame;
+            }
+        }
+
+        private Rect GetCurrentMonitorWorkArea()
+        {
+            try
+            {
+                IntPtr hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    IntPtr hMon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+                    if (hMon != IntPtr.Zero)
+                    {
+                        MONITORINFO mi = new MONITORINFO();
+                        mi.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+                        if (GetMonitorInfo(hMon, ref mi))
+                        {
+                            double sx = 1.0, sy = 1.0;
+                            var src = PresentationSource.FromVisual(this);
+                            if (src != null && src.CompositionTarget != null)
+                            {
+                                sx = src.CompositionTarget.TransformFromDevice.M11;
+                                sy = src.CompositionTarget.TransformFromDevice.M22;
+                            }
+                            double l = mi.rcWork.Left * sx;
+                            double t = mi.rcWork.Top * sy;
+                            double w = Math.Max(100.0, (mi.rcWork.Right - mi.rcWork.Left) * sx);
+                            double h = Math.Max(100.0, (mi.rcWork.Bottom - mi.rcWork.Top) * sy);
+                            return new Rect(l, t, w, h);
+                        }
+                    }
+                }
+            }
+            catch { }
+            return SystemParameters.WorkArea;
+        }
+
+        private bool IsCursorInDockedZone(string side)
+        {
+            try
+            {
+                POINT pt;
+                if (!GetCursorPos(out pt)) return false;
+                double mx = pt.X;
+                double my = pt.Y;
+                var src = PresentationSource.FromVisual(this);
+                if (src != null && src.CompositionTarget != null)
+                {
+                    Point logical = src.CompositionTarget.TransformFromDevice.Transform(new Point(mx, my));
+                    mx = logical.X;
+                    my = logical.Y;
+                }
+                var wa = GetCurrentMonitorWorkArea();
+                double minX, maxX;
+                if (!_dockPeekOut)
+                {
+                    // 窄触发区：仅覆盖屏幕边缘露出的宠物半身与色块
+                    double narrowW = Math.Round(68.0 * _config.Scale);
+                    if (side == "right")
+                    {
+                        minX = wa.Right - narrowW;
+                        maxX = wa.Right + 6.0;
+                    }
+                    else
+                    {
+                        minX = wa.Left - 6.0;
+                        maxX = wa.Left + narrowW;
+                    }
+                }
+                else
+                {
+                    // 宽保持区：覆盖整个探出后的窗口与边缘联合区域
+                    if (side == "right")
+                    {
+                        minX = Math.Min(Left, GetDockedTargetLeft("right", true)) - 8.0;
+                        maxX = wa.Right + 8.0;
+                    }
+                    else
+                    {
+                        minX = wa.Left - 8.0;
+                        maxX = Math.Max(Left + Width, GetDockedTargetLeft("left", true) + Width) + 8.0;
+                    }
+                }
+                double minY = Top - 8.0;
+                double maxY = Top + Height + 8.0;
+                return mx >= minX && mx <= maxX && my >= minY && my <= maxY;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private double GetDockedTargetLeft(string side, bool expandedForHoverOrAlert)
+        {
+            var wa = GetCurrentMonitorWorkArea();
+            double bodyHalfW = _stageGrid.Width * 0.28;
+            if (side == "left")
+            {
+                double halfPeek = wa.Left - Width / 2.0 + bodyHalfW * 0.12;
+                if (expandedForHoverOrAlert)
+                {
+                    double fullPeek = wa.Left - 14.0;
+                    return Math.Max(halfPeek, fullPeek);
+                }
+                return halfPeek;
+            }
+            else
+            {
+                double halfPeek = wa.Right - Width / 2.0 - bodyHalfW * 0.12;
+                if (expandedForHoverOrAlert)
+                {
+                    double fullPeek = wa.Right - Width + 14.0;
+                    return Math.Min(halfPeek, fullPeek);
+                }
+                return halfPeek;
+            }
+        }
+
+        private void SnapToScreenEdgeIfNear()
+        {
+            var wa = GetCurrentMonitorWorkArea();
+            double centerX = Left + Width / 2.0;
+            double bodyHalfW = _stageGrid.Width * 0.28;
+            bool hasCursor = false;
+            double cursorX = centerX;
+            try
+            {
+                POINT pt;
+                if (GetCursorPos(out pt))
+                {
+                    hasCursor = true;
+                    cursorX = pt.X;
+                    var src = PresentationSource.FromVisual(this);
+                    if (src != null && src.CompositionTarget != null)
+                    {
+                        cursorX = src.CompositionTarget.TransformFromDevice.Transform(new Point(pt.X, pt.Y)).X;
+                    }
+                }
+            }
+            catch { }
+
+            _dockPeekOut = false;
+            if ((centerX - bodyHalfW <= wa.Left + 85.0) || (hasCursor && cursorX <= wa.Left + 60.0))
+            {
+                _dockSide = "left";
+                _dockIgnoreHoverUntil = DateTime.Now.AddMilliseconds(700);
+                _bubbleHost.HorizontalAlignment = HorizontalAlignment.Center;
+            }
+            else if ((centerX + bodyHalfW >= wa.Right - 85.0) || (hasCursor && cursorX >= wa.Right - 60.0))
+            {
+                _dockSide = "right";
+                _dockIgnoreHoverUntil = DateTime.Now.AddMilliseconds(700);
+                _bubbleHost.HorizontalAlignment = HorizontalAlignment.Center;
+            }
+            else
+            {
+                _dockSide = "";
+                _bubbleHost.HorizontalAlignment = HorizontalAlignment.Center;
+            }
+            UpdateVisualState();
+            if (!string.IsNullOrEmpty(_dockSide))
+            {
+                Left = GetDockedTargetLeft(_dockSide, false);
+            }
+        }
+
+        private bool HasPendingApproval()
+        {
+            lock (_approvalLock) { return _pendingApprovals.Count > 0; }
+        }
+
+        private bool HasUrgentNotification()
+        {
+            return _state == PetState.Ready || _state == PetState.NeedsInput || _state == PetState.Blocked || HasPendingApproval();
+        }
+
+        private bool IsOtherAppFullscreen()
+        {
+            try
+            {
+                int quns = 0;
+                if (SHQueryUserNotificationState(out quns) == 0 && (quns == 2 || quns == 3 || quns == 4))
+                {
+                    return true;
+                }
+            }
+            catch { }
+
+            try
+            {
+                IntPtr fg = GetForegroundWindow();
+                if (fg == IntPtr.Zero) return false;
+                IntPtr selfHwnd = new WindowInteropHelper(this).Handle;
+                if (fg == selfHwnd) return false;
+
+                var cls = new StringBuilder(64);
+                GetClassName(fg, cls, cls.Capacity);
+                string clsName = cls.ToString();
+                if (clsName == "Progman" || clsName == "WorkerW" || clsName == "Shell_TrayWnd" || clsName == "Shell_SecondaryTrayWnd")
+                {
+                    return false;
+                }
+
+                uint pid = 0;
+                GetWindowThreadProcessId(fg, out pid);
+                if (pid == (uint)Process.GetCurrentProcess().Id) return false;
+                try
+                {
+                    using (var proc = Process.GetProcessById((int)pid))
+                    {
+                        if (string.Equals(proc.ProcessName, "Antigravity", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return false;
+                        }
+                    }
+                }
+                catch { }
+
+                RECT winRect;
+                if (!GetWindowRect(fg, out winRect)) return false;
+                IntPtr hMon = MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST);
+                if (hMon == IntPtr.Zero) return false;
+                MONITORINFO mi = new MONITORINFO();
+                mi.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+                if (!GetMonitorInfo(hMon, ref mi)) return false;
+
+                return winRect.Left <= mi.rcMonitor.Left + 2 &&
+                       winRect.Top <= mi.rcMonitor.Top + 2 &&
+                       winRect.Right >= mi.rcMonitor.Right - 2 &&
+                       winRect.Bottom >= mi.rcMonitor.Bottom - 2;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void SyncFullscreenAndEdgeState()
+        {
+            if (_isClosing || !_config.Enabled) return;
+
+            if (!_config.HideOnFullscreen)
+            {
+                if (_fullscreenPeekActive)
+                {
+                    if (_savedNormalLeft >= 0 && _savedNormalTop >= 0)
+                    {
+                        Left = _savedNormalLeft;
+                        Top = _savedNormalTop;
+                        ClampToWorkArea();
+                    }
+                    _fullscreenPeekActive = false;
+                }
+                if (_hiddenByFullscreen)
+                {
+                    _hiddenByFullscreen = false;
+                    if (!IsVisible) Show();
+                }
+                return;
+            }
+
+            bool isFs = IsOtherAppFullscreen();
+            bool urgent = HasUrgentNotification();
+
+            if (isFs)
+            {
+                if (urgent)
+                {
+                    if (!_fullscreenPeekActive)
+                    {
+                        _savedNormalLeft = Left;
+                        _savedNormalTop = Top;
+                        _fullscreenPeekActive = true;
+                        _hiddenByFullscreen = false;
+                    }
+                    var wa = GetCurrentMonitorWorkArea();
+                    string peekSide = (_dockSide == "left") ? "left" : "right";
+                    double peekLeft = GetDockedTargetLeft(peekSide, true);
+                    double peekTop = Math.Max(wa.Top + 40, Math.Min(wa.Bottom - Height - 24, Top));
+                    _bubbleHost.HorizontalAlignment = (peekSide == "left") ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+                    if (Math.Abs(Left - peekLeft) > 1 || Math.Abs(Top - peekTop) > 1)
+                    {
+                        Left = peekLeft;
+                        Top = peekTop;
+                    }
+                    if (!IsVisible) Show();
+                    var hwnd = new WindowInteropHelper(this).Handle;
+                    if (hwnd != IntPtr.Zero)
+                    {
+                        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                    }
+                }
+                else
+                {
+                    _fullscreenPeekActive = false;
+                    _hiddenByFullscreen = true;
+                    if (IsVisible) Hide();
+                }
+            }
+            else
+            {
+                if (_fullscreenPeekActive)
+                {
+                    if (_savedNormalLeft >= 0 && _savedNormalTop >= 0)
+                    {
+                        Left = _savedNormalLeft;
+                        Top = _savedNormalTop;
+                        ClampToWorkArea();
+                    }
+                    _fullscreenPeekActive = false;
+                    _bubbleHost.HorizontalAlignment = string.IsNullOrEmpty(_dockSide)
+                        ? HorizontalAlignment.Center
+                        : (_dockSide == "left" ? HorizontalAlignment.Right : HorizontalAlignment.Left);
+                }
+                if (_hiddenByFullscreen)
+                {
+                    _hiddenByFullscreen = false;
+                    if (!IsVisible) Show();
+                    if (_config.Topmost) ApplyTopmost(true);
+                }
+            }
+        }
+
+        private bool TryGetAntigravityWindowRect(out RECT foundRect)
+        {
+            RECT res = new RECT();
+            bool found = false;
+            try
+            {
+                var pids = new HashSet<int>(Process.GetProcessesByName("Antigravity").Select(p => p.Id));
+                if (pids.Count == 0) { foundRect = res; return false; }
+                EnumWindows((hWnd, lParam) =>
+                {
+                    if (!IsWindowVisible(hWnd) || IsIconic(hWnd)) return true;
+                    uint pid;
+                    GetWindowThreadProcessId(hWnd, out pid);
+                    if (pids.Contains((int)pid))
+                    {
+                        RECT r;
+                        if (GetWindowRect(hWnd, out r) && (r.Right - r.Left) > 300 && (r.Bottom - r.Top) > 200)
+                        {
+                            res = r;
+                            found = true;
+                            return false;
+                        }
+                    }
+                    return true;
+                }, IntPtr.Zero);
+            }
+            catch { }
+            foundRect = res;
+            return found;
+        }
+
+        private void ResolveCurrentApproval(string decision)
+        {
+            PendingApproval cur = null;
+            lock (_approvalLock)
+            {
+                if (_pendingApprovals.Count > 0)
+                {
+                    cur = _pendingApprovals[0];
+                    _pendingApprovals.RemoveAt(0);
+                    cur.Decision = decision;
+                    cur.WaitHandle.Set();
+                }
+            }
+            UpdateVisualState();
         }
 
         private void UpdateRecentConversation(string convId, string title, string st)
@@ -1482,7 +2350,15 @@ namespace AntigravityPet
             double vsLeft = SystemParameters.VirtualScreenLeft;
             double vsTop = SystemParameters.VirtualScreenTop;
             double vsRight = vsLeft + SystemParameters.VirtualScreenWidth;
-            Left = Math.Max(vsLeft, Math.Min(vsRight - Width, centerX - Width * 0.5));
+            if (!string.IsNullOrEmpty(_dockSide) || _fullscreenPeekActive)
+            {
+                string activeSide = !string.IsNullOrEmpty(_dockSide) ? _dockSide : "right";
+                Left = GetDockedTargetLeft(activeSide, _dockPeekOut || _fullscreenPeekActive);
+            }
+            else
+            {
+                Left = Math.Max(vsLeft, Math.Min(vsRight - Width, centerX - Width * 0.5));
+            }
             Top = Math.Max(vsTop, bottom - Height);
         }
 
@@ -1605,15 +2481,16 @@ namespace AntigravityPet
 
             var card = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(242, 15, 23, 42)),
+                Background = new SolidColorBrush(Color.FromArgb(245, 15, 23, 42)),
                 BorderBrush = new SolidColorBrush(isPinned ? Color.FromRgb(250, 204, 21) : accent),
-                BorderThickness = new Thickness(isPinned ? 1.5 : 1.1),
-                CornerRadius = new CornerRadius(9),
+                BorderThickness = new Thickness(isPinned ? 2.0 : 1.8),
+                CornerRadius = new CornerRadius(2),
+                SnapsToDevicePixels = true,
                 Padding = new Thickness(9, 4, 9, 4),
                 Margin = new Thickness(0, 0, 0, 4),
                 Cursor = Cursors.Hand,
                 Child = rowPanel,
-                Effect = new DropShadowEffect { BlurRadius = 8, ShadowDepth = 1.5, Opacity = 0.35 }
+                Effect = new DropShadowEffect { BlurRadius = 0, ShadowDepth = 2.5, Direction = 315, Color = Colors.Black, Opacity = 0.8 }
             };
 
             pinBtn.MouseLeftButtonUp += (s, e) =>
@@ -1643,6 +2520,36 @@ namespace AntigravityPet
         private void UpdateBubbleDisplay(Color badgeBg, bool isAlert, string defaultMsg)
         {
             double baseW = Math.Round(BaseWidth * _config.Scale);
+            // 统一还原正常气泡基础样式
+            _bubbleBorder.Width = double.NaN;
+            _bubbleBorder.Height = double.NaN;
+            _bubbleBorder.Padding = new Thickness(12, 6, 12, 6);
+            _bubbleBorder.Margin = new Thickness(0);
+            _bubbleBorder.Background = new SolidColorBrush(Color.FromArgb(242, 15, 23, 42));
+            _bubbleText.Visibility = Visibility.Visible;
+
+            PendingApproval topApproval = null;
+            lock (_approvalLock)
+            {
+                if (_pendingApprovals.Count > 0) topApproval = _pendingApprovals[0];
+            }
+            if (topApproval != null)
+            {
+                _stackBack1.Visibility = Visibility.Collapsed;
+                _stackBack2.Visibility = Visibility.Collapsed;
+                _expandedStackPanel.Visibility = Visibility.Collapsed;
+                _bubbleExpanded = false;
+                _bubbleText.MaxWidth = Math.Round(300 * _config.Scale);
+                _bubbleText.Text = T("审批: ", "Approve: ") + Shorten(topApproval.Summary, 24);
+                _bubbleBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(245, 158, 11));
+                _approvalBar.Visibility = Visibility.Visible;
+                _bubbleBorder.Visibility = Visibility.Visible;
+                double wNeed = Math.Max(baseW, Math.Min(Math.Round(360 * _config.Scale), MeasureBubbleTextWidth(_bubbleText.Text, 11.5) + 42));
+                SetWindowSizeKeepingAnchor(wNeed, _baseWindowHeight + 28);
+                return;
+            }
+            if (_approvalBar != null) _approvalBar.Visibility = Visibility.Collapsed;
+
             if (_config.BubbleMode == "off")
             {
                 _bubbleBorder.Visibility = Visibility.Hidden;
@@ -1650,6 +2557,36 @@ namespace AntigravityPet
                 _stackBack2.Visibility = Visibility.Collapsed;
                 _expandedStackPanel.Visibility = Visibility.Collapsed;
                 _bubbleExpanded = false;
+                SetWindowSizeKeepingAnchor(baseW, _baseWindowHeight);
+                return;
+            }
+
+            // 贴边收起观察态：将聊天框直接精简为高对比度像素状态色块
+            bool isDockedCompact = !string.IsNullOrEmpty(_dockSide) && !_dockPeekOut && !_fullscreenPeekActive && !_bubbleExpanded;
+            if (isDockedCompact)
+            {
+                _bubbleHost.HorizontalAlignment = HorizontalAlignment.Center;
+                _stackBack1.Visibility = Visibility.Collapsed;
+                _stackBack2.Visibility = Visibility.Collapsed;
+                _expandedStackPanel.Visibility = Visibility.Collapsed;
+                _bubbleText.Visibility = Visibility.Collapsed;
+                bool showBlock = (_state != PetState.Idle) && (_config.BubbleMode != "alerts" || isAlert);
+                if (!showBlock)
+                {
+                    _bubbleBorder.Visibility = Visibility.Hidden;
+                }
+                else
+                {
+                    _bubbleBorder.Width = Math.Round(34 * _config.Scale);
+                    _bubbleBorder.Height = Math.Round(14 * _config.Scale);
+                    _bubbleBorder.Padding = new Thickness(0);
+                    _bubbleBorder.Background = new SolidColorBrush(badgeBg);
+                    _bubbleBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(15, 23, 42));
+                    _bubbleBorder.Margin = (_dockSide == "right")
+                        ? new Thickness(0, 0, Math.Round(44 * _config.Scale), 0)
+                        : new Thickness(Math.Round(44 * _config.Scale), 0, 0, 0);
+                    _bubbleBorder.Visibility = Visibility.Visible;
+                }
                 SetWindowSizeKeepingAnchor(baseW, _baseWindowHeight);
                 return;
             }
@@ -1762,7 +2699,10 @@ namespace AntigravityPet
             if (shouldShowBubble)
             {
                 _bubbleText.Text = msg;
-                _bubbleBorder.BorderBrush = new SolidColorBrush(_state == PetState.Idle ? Color.FromRgb(56, 189, 248) : badgeBg);
+                Color borderClr = (_state == PetState.Idle || _state == PetState.Running) && _currentPack != null
+                    ? _currentPack.ThemeColor
+                    : badgeBg;
+                _bubbleBorder.BorderBrush = new SolidColorBrush(borderClr);
                 _bubbleBorder.ToolTip = string.IsNullOrWhiteSpace(_activeTitle)
                     ? T("点击打开对应 Antigravity 对话", "Click to open Antigravity conversation")
                     : (T("点击打开对话: ", "Open conversation: ") + _activeTitle);
@@ -1787,9 +2727,9 @@ namespace AntigravityPet
                     _badgeBorder.Visibility = Visibility.Collapsed;
                     break;
                 case PetState.Running:
-                    haloColor = Color.FromRgb(56, 189, 248);
+                    haloColor = _currentPack != null ? _currentPack.ThemeColor : Color.FromRgb(56, 189, 248);
                     badge = "⚡";
-                    badgeBg = Color.FromRgb(14, 165, 233);
+                    badgeBg = _currentPack != null ? _currentPack.ThemeColor : Color.FromRgb(14, 165, 233);
                     defaultMsg = T("工作中...", "Working...");
                     break;
                 case PetState.NeedsInput:
@@ -2048,9 +2988,59 @@ namespace AntigravityPet
                 RebuildContextMenu();
             }));
 
+            menu.Items.Add(MakeMenuItem(T("⚡ 快捷派活 (Skill / 指令)", "⚡ Quick Dispatch (Skill / Prompt)"), () => ShowQuickDispatchWindow()));
+
+            var accMenu = new MenuItem { Header = T("👑 成长配饰", "👑 Accessories") };
+            string[] accIds = { "auto", "none", "glasses", "cap", "coffee", "crown" };
+            string[] accZh = { "自动解锁佩戴", "不佩戴", "极客墨镜 (10任务)", "赛博鸭舌帽 (50任务)", "续命咖啡 (150任务)", "黄金皇冠 (300任务)" };
+            string[] accEn = { "Auto Unlock", "None", "Geek Glasses (10+)", "Cyber Cap (50+)", "Coffee Cup (150+)", "Gold Crown (300+)" };
+            for (int i = 0; i < accIds.Length; i++)
+            {
+                string aid = accIds[i];
+                accMenu.Items.Add(MakeCheckItem(T(accZh[i], accEn[i]), (_config.Accessory ?? "auto") == aid, () =>
+                {
+                    _config.Accessory = aid;
+                    UpdateAccessoryVisual();
+                    SaveConfig();
+                    RebuildContextMenu();
+                }));
+            }
+            menu.Items.Add(accMenu);
+
             menu.Items.Add(MakeCheckItem(T("📌 始终置顶", "📌 Always on Top"), _config.Topmost, () =>
             {
                 ApplyTopmost(!_config.Topmost);
+                SaveConfig();
+                RebuildContextMenu();
+            }));
+
+            var dockMenu = new MenuItem { Header = T("📌 屏幕贴边停靠", "📌 Dock to Screen Edge") };
+            dockMenu.Items.Add(MakeCheckItem(T("⬅️ 贴靠屏幕左侧", "⬅️ Dock Left Edge"), _dockSide == "left", () =>
+            {
+                _dockSide = "left"; _dockPeekOut = false; _dockIgnoreHoverUntil = DateTime.Now.AddMilliseconds(700);
+                UpdateVisualState(); Left = GetDockedTargetLeft("left", false); RebuildContextMenu();
+            }));
+            dockMenu.Items.Add(MakeCheckItem(T("➡️ 贴靠屏幕右侧", "➡️ Dock Right Edge"), _dockSide == "right", () =>
+            {
+                _dockSide = "right"; _dockPeekOut = false; _dockIgnoreHoverUntil = DateTime.Now.AddMilliseconds(700);
+                UpdateVisualState(); Left = GetDockedTargetLeft("right", false); RebuildContextMenu();
+            }));
+            dockMenu.Items.Add(MakeCheckItem(T("🔓 取消贴边", "🔓 Undock"), string.IsNullOrEmpty(_dockSide), () =>
+            {
+                ResetToCorner(true); RebuildContextMenu();
+            }));
+            menu.Items.Add(dockMenu);
+
+            menu.Items.Add(MakeCheckItem(T("🧲 吸附 Antigravity 窗口", "🧲 Snap to Antigravity"), _config.SnapToAgy, () =>
+            {
+                _config.SnapToAgy = !_config.SnapToAgy;
+                SaveConfig();
+                RebuildContextMenu();
+            }));
+
+            menu.Items.Add(MakeCheckItem(T("🎮 全屏应用时自动隐藏", "🎮 Hide on Fullscreen"), _config.HideOnFullscreen, () =>
+            {
+                _config.HideOnFullscreen = !_config.HideOnFullscreen;
                 SaveConfig();
                 RebuildContextMenu();
             }));
@@ -2195,6 +3185,10 @@ namespace AntigravityPet
                             bubbleStyle = IsDetailedStyle() ? "detailed" : "simple",
                             pinnedConversationId = _config.PinnedConversationId ?? "",
                             readyTimeoutSec = _config.ReadyTimeoutSec,
+                            snapToAgy = _config.SnapToAgy,
+                            hideOnFullscreen = _config.HideOnFullscreen,
+                            accessory = _config.Accessory ?? "auto",
+                            effectiveAccessory = GetEffectiveAccessoryId(),
                             autoWalk = _config.AutoWalk,
                             eyeFollow = _config.EyeFollow,
                             topmost = _config.Topmost,
@@ -2218,6 +3212,41 @@ namespace AntigravityPet
                         };
                     });
                     responseJson = _json.Serialize(info);
+                }
+                else if (path == "/approval")
+                {
+                    string convId = GetStr(data, "conversationId", "default");
+                    string toolName = GetStr(data, "toolName", "tool");
+                    string summary = GetStr(data, "summary", toolName);
+                    int waitSec = 45;
+                    int.TryParse(GetStr(data, "timeoutSec", "45"), out waitSec);
+                    if (waitSec < 5 || waitSec > 120) waitSec = 45;
+
+                    var req = new PendingApproval
+                    {
+                        Id = Guid.NewGuid().ToString("N"),
+                        ConversationId = convId,
+                        ToolName = toolName,
+                        Summary = summary
+                    };
+                    lock (_approvalLock) { _pendingApprovals.Add(req); }
+
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (!IsVisible && _config.Enabled) Show();
+                        UpdateVisualState();
+                        SyncFullscreenAndEdgeState();
+                        PlayPetSound("needs_input");
+                    }));
+
+                    req.WaitHandle.Wait(TimeSpan.FromSeconds(waitSec));
+                    lock (_approvalLock) { _pendingApprovals.Remove(req); }
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        UpdateVisualState();
+                        SyncFullscreenAndEdgeState();
+                    }));
+                    responseJson = _json.Serialize(new { ok = true, decision = req.Decision });
                 }
                 else if (path == "/state")
                 {
@@ -2344,6 +3373,29 @@ namespace AntigravityPet
                             SaveConfig();
                             RebuildContextMenu();
                         }
+                        else if (action == "snaptoagy")
+                        {
+                            _config.SnapToAgy = ParseBoolStr(val, !_config.SnapToAgy);
+                            SaveConfig();
+                            RebuildContextMenu();
+                        }
+                        else if (action == "hideonfullscreen")
+                        {
+                            _config.HideOnFullscreen = ParseBoolStr(val, !_config.HideOnFullscreen);
+                            SaveConfig();
+                            RebuildContextMenu();
+                        }
+                        else if (action == "accessory")
+                        {
+                            _config.Accessory = string.IsNullOrWhiteSpace(val) ? "auto" : val.Trim().ToLowerInvariant();
+                            UpdateAccessoryVisual();
+                            SaveConfig();
+                            RebuildContextMenu();
+                        }
+                        else if (action == "quickdispatch")
+                        {
+                            ShowQuickDispatchWindow();
+                        }
                         else if (action == "language")
                         {
                             string lval = (val ?? "auto").Trim().ToLowerInvariant();
@@ -2430,10 +3482,135 @@ namespace AntigravityPet
             if (data.ContainsKey("topmost")) ApplyTopmost(GetBool(data, "topmost", _config.Topmost));
             if (data.ContainsKey("autoStartOnBoot")) { _config.AutoStartOnBoot = GetBool(data, "autoStartOnBoot", _config.AutoStartOnBoot); SyncAutoStartRegistry(_config.AutoStartOnBoot); }
             if (data.ContainsKey("soundAlert")) _config.SoundAlert = GetBool(data, "soundAlert", _config.SoundAlert);
+            if (data.ContainsKey("snapToAgy")) _config.SnapToAgy = GetBool(data, "snapToAgy", _config.SnapToAgy);
+            if (data.ContainsKey("hideOnFullscreen")) _config.HideOnFullscreen = GetBool(data, "hideOnFullscreen", _config.HideOnFullscreen);
+            if (data.ContainsKey("accessory") && data["accessory"] != null) { _config.Accessory = data["accessory"].ToString().ToLowerInvariant(); UpdateAccessoryVisual(); }
 
             UpdateVisualState();
             SaveConfig();
             RebuildContextMenu();
+        }
+
+        private void ShowQuickDispatchWindow()
+        {
+            var dlg = new Window
+            {
+                Width = 310,
+                Height = 112,
+                WindowStyle = WindowStyle.None,
+                AllowsTransparency = true,
+                Background = Brushes.Transparent,
+                Topmost = true,
+                ShowInTaskbar = false,
+                Left = Math.Max(SystemParameters.VirtualScreenLeft, Left + Width * 0.5 - 155),
+                Top = Math.Max(SystemParameters.VirtualScreenTop, Top - 118)
+            };
+
+            var root = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(248, 15, 23, 42)),
+                BorderBrush = new SolidColorBrush(_currentPack != null ? _currentPack.ThemeColor : Color.FromRgb(56, 189, 248)),
+                BorderThickness = new Thickness(2),
+                CornerRadius = new CornerRadius(2),
+                Padding = new Thickness(10, 8, 10, 8),
+                Effect = new DropShadowEffect { BlurRadius = 0, ShadowDepth = 3, Direction = 315, Color = Colors.Black, Opacity = 0.85 }
+            };
+
+            var panel = new StackPanel { Orientation = Orientation.Vertical };
+            var head = new TextBlock
+            {
+                Text = T("⚡ 快捷派活给 Antigravity", "⚡ Quick Dispatch to Antigravity"),
+                Foreground = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
+                FontSize = 11,
+                FontWeight = FontWeights.Bold,
+                FontFamily = new FontFamily("Consolas, Microsoft YaHei UI"),
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+            panel.Children.Add(head);
+
+            var box = new TextBox
+            {
+                Background = new SolidColorBrush(Color.FromRgb(30, 41, 59)),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(71, 85, 105)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(6, 4, 6, 4),
+                FontSize = 12,
+                FontFamily = new FontFamily("Consolas, Microsoft YaHei UI")
+            };
+            panel.Children.Add(box);
+
+            var skillsRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
+            string[] skills = { "/plan", "/code-review", "/compact", "/goal" };
+            foreach (string sk in skills)
+            {
+                string captured = sk;
+                var chip = new Border
+                {
+                    Background = new SolidColorBrush(Color.FromRgb(30, 41, 59)),
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(71, 85, 105)),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(2),
+                    Padding = new Thickness(6, 2, 6, 2),
+                    Margin = new Thickness(0, 0, 5, 0),
+                    Cursor = Cursors.Hand,
+                    Child = new TextBlock { Text = captured, Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)), FontSize = 10, FontFamily = new FontFamily("Consolas") }
+                };
+                chip.MouseLeftButtonUp += (s, e) => { SendDispatchToPanel(captured); dlg.Close(); };
+                skillsRow.Children.Add(chip);
+            }
+            panel.Children.Add(skillsRow);
+            root.Child = panel;
+            dlg.Content = root;
+
+            box.KeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Enter && !string.IsNullOrWhiteSpace(box.Text))
+                {
+                    SendDispatchToPanel(box.Text.Trim());
+                    dlg.Close();
+                }
+                else if (e.Key == Key.Escape)
+                {
+                    dlg.Close();
+                }
+            };
+            dlg.Deactivated += (s, e) => { try { dlg.Close(); } catch { } };
+            dlg.Show();
+            box.Focus();
+        }
+
+        private void SendDispatchToPanel(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return;
+            string cid = !string.IsNullOrWhiteSpace(_activeConversationId) ? _activeConversationId : _lastConversationId;
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    string bridgePath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(_configPath), "panel-bridge.json");
+                    if (!File.Exists(bridgePath))
+                    {
+                        Dispatcher.BeginInvoke(new Action(() => OpenAntigravityConversation(cid, _activeTitle)));
+                        return;
+                    }
+                    var bridge = _json.Deserialize<Dictionary<string, object>>(File.ReadAllText(bridgePath, Encoding.UTF8));
+                    int port = 0;
+                    if (bridge != null && bridge.ContainsKey("port")) int.TryParse(bridge["port"].ToString(), out port);
+                    string token = GetStr(bridge, "token", "");
+                    if (port <= 0) return;
+
+                    var req = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:" + port + "/api/dispatch");
+                    req.Method = "POST";
+                    req.ContentType = "application/json; charset=utf-8";
+                    req.Timeout = 3000;
+                    byte[] body = Encoding.UTF8.GetBytes(_json.Serialize(new { token = token, conversationId = cid, message = message }));
+                    req.ContentLength = body.Length;
+                    using (var st = req.GetRequestStream()) st.Write(body, 0, body.Length);
+                    using (var resp = req.GetResponse()) { }
+                }
+                catch { }
+            });
         }
 
         private static string GetStr(Dictionary<string, object> dict, string key, string fallback)

@@ -5,6 +5,28 @@ All notable changes to **Antigravity Pet** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-11-24
+
+### Added
+- **Reverse Control — Double-Click Quick Dispatch & In-Bubble Approval (`PreToolUse`)**:
+  - **Double-click** the pet on Windows or macOS to open a lightweight prompt dialog and dispatch tasks directly to Antigravity via `SidecarApp.sendMessage()` (with a `240ms` single-click anti-conflict guard).
+  - High-risk `run_command` tool calls intercepted by `hooks.json` (`PreToolUse`) pause synchronously on the pet bubble with **✓ Allow / ✕ Deny** buttons (`45s` timeout safely falls back to `"ask"`), while safe commands pass through with zero latency.
+- **Screen-Edge Half-Body Peeking & Compact Status Block**:
+  - Drag the pet near the left or right edge of any monitor (or use the right-click **Dock to Screen Edge** menu) to tuck half its body off-screen with a subtle `14°` peek tilt and a `700ms` release cooldown.
+  - While docked and unhovered, the chat bubble collapses into a crisp `34×14` high-contrast status color block above the visible half-body; hovering over the dual-hysteresis screen zone (`260ms` debounce) smoothly peeks the pet out with the full bubble.
+- **Fullscreen Auto-Hide & Urgent Fullscreen Edge Peek**:
+  - Dual fullscreen detection (`SHQueryUserNotificationState` + foreground monitor coverage check on Windows; `CGWindowListCopyWindowInfo` on macOS) hides the pet during fullscreen games/videos and automatically peeks it out on the screen edge without stealing focus whenever `Ready`, `Needs Input`, `Blocked`, or an approval prompt occurs.
+  - Added optional **Snap to Antigravity Window** (`snapToAgy`) docking to the top-right titlebar edge.
+- **Growth Pixel Accessories (Frame-Synced)**:
+  - Added pixel **Glasses**, **Dev Cap**, **Coffee Cup** (animated steam), and **Gold Crown** unlocked by completed task count or selectable manually from the Settings Panel / context menu.
+  - Accessories are composited directly into each sprite animation frame with a `1px` dark pixel outline, syncing 1:1 with breathing, walking, jumping, `flipX` mirroring, and drag physics.
+- **Custom Pet Pack v3 Spec & `.zip` Importer**:
+  - Added `spriteVersionNumber: 3` support for `themeColor`, custom `.wav` `sounds` per state, and per-action frame folder fallback (`idle/`, `running/`, etc.), plus one-click `.zip` pet pack import in the Settings Panel (`POST /api/import-pet`).
+
+### Changed
+- **8 Character-Specific Working Props & Pixel Bubbles**: Re-authored `Row 7` working animations with unified `1px` outlines and 6-frame motion for all 8 built-in pets; redesigned status bubbles with `2px` pixel corners, hard drop shadows, monospace typography, and `themeColor` accents.
+- **Professional IDE Settings Panel**: Redesigned `sidecars/panel/index.html` and `ui/settings.html` with neutral slate surfaces and crisp `1.5px` monochrome SVG icons.
+
 ## [3.3.0] - 2026-11-24
 
 ### Added

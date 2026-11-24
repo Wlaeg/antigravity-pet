@@ -26,19 +26,18 @@
 
 ### ✨ Highlights
 
-- **Zero Taskbar, Tray & Dock Clutter**
-  - Uses Win32 `WS_EX_TOOLWINDOW` on Windows and `LSUIElement` / `NSApplication.ActivationPolicy.accessory` on macOS so the floating pet never occupies a taskbar button, tray icon, or Dock icon.
-  - Global show/hide toggle hotkey: **`Win + Alt + P`** (Windows) / **`⌥ + ⌘ + P`** (macOS).
-- **Click Bubble or Pet to Jump Straight to Chat**
-  - Whether a task is **running** or **ready**, clicking the status bubble or the pet itself brings Antigravity to the foreground (even if minimized or hidden) and opens that exact conversation via `antigravity://conversation/<id>`.
-- **Launch & Exit with Antigravity**
-  - No OS login/startup clutter. When **Launch with Antigravity** is enabled, the pet starts automatically alongside Antigravity and exits gracefully shortly after Antigravity closes.
-- **Built-in Settings Panel (`...` Menu & MCP App)**
-  - Manage everything inside Antigravity's top-right `...` plugin menu (**Desktop Pet Settings**): enable/hide/quit pet, switch characters, adjust scale (`0.75x / 1.0x / 1.3x / 1.5x`), bubble mode (`always / alerts / off`), **bubble style (`Simple` vs `Detailed Stacked` with hover-to-expand `Task - State` cards & `📌 Pin`)**, launch with Antigravity, idle roaming, 16-direction eye tracking, always-on-top, sound alerts, and quick links to recent conversations.
-- **EN / ZH Bilingual UI (Auto-Follows Antigravity)**
-  - Automatically detects your Antigravity locale or lets you switch instantly between **Auto (Follow Antigravity)**, **English**, and **简体中文**.
-- **Crisp `36×39` Pixel-Art Engine**
-  - Nearest-neighbor scaled `8×11` sprite atlas (`1536×2288 px`, `192×208 px` per frame) supporting idle breathing, walking, waving, jumping, working, waiting alerts, failure states, celebration loops, and 16-direction cursor eye-tracking.
+- **Reverse Control: Double-Click Quick Dispatch & In-Bubble Approval**
+  - **Double-click** the pet to open a quick prompt box and send tasks directly to Antigravity without switching windows (single-click still jumps straight to the active conversation via `antigravity://conversation/<id>`).
+  - High-risk commands intercepted via `PreToolUse` show **✓ Allow / ✕ Deny** buttons right inside the pet's pixel bubble (`45s` timeout safely falls back to `"ask"`).
+- **Screen-Edge Half-Body Peeking & Compact Status Block**
+  - Drag the pet to the left or right edge of any display to dock it half-hidden with a `14°` peek tilt; the bubble simplifies into a `34×14` high-contrast status color block and smoothly expands back out on hover.
+- **Fullscreen Auto-Hide & Urgent Edge Peek**
+  - Automatically hides during fullscreen games or videos, and peeks onto the screen edge without stealing focus whenever a task finishes (`Ready`), needs input/approval, or encounters an error (`Blocked`).
+  - Optional **Snap to Antigravity Window** keeps the pet docked to the top-right edge of your IDE.
+- **Growth Pixel Accessories & Character-Specific Working Props**
+  - Earn and equip frame-synced pixel **Glasses**, **Dev Cap**, **Coffee Cup**, and **Gold Crown** as you complete tasks; all 8 built-in pets feature custom animated working props and `themeColor` pixel bubbles.
+- **Zero Taskbar/Dock Clutter & Built-in Settings Panel (`...` Menu)**
+  - Uses `WS_EX_TOOLWINDOW` (Windows) and `LSUIElement` (macOS) with **`Win + Alt + P`** / **`⌥ + ⌘ + P`** global hotkey, **Launch with Antigravity**, EN/ZH auto-sync, **Detailed Stacked Bubbles** with `📌 Pin`, and one-click **`.zip` Custom Pet Pack v3 Import**.
 
 ---
 
@@ -55,7 +54,7 @@
 | `android-bugdroid` | **Android Bugdroid** | Classic Google Android green robot mascot | [`pets/android-bugdroid`](pets/android-bugdroid) |
 | `flutter-dash` | **Flutter Dash** | Official Google Flutter & Dart blue bird mascot | [`pets/flutter-dash`](pets/flutter-dash) |
 
-> Custom pet packs placed inside `%USERPROFILE%\.antigravity-pet\pets\<pet-id>\` or `pets\<pet-id>\` are loaded automatically and can be hot-reloaded without restarting.
+> Custom v3 pet packs (`themeColor`, custom `.wav` `sounds`, or per-action frame folders) can be imported directly via **Import .zip** in the Settings Panel, or placed inside `%USERPROFILE%\.antigravity-pet\pets\<pet-id>\`.
 
 ---
 
@@ -200,19 +199,17 @@ Each custom pet pack only requires two files: `pet.json` and `spritesheet.png` (
 
 ### ✨ 核心亮点
 
-- **零任务栏、系统托盘与 Dock 干扰**
-  - Windows 采用 `WS_EX_TOOLWINDOW` 扩展样式，macOS 采用 `LSUIElement` + `.accessory` 策略，绝不在任务栏、系统托盘或 macOS Dock 栏占用图标。
-  - 全局显隐热键：**`Win + Alt + P`**（Windows）/ **`⌥ + ⌘ + P`**（macOS），随时一键召唤或隐藏。
-- **点击气泡或本体，直达对应对话**
-  - 无论任务正在**运行中**还是**已完成**，点击头顶气泡或桌宠本体，即使 Antigravity 处于最小化或隐藏状态，也能自动唤醒窗口并通过 `antigravity://conversation/<id>` 精确跳转至对应会话。
-- **随 Antigravity 启动与退出**
-  - 不写入开机自启项、不占开机资源；开启 **「随 Antigravity 启动」** 后，打开 Antigravity 时自动拉起桌宠，关闭客户端时自动退出并保留配置。
-- **客户端内全量设置面板（右上角 `...` 插件目录）**
-  - 直接在 Antigravity 右上角三个点（`...`）选择 **「桌面宠物设置」**，即可手动开启/隐藏/退出桌宠、切换 8 款像素角色、调整窗口尺寸（`0.75x / 1.0x / 1.3x / 1.5x`）、配置气泡显示模式与 **气泡展示风格（简易模式 / 详细堆叠展开模式：显示「任务名称 - 状态」，悬停展开全部并发会话并支持 `📌` 固定跟踪）**、开启待机散步、16 方向眼神跟随鼠标、置顶、提示音，以及查看最近对话并一键跳转。
-- **内置中英文双语切换（自动跟随 Antigravity 语言）**
-  - 支持 **跟随 Antigravity (自动)**、**English** 与 **简体中文** 实时切换，气泡提示与设置面板同步更新。
-- **精致 `36×39` 像素动画引擎**
-  - 采用最近邻（Nearest-Neighbor）无模糊缩放渲染 `8×11` 精灵图集（`1536×2288`，单格 `192×208`），包含待机呼吸、左右散步、挥手打招呼、开心跳跃、忙碌工作、等待输入、出错晕眩、完成庆祝与 16 方向眼神注视鼠标。
+- **反向控制：双击快捷派活 & 气泡快捷审批**
+  - **双击桌宠本体** 即可呼出极简指令框直接向 Antigravity 派活（内置 `240ms` 防冲突保护，单击仍正常跳转关联对话）。
+  - 通过 `hooks.json` (`PreToolUse`) 拦截高危命令时，桌宠头顶气泡直接弹出 **✓ 允许 / ✕ 拒绝** 按钮（45 秒超时自动回退系统确认）。
+- **左右贴边半身观察 & 极简状态色块**
+  - 将宠物拖到当前屏幕左/右边缘（或通过右键「📌 屏幕贴边停靠」），宠物自动藏起半身并微倾 `14°` 观察；收起时聊天框精简为 `34×14` 高对比度状态色块，鼠标悬停即平滑探出显示完整气泡。
+- **全屏自动避让 & 关键提醒贴边弹出**
+  - 全屏游戏或看视频时自动隐藏避让；一旦出现任务完成（`Ready`）、需要输入/审批或报错（`Blocked`），立即无焦点置顶贴边弹出提醒，处理后自动收回。支持可选 **吸附 Antigravity 窗口** 边缘。
+- **成长像素配饰 & 8 款角色专属工作抱物**
+  - 随完成任务数自动解锁（或手动佩戴）**像素墨镜、鸭舌帽、咖啡杯、黄金皇冠**，帧级合成进角色动画层并同步左右镜像与拖拽物理效果；8 款内置角色均配备专属 `1px` 描边工作抱物与类像素风主题色气泡。
+- **零任务栏/Dock 干扰 & 专业内置设置面板**
+  - Windows `WS_EX_TOOLWINDOW` / macOS `LSUIElement` 零图标驻留，支持 **`Win + Alt + P`** / **`⌥ + ⌘ + P`** 全局热键、随 Antigravity 启停、中英文自动跟随、**详细堆叠气泡 + `📌` 会话固定**，以及 **`.zip` 自定义宠物包一键导入**。
 
 ---
 
@@ -229,7 +226,7 @@ Each custom pet pack only requires two files: `pet.json` and `spritesheet.png` (
 | `android-bugdroid` | **安卓小绿人 Bugdroid** | Google Android 官方经典绿色小机器人 | [`pets/android-bugdroid`](pets/android-bugdroid) |
 | `flutter-dash` | **Flutter 小蓝鸟 Dash** | Google Flutter & Dart 官方吉祥物小蓝鸟 | [`pets/flutter-dash`](pets/flutter-dash) |
 
-> 将自制宠物包放入 `%USERPROFILE%\.antigravity-pet\pets\<pet-id>\` 或插件 `pets\<pet-id>\` 目录，点击「刷新列表」即可热重载启用。
+> 支持在设置面板点击 **「导入宠物包」** 一键上传 `.zip`（支持 v3 `themeColor`、自定义 `.wav` 音效与分动作序列帧目录），或直接放入 `%USERPROFILE%\.antigravity-pet\pets\<pet-id>\` 热重载启用。
 
 ---
 

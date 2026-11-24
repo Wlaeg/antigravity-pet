@@ -2,6 +2,7 @@
   "id": "byte-ghost",
   "displayName": "电子幽灵 ByteGhost",
   "description": "呆萌漂浮的霓虹小幽灵",
-  "spriteVersionNumber": 2,
+  "themeColor": "#818CF8",
+  "spriteVersionNumber": 3,
   "spritesheetPath": "spritesheet.png"
 }

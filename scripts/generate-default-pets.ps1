@@ -133,7 +133,8 @@ public static class PixelPetGenerator
                 break;
             case "work":
                 typing = true;
-                if (frame % 2 == 1) bodyY = 1;
+                int[] wOff = { 0, 1, 0, -1, 0, 1 };
+                bodyY = wOff[frame % 6];
                 eyeDy = 1;
                 break;
             case "review":
@@ -504,17 +505,147 @@ public static class PixelPetGenerator
             FillRect(grid, cx + 8, cy + armLift, 3, 4, armColor);
         }
 
-        AddOutline(grid, outline);
-
         if (typing)
         {
-            Color lapColor = Color.FromArgb(255, 51, 65, 85);
-            Color scrColor = (frame % 2 == 0) ? cyan : Color.FromArgb(255, 125, 211, 252);
-            FillRect(grid, cx - 6, cy + 4, 12, 6, lapColor);
-            FillRect(grid, cx - 5, cy + 5, 10, 4, scrColor);
-            int pawX = (frame % 2 == 0) ? cx - 4 : cx + 2;
-            FillRect(grid, pawX, cy + 9, 3, 2, cream);
+            int actDy = (frame % 3 == 1) ? 1 : 0;
+            int actDx = (frame % 2 == 0) ? 0 : 1;
+            int pawLeftY = (frame % 2 == 0) ? cy + 8 : cy + 9;
+            int pawRightY = (frame % 2 == 0) ? cy + 9 : cy + 8;
+            if (skin == "astro-bot")
+            {
+                // 迷你星图平板（随身体起伏，行星点位与航线动态移动，双手交替点按）
+                Color pad = Color.FromArgb(255, 30, 41, 59);
+                Color space = Color.FromArgb(255, 15, 23, 42);
+                int py = cy + 4 + actDy;
+                FillRect(grid, cx - 7, py, 14, 7, pad);
+                FillRect(grid, cx - 6, py + 1, 12, 5, space);
+                FillRect(grid, cx - 4 + (frame % 2), py + 2, 2, 2, gold);
+                SetPix(grid, cx - 1 + (frame % 3), py + 3, cyan);
+                SetPix(grid, cx + 2, py + 2 + (frame % 2), amber);
+                SetPix(grid, cx + 4 - (frame % 2), py + 4, white);
+                FillRect(grid, cx - 5, pawLeftY, 3, 2, cream);
+                FillRect(grid, cx + 2, pawRightY, 3, 2, cream);
+            }
+            else if (skin == "shadow-cat")
+            {
+                // 亮粉色毛线球（随身体起伏并微幅滚动，猫爪交替拨弄）
+                Color yarn = Color.FromArgb(255, 236, 72, 153);
+                Color yarnHi = Color.FromArgb(255, 249, 168, 212);
+                Color yarnDk = Color.FromArgb(255, 190, 24, 93);
+                int yx = cx - 5 + actDx;
+                int yy = cy + 4 + actDy;
+                FillRect(grid, yx, yy + 1, 10, 6, yarn);
+                FillRect(grid, yx + 1, yy, 8, 8, yarn);
+                ClearPix(grid, yx, yy + 1);
+                FillRect(grid, yx + 2 + (frame % 2), yy + 2, 5, 1, yarnHi);
+                FillRect(grid, yx + 3 - (frame % 2), yy + 4, 6, 1, yarnDk);
+                SetPix(grid, yx + 5, yy + 1 + (frame % 2), yarnHi);
+                FillRect(grid, cx - 5, pawLeftY, 3, 2, Color.FromArgb(255, 58, 63, 82));
+                FillRect(grid, cx + 2, pawRightY, 3, 2, Color.FromArgb(255, 58, 63, 82));
+            }
+            else if (skin == "byte-ghost")
+            {
+                // 复古 3.5 寸霓虹软盘（随幽灵身体浮沉，读写指示灯交替闪烁）
+                Color disk = Color.FromArgb(255, 99, 102, 241);
+                Color diskDk = Color.FromArgb(255, 67, 56, 202);
+                int dy = cy + 3 + (frame % 2);
+                FillRect(grid, cx - 5, dy, 10, 8, disk);
+                ClearPix(grid, cx + 4, dy);
+                FillRect(grid, cx - 3, dy, 5, 3, cream);
+                SetPix(grid, cx - 1, dy + 1, diskDk);
+                FillRect(grid, cx - 3, dy + 4, 6, 3, white);
+                FillRect(grid, cx - 2, dy + 5, 4, 1, (frame % 2 == 0) ? cyan : green);
+                SetPix(grid, cx + 3, dy + 6, (frame % 2 == 0) ? green : amber);
+            }
+            else if (skin == "shiba-dog")
+            {
+                // 奶白骨头造型迷你机械键盘（紧贴胸前，左右柴犬爪交替敲击，按键高光跳动）
+                Color bone = Color.FromArgb(255, 254, 243, 199);
+                Color keyCap = Color.FromArgb(255, 245, 158, 11);
+                int ky = cy + 5 + actDy;
+                FillRect(grid, cx - 7, ky, 14, 5, bone);
+                FillRect(grid, cx - 8, ky - 1, 2, 7, bone);
+                FillRect(grid, cx + 6, ky - 1, 2, 7, bone);
+                SetPix(grid, cx - 4 + (frame % 3) * 3, ky + 1, keyCap);
+                SetPix(grid, cx - 2 + (frame % 2), ky + 3, amber);
+                SetPix(grid, cx + 3 - (frame % 2), ky + 3, amber);
+                FillRect(grid, cx - 5, pawLeftY, 3, 2, cream);
+                FillRect(grid, cx + 2, pawRightY, 3, 2, cream);
+            }
+            else if (skin == "pixel-dragon")
+            {
+                // 发光翡翠魔法水晶（与龙身形成弹性悬浮跟随，金色魔法粒子绕转）
+                Color gem = (frame % 2 == 0) ? Color.FromArgb(255, 52, 211, 153) : Color.FromArgb(255, 110, 231, 183);
+                Color gemEdge = Color.FromArgb(255, 5, 150, 105);
+                int gy = cy + 3 - (frame % 2);
+                FillRect(grid, cx - 2, gy, 4, 8, gem);
+                FillRect(grid, cx - 4, gy + 2, 8, 4, gem);
+                FillRect(grid, cx - 1, gy + 1, 2, 2, white);
+                SetPix(grid, cx + 2, gy + 4, gemEdge);
+                int pOff = frame % 3;
+                SetPix(grid, cx - 5 + pOff, gy + 1, gold);
+                SetPix(grid, cx + 5 - pOff, gy + 6, gold);
+            }
+            else if (skin == "android-bugdroid")
+            {
+                // 银色机械扳手（随动作上下摆动拧紧）+ 金色齿轮 4 角交替旋转
+                Color steel = Color.FromArgb(255, 203, 213, 225);
+                Color steelDk = Color.FromArgb(255, 100, 116, 139);
+                int wy = cy + 5 + (frame % 2);
+                FillRect(grid, cx - 6, wy + 1, 10, 2, steel);
+                FillRect(grid, cx - 8, wy, 3, 4, steelDk);
+                ClearPix(grid, cx - 8, wy + 1);
+                Color gear = (frame % 2 == 0) ? gold : amber;
+                int gy = cy + 4 + actDy;
+                FillRect(grid, cx + 2, gy, 5, 5, gear);
+                SetPix(grid, cx + 4, gy + 2, outline);
+                if (frame % 2 == 0)
+                {
+                    ClearPix(grid, cx + 2, gy);
+                    ClearPix(grid, cx + 6, gy);
+                    ClearPix(grid, cx + 2, gy + 4);
+                    ClearPix(grid, cx + 6, gy + 4);
+                }
+                else
+                {
+                    ClearPix(grid, cx + 4, gy);
+                    ClearPix(grid, cx + 4, gy + 4);
+                    ClearPix(grid, cx + 2, gy + 2);
+                    ClearPix(grid, cx + 6, gy + 2);
+                }
+            }
+            else if (skin == "flutter-dash")
+            {
+                // Dart 蓝白环形靶盘 + 亮黄小羽毛笔（随节奏左右上下点画）
+                Color targetBlue = Color.FromArgb(255, 1, 117, 194);
+                Color targetCyan = Color.FromArgb(255, 84, 197, 248);
+                int ty = cy + 4 + actDy;
+                FillRect(grid, cx - 6, ty, 10, 7, targetBlue);
+                FillRect(grid, cx - 4, ty + 1, 6, 5, white);
+                FillRect(grid, cx - 2, ty + 2, 2, 3, targetCyan);
+                int qx = cx + 2 + (frame % 3 == 2 ? 1 : 0);
+                int qy = cy + 3 + (frame % 2);
+                FillRect(grid, qx, qy, 2, 5, gold);
+                SetPix(grid, qx + 1, qy - 1, white);
+                SetPix(grid, qx - 1, qy + 4, amber);
+            }
+            else // cyber-fox
+            {
+                // 赛博全息终端（紧贴双爪，脉冲进度条与双爪敲击节奏联动）
+                Color lapColor = Color.FromArgb(255, 30, 41, 59);
+                Color scrColor = Color.FromArgb(255, 15, 23, 42);
+                int ly = cy + 4 + actDy;
+                FillRect(grid, cx - 7, ly, 14, 6, lapColor);
+                FillRect(grid, cx - 6, ly + 1, 12, 4, scrColor);
+                FillRect(grid, cx - 5, ly + 2, 4 + (frame % 3) * 2, 1, cyan);
+                FillRect(grid, cx - 5, ly + 4, 6 - (frame % 2) * 2, 1, Color.FromArgb(255, 125, 211, 252));
+                FillRect(grid, cx - 5, pawLeftY, 3, 2, cream);
+                FillRect(grid, cx + 2, pawRightY, 3, 2, cream);
+            }
         }
+
+        AddOutline(grid, outline);
+
         if (pose == "failed")
         {
             DrawSymbol(grid, "X", 27, (frame % 2 == 0) ? 3 : 5, red);
@@ -566,14 +697,14 @@ public static class PixelPetGenerator
     {
         Directory.CreateDirectory(outRoot);
         string[,] defs = {
-            { "cyber-fox", "小蓝狐 CyberFox", "赛博蓝色小狐狸（默认）" },
-            { "astro-bot", "像素宇航员 Astro", "带发光面罩的迷你太空人" },
-            { "shadow-cat", "小黑猫 ShadowCat", "金色大眼的灵动黑猫" },
-            { "byte-ghost", "电子幽灵 ByteGhost", "呆萌漂浮的霓虹小幽灵" },
-            { "shiba-dog", "像素柴犬 Shiba", "暖黄卷尾的豆豆眉小柴犬" },
-            { "pixel-dragon", "像素小青龙 Dragon", "长着金角小翅膀的翡翠青龙" },
-            { "android-bugdroid", "安卓小绿人 Bugdroid", "Google Android 官方经典绿色小机器人" },
-            { "flutter-dash", "Flutter 小蓝鸟 Dash", "Google Flutter & Dart 官方吉祥物小蓝鸟" }
+            { "cyber-fox", "小蓝狐 CyberFox", "赛博蓝色小狐狸（默认）", "#38BDF8" },
+            { "astro-bot", "像素宇航员 Astro", "带发光面罩的迷你太空人", "#93C5FD" },
+            { "shadow-cat", "小黑猫 ShadowCat", "金色大眼的灵动黑猫", "#FBBF24" },
+            { "byte-ghost", "电子幽灵 ByteGhost", "呆萌漂浮的霓虹小幽灵", "#818CF8" },
+            { "shiba-dog", "像素柴犬 Shiba", "暖黄卷尾的豆豆眉小柴犬", "#F59E0B" },
+            { "pixel-dragon", "像素小青龙 Dragon", "长着金角小翅膀的翡翠青龙", "#10B981" },
+            { "android-bugdroid", "安卓小绿人 Bugdroid", "Google Android 官方经典绿色小机器人", "#3DDC84" },
+            { "flutter-dash", "Flutter 小蓝鸟 Dash", "Google Flutter & Dart 官方吉祥物小蓝鸟", "#54C5F8" }
         };
 
         for (int i = 0; i < defs.GetLength(0); i++)
@@ -581,6 +712,7 @@ public static class PixelPetGenerator
             string id = defs[i, 0];
             string name = defs[i, 1];
             string desc = defs[i, 2];
+            string themeColor = defs[i, 3];
             string dir = Path.Combine(outRoot, id);
             Directory.CreateDirectory(dir);
 
@@ -607,7 +739,8 @@ public static class PixelPetGenerator
                 "  \"id\": \"" + id + "\",\n" +
                 "  \"displayName\": \"" + name + "\",\n" +
                 "  \"description\": \"" + desc + "\",\n" +
-                "  \"spriteVersionNumber\": 2,\n" +
+                "  \"themeColor\": \"" + themeColor + "\",\n" +
+                "  \"spriteVersionNumber\": 3,\n" +
                 "  \"spritesheetPath\": \"spritesheet.png\"\n" +
                 "}\n";
             File.WriteAllText(Path.Combine(dir, "pet.json"), json, new UTF8Encoding(false));

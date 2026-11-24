@@ -46,10 +46,20 @@ description: >-
   - Row 8: `review`（完成/星星庆祝，推荐 6 帧）
   - Row 9–10: `look-directions`（顺时针 16 个看鼠标方向，第 0 帧朝正右、第 4 帧朝正下、第 8 帧朝正左、第 12 帧朝正上）
 
+## v3 宠物包扩展字段（可选）
+
+- `spriteVersionNumber`: 推荐设为 `3`。
+- `themeColor`: 16 进制主色调（如 `"#06B6D4"`），用于匹配角色专属光环与类像素风状态气泡边框。
+- `sounds`: 自定义 `.wav` 音效映射（相对于宠物目录，支持 `ready`、`needs_input`、`blocked`），例如：
+  ```json
+  "sounds": { "ready": "sounds/ready.wav", "needs_input": "sounds/ask.wav" }
+  ```
+- **分动作序列帧目录回退**：如果未提供 `spritesheet.png`，也可按动作名建立子目录（`idle/`、`walk_right/`、`walk_left/`、`wave/`、`jump/`、`blocked/`、`needs_input/`、`running/`、`ready/`），按文件名排序放入逐帧 `.png`。
+
 ## 生成与立即启用流程
 
-1. 可基于用户描述参考 [generate-default-pets.ps1](file:///C:/Users/Nelson/.gemini/config/plugins/antigravity-pet/scripts/generate-default-pets.ps1) 的 `System.Drawing` 24×26 像素画生成器快速构建高质量无锯齿 1536×2288 精灵图（或结合图像生成工具产出后再用脚本按 192×208 网格对齐裁剪）。
-2. 写入 `pet.json` 与 `spritesheet.png` 后，通过本地接口热重载并切换到新宠物：
+1. 可基于用户描述参考 [generate-default-pets.ps1](file:///C:/Users/Nelson/.gemini/config/plugins/antigravity-pet/scripts/generate-default-pets.ps1) 的 `System.Drawing` 像素画生成器快速构建高质量无锯齿 1536×2288 精灵图（或结合图像生成工具产出后再用脚本按 192×208 网格对齐裁剪）。
+2. 写入 `pet.json` 与 `spritesheet.png` 后，通过本地接口热重载并切换到新宠物（或打包为 `.zip` 在设置面板点击「导入宠物包」一键导入）：
    ```powershell
    Invoke-RestMethod -Uri "http://127.0.0.1:47821/reload" -Method Post -Body '{}' -ContentType "application/json"
    Invoke-RestMethod -Uri "http://127.0.0.1:47821/skin" -Method Post -Body '{"skin":"<pet-id>"}' -ContentType "application/json"
