@@ -49,6 +49,7 @@ function readOfflineConfig() {
     AutoWalk: true,
     EyeFollow: true,
     AutoStartOnBoot: true,
+    CheckUpdatesOnStartup: true,
     SoundAlert: false,
     Language: 'auto',
     AgyDetectedLocale: '',
@@ -282,6 +283,7 @@ export async function getSnapshot() {
     eyeFollow: cfg.EyeFollow !== false,
     topmost: cfg.Topmost !== false,
     autoStartOnBoot: cfg.AutoStartOnBoot !== false,
+    checkUpdatesOnStartup: cfg.CheckUpdatesOnStartup !== false,
     soundAlert: !!cfg.SoundAlert,
     language: cfg.Language || 'auto',
     effectiveLanguage: effLang,
@@ -376,6 +378,10 @@ export async function applySetting(args = {}) {
     writeOfflineConfig({ AutoStartOnBoot: b });
     await syncRegistryAutoStart(b);
     if (isRunning) await httpRequest('POST', '/control', { action: 'autoStartOnBoot', value: String(b) });
+  } else if (action === 'checkUpdatesOnStartup') {
+    const b = parseBool(value, true);
+    writeOfflineConfig({ CheckUpdatesOnStartup: b });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'checkUpdatesOnStartup', value: String(b) });
   } else if (action === 'soundAlert') {
     const b = parseBool(value, false);
     writeOfflineConfig({ SoundAlert: b });
@@ -407,7 +413,7 @@ export async function applySetting(args = {}) {
     if (isRunning) await httpRequest('POST', '/control', { action: 'resetPos' });
   } else if (action === 'reload') {
     if (isRunning) await httpRequest('POST', '/reload', {});
-  } else if (action === 'wave' || action === 'jump' || action === 'walk') {
+  } else if (action === 'wave' || action === 'jump' || action === 'walk' || action === 'dockLeft' || action === 'dockRight' || action === 'undock') {
     if (isRunning) await httpRequest('POST', '/control', { action });
   } else if (action === 'openConversation') {
     if (isRunning) await httpRequest('POST', '/control', { action: 'open', value: String(value || '') });
@@ -538,14 +544,18 @@ function startLocalDispatchBridge(app) {
             return;
           }
           let cid = String(data.conversationId || '').trim();
-          if (!cid || cid === 'default' || cid === 'preview') {
-            if (typeof app.newConversation === 'function') {
+          const forceNew = data.newConversation === true || !cid || cid === 'default' || cid === 'preview';
+          if (forceNew && typeof app.startConversation === 'function') {
+            const created = await app.startConversation(msg);
+            cid = (created && (created.conversationId || created.id)) || cid;
+          } else {
+            if (forceNew && typeof app.newConversation === 'function') {
               const created = await app.newConversation();
               cid = (created && (created.conversationId || created.id)) || cid;
             }
-          }
-          if (typeof app.sendMessage === 'function') {
-            await app.sendMessage(cid, msg);
+            if (typeof app.sendMessage === 'function') {
+              await app.sendMessage(cid, msg);
+            }
           }
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true, conversationId: cid }));

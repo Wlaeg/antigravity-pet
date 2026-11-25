@@ -49,6 +49,7 @@ function readOfflineConfig() {
     AutoWalk: true,
     EyeFollow: true,
     AutoStartOnBoot: true,
+    CheckUpdatesOnStartup: true,
     SoundAlert: false,
     Language: 'auto',
     AgyDetectedLocale: '',
@@ -275,6 +276,7 @@ async function getSnapshot() {
     eyeFollow: cfg.EyeFollow !== false,
     topmost: cfg.Topmost !== false,
     autoStartOnBoot: cfg.AutoStartOnBoot !== false,
+    checkUpdatesOnStartup: cfg.CheckUpdatesOnStartup !== false,
     soundAlert: !!cfg.SoundAlert,
     language: cfg.Language || 'auto',
     effectiveLanguage: effLang,
@@ -428,6 +430,7 @@ async function applySetting(args = {}) {
       await syncRegistryAutoStart(patch.AutoStartOnBoot);
     }
     if (args.soundAlert !== undefined) patch.SoundAlert = parseBool(args.soundAlert, false);
+    if (args.checkUpdatesOnStartup !== undefined) patch.CheckUpdatesOnStartup = parseBool(args.checkUpdatesOnStartup, true);
     if (Object.keys(patch).length > 0) {
       writeOfflineConfig(patch);
       if (isRunning) {
@@ -441,6 +444,7 @@ async function applySetting(args = {}) {
           eyeFollow: patch.EyeFollow,
           topmost: patch.Topmost,
           autoStartOnBoot: patch.AutoStartOnBoot,
+          checkUpdatesOnStartup: patch.CheckUpdatesOnStartup,
           soundAlert: patch.SoundAlert
         });
       }

@@ -57,6 +57,7 @@ namespace AntigravityPet
         public bool AutoWalk { get; set; }
         public bool EyeFollow { get; set; }
         public bool AutoStartOnBoot { get; set; }
+        public bool CheckUpdatesOnStartup { get; set; }
         public bool SoundAlert { get; set; }
         public string Language { get; set; }           // auto | en | zh
         public string AgyDetectedLocale { get; set; }
@@ -81,6 +82,7 @@ namespace AntigravityPet
             AutoWalk = true;
             EyeFollow = true;
             AutoStartOnBoot = true;
+            CheckUpdatesOnStartup = true;
             SoundAlert = false;
             Language = "auto";
             AgyDetectedLocale = "";
@@ -187,6 +189,8 @@ namespace AntigravityPet
         private const int SW_RESTORE = 9;
         private const int SW_SHOW = 5;
         private const int PORT = 47821;
+        private const int WM_DISPLAYCHANGE = 0x007E;
+        private const int WM_DPICHANGED = 0x02E0;
         private const int WM_HOTKEY = 0x0312;
         private const int HOTKEY_ID = 0xA970;
         private const uint MOD_ALT = 0x0001;
@@ -248,6 +252,12 @@ namespace AntigravityPet
         private string _pendingSingleTitle = "";
         private Border _approvalBar;
         private StackPanel _bubbleWrapperPanel;
+        private string _availableUpdateVersion = "";
+        private string _availableUpdateUrl = "";
+        private string _availableUpdateZipUrl = "";
+        private DateTime _updatePromptShownAt = DateTime.MinValue;
+        private bool _isUpdatingSelf = false;
+        private string _selfUpdateStatusMsg = "";
 
         private HttpListener _listener;
         private Thread _httpThread;
@@ -283,6 +293,13 @@ namespace AntigravityPet
 
         private bool _isDragging = false;
         private bool _movedDuringDrag = false;
+        private bool _lastDragWasTouch = false;
+        private bool _suppressDockedHoverUntilCursorMoves = false;
+        private bool _requireHoverExitBeforePeek = false;
+        private bool _dockHoverAnchorNeedsCapture = false;
+        private Point _dockTouchReleaseCursorPos;
+        private int _activeTouchId = -1;
+        private DateTime _lastTouchTapAt = DateTime.MinValue;
         private Point _dragStartScreen;
         private Point _dragStartWindow;
 
@@ -312,8 +329,8 @@ namespace AntigravityPet
             SaveConfig();
 
             _rootGrid = new Grid { Background = Brushes.Transparent };
-            _rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             _rootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            _rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             Content = _rootGrid;
 
             // 顶部可点击居中聊天框气泡（支持简易单气泡 & 详细堆叠展开模式）
@@ -322,7 +339,7 @@ namespace AntigravityPet
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Bottom,
                 Background = Brushes.Transparent,
-                Margin = new Thickness(4, 4, 4, 2)
+                Margin = new Thickness(4, 4, 4, -2)
             };
             Grid.SetRow(_bubbleHost, 0);
             _rootGrid.Children.Add(_bubbleHost);
@@ -608,6 +625,19 @@ namespace AntigravityPet
                     RegisterHotKey(hwnd, HOTKEY_ID, MOD_WIN | MOD_ALT, VK_P);
                 }
             }
+            try { SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged; } catch { }
+            EnsureInsideScreenBounds(false);
+            if (_config.CheckUpdatesOnStartup) CheckGitHubReleaseAsync();
+        }
+
+        private void OnDisplaySettingsChanged(object sender, EventArgs e)
+        {
+            if (_isClosing) return;
+            try
+            {
+                Dispatcher.BeginInvoke(new Action(() => EnsureInsideScreenBounds(true)));
+            }
+            catch { }
         }
 
         private void ApplyTopmost(bool topmost, bool frameChanged = false)
@@ -635,6 +665,10 @@ namespace AntigravityPet
                 ToggleVisibility();
                 handled = true;
             }
+            else if (msg == WM_DISPLAYCHANGE || msg == WM_DPICHANGED)
+            {
+                Dispatcher.BeginInvoke(new Action(() => EnsureInsideScreenBounds(true)));
+            }
             return IntPtr.Zero;
         }
 
@@ -642,6 +676,7 @@ namespace AntigravityPet
         {
             _isClosing = true;
             SaveConfig();
+            try { SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged; } catch { }
             try
             {
                 var hwnd = new WindowInteropHelper(this).Handle;
@@ -717,23 +752,57 @@ namespace AntigravityPet
             _floorShadow.Width = Math.Round(74 * scale);
             _floorShadow.Height = Math.Round(14 * scale);
             _bubbleText.MaxWidth = Math.Round((BaseWidth - 28) * scale);
+            _bubbleHost.Margin = new Thickness(4, 4, 4, Math.Round(-2 * scale));
+            double badgeSize = Math.Round(22 * scale);
+            _badgeBorder.Width = badgeSize;
+            _badgeBorder.Height = badgeSize;
+            _badgeBorder.CornerRadius = new CornerRadius(badgeSize / 2.0);
+            _badgeBorder.Margin = new Thickness(0, Math.Round(12 * scale), Math.Round(8 * scale), 0);
+            _badgeText.FontSize = Math.Max(9.0, Math.Round(11 * scale));
             ClampToWorkArea();
             if (save) SaveConfig();
         }
 
         private void ClampToWorkArea()
         {
-            double vsLeft = SystemParameters.VirtualScreenLeft;
-            double vsTop = SystemParameters.VirtualScreenTop;
-            double vsRight = vsLeft + SystemParameters.VirtualScreenWidth;
-            double vsBottom = vsTop + SystemParameters.VirtualScreenHeight;
-            if (string.IsNullOrEmpty(_dockSide) && !_fullscreenPeekActive)
+            var wa = GetCurrentMonitorWorkArea();
+            if (_fullscreenPeekActive)
             {
-                if (Left < vsLeft) Left = vsLeft;
-                if (Left > vsRight - Width) Left = Math.Max(vsLeft, vsRight - Width);
+                if (Top < wa.Top) Top = wa.Top;
+                if (Top > wa.Bottom - Height) Top = Math.Max(wa.Top, wa.Bottom - Height);
+                return;
             }
-            if (Top < vsTop) Top = vsTop;
-            if (Top > vsBottom - Height) Top = Math.Max(vsTop, vsBottom - Height);
+
+            if (!string.IsNullOrEmpty(_dockSide))
+            {
+                Left = GetDockedTargetLeft(_dockSide, _dockPeekOut);
+            }
+            else
+            {
+                if (Left < wa.Left) Left = wa.Left;
+                if (Left > wa.Right - Width) Left = Math.Max(wa.Left, wa.Right - Width);
+            }
+            if (Top < wa.Top) Top = wa.Top;
+            if (Top > wa.Bottom - Height) Top = Math.Max(wa.Top, wa.Bottom - Height);
+        }
+
+        private void EnsureInsideScreenBounds(bool saveIfChanged)
+        {
+            if (_isClosing || _isDragging) return;
+            double oldLeft = Left;
+            double oldTop = Top;
+            ClampToWorkArea();
+            if (Math.Abs(Left - oldLeft) > 0.5 || Math.Abs(Top - oldTop) > 0.5)
+            {
+                if (_transient == TransientAction.Walk)
+                {
+                    CancelWalk();
+                }
+                if (saveIfChanged)
+                {
+                    SaveConfig();
+                }
+            }
         }
 
         private void ReloadPetPacks()
@@ -963,20 +1032,42 @@ namespace AntigravityPet
 
         private void SetupMouseEvents()
         {
-            // 气泡聊天框可点击：无论任务进行中还是结束后点击，自动打开对应对话
+            // 气泡聊天框可点击：若有新版本提示则新建对话让 Antigravity 安装，否则打开对应对话
             _bubbleBorder.MouseEnter += (s, e) =>
             {
-                _bubbleBorder.Background = new SolidColorBrush(Color.FromArgb(248, 30, 41, 59));
+                if (!string.IsNullOrEmpty(_availableUpdateVersion))
+                {
+                    _bubbleBorder.Background = new SolidColorBrush(Color.FromArgb(250, 59, 22, 128));
+                }
+                else
+                {
+                    _bubbleBorder.Background = new SolidColorBrush(Color.FromArgb(248, 30, 41, 59));
+                }
                 _bubbleBorder.BorderThickness = new Thickness(1.8);
             };
             _bubbleBorder.MouseLeave += (s, e) =>
             {
-                _bubbleBorder.Background = new SolidColorBrush(Color.FromArgb(236, 15, 23, 42));
+                if (!string.IsNullOrEmpty(_availableUpdateVersion))
+                {
+                    _bubbleBorder.Background = new SolidColorBrush(Color.FromArgb(245, 46, 16, 101));
+                }
+                else
+                {
+                    _bubbleBorder.Background = new SolidColorBrush(Color.FromArgb(236, 15, 23, 42));
+                }
                 _bubbleBorder.BorderThickness = new Thickness(1.2);
             };
             _bubbleBorder.MouseLeftButtonUp += (s, e) =>
             {
                 e.Handled = true;
+                if (!string.IsNullOrEmpty(_availableUpdateVersion) && !_isUpdatingSelf)
+                {
+                    StartTransient(TransientAction.Jump, 5);
+                    PerformSelfUpdateAsync(_availableUpdateVersion, _availableUpdateZipUrl);
+                    return;
+                }
+                if (_isUpdatingSelf) return;
+
                 string convId = !string.IsNullOrWhiteSpace(_activeConversationId) ? _activeConversationId : _lastConversationId;
                 string title = _activeTitle;
 
@@ -1005,80 +1096,154 @@ namespace AntigravityPet
             _singleClickTimer.Tick += (ts, te) =>
             {
                 _singleClickTimer.Stop();
-                StartTransient(TransientAction.Jump, 5);
-                if (_state == PetState.Ready || _state == PetState.NeedsInput || _state == PetState.Blocked)
-                {
-                    ClearReminderTasks();
-                }
-                OpenAntigravityConversation(_pendingSingleConvId, _pendingSingleTitle);
+                if (_transient == TransientAction.Walk) CancelWalk();
+                if (_rng.Next(0, 2) == 0) StartTransient(TransientAction.Jump, 5);
+                else StartTransient(TransientAction.Wave, 8);
             };
+
+            Stylus.SetIsPressAndHoldEnabled(_stageGrid, false);
+            Stylus.SetIsFlicksEnabled(_stageGrid, false);
+            Stylus.SetIsTapFeedbackEnabled(_stageGrid, false);
+            Stylus.SetIsTouchFeedbackEnabled(_stageGrid, false);
 
             _stageGrid.MouseLeftButtonDown += (s, e) =>
             {
-                if (_transient == TransientAction.Walk) CancelWalk();
-                _isDoubleClickGesture = (e.ClickCount >= 2);
-                if (_isDoubleClickGesture) _singleClickTimer.Stop();
-                _isDragging = true;
-                _movedDuringDrag = false;
-                _dragStartScreen = GetCursorLogicalPos(e);
-                _lastDragScreenX = _dragStartScreen.X;
-                _dragTargetAngle = 0;
-                _dragStartWindow = new Point(Left, Top);
+                if (_activeTouchId != -1) return;
+                _suppressDockedHoverUntilCursorMoves = false;
+                BeginDrag(GetCursorLogicalPos(e), e.ClickCount >= 2, false);
                 _stageGrid.CaptureMouse();
             };
 
             _stageGrid.MouseMove += (s, e) =>
             {
-                if (!_isDragging) return;
-                Point current = GetCursorLogicalPos(e);
-                double dx = current.X - _dragStartScreen.X;
-                double dy = current.Y - _dragStartScreen.Y;
-                double vx = current.X - _lastDragScreenX;
-                _lastDragScreenX = current.X;
-
-                if (_movedDuringDrag || Math.Abs(dx) > 4 || Math.Abs(dy) > 4)
-                {
-                    _movedDuringDrag = true;
-                    _singleClickTimer.Stop();
-                    Left = _dragStartWindow.X + dx;
-                    Top = _dragStartWindow.Y + dy;
-                    _dragTargetAngle = Math.Max(-22.0, Math.Min(22.0, -vx * 0.85));
-                    _floorShadow.Opacity = 0.08;
-                    RenderCurrentFrame();
-                }
+                if (!_isDragging || _activeTouchId != -1) return;
+                UpdateDrag(GetCursorLogicalPos(e), 4.0);
             };
 
             _stageGrid.MouseLeftButtonUp += (s, e) =>
             {
-                if (!_isDragging) return;
-                _isDragging = false;
-                _dragTargetAngle = 0;
-                _floorShadow.Opacity = 0.22;
+                if (!_isDragging || _activeTouchId != -1) return;
                 _stageGrid.ReleaseMouseCapture();
+                EndDrag(_isDoubleClickGesture || e.ClickCount >= 2);
+            };
 
-                if (_movedDuringDrag)
+            _stageGrid.TouchDown += (s, e) =>
+            {
+                if (_activeTouchId != -1 && _activeTouchId != e.TouchDevice.Id) return;
+                _activeTouchId = e.TouchDevice.Id;
+                var now = DateTime.Now;
+                bool isDoubleTap = (now - _lastTouchTapAt).TotalMilliseconds <= 350.0;
+                _lastTouchTapAt = isDoubleTap ? DateTime.MinValue : now;
+                BeginDrag(WindowPosToLogicalScreen(e.GetTouchPoint(this).Position), isDoubleTap, true);
+                _stageGrid.CaptureTouch(e.TouchDevice);
+                e.Handled = true;
+            };
+
+            _stageGrid.TouchMove += (s, e) =>
+            {
+                if (!_isDragging || e.TouchDevice.Id != _activeTouchId) return;
+                UpdateDrag(WindowPosToLogicalScreen(e.GetTouchPoint(this).Position), 6.0);
+                if (_movedDuringDrag) _lastTouchTapAt = DateTime.MinValue;
+                e.Handled = true;
+            };
+
+            _stageGrid.TouchUp += (s, e) =>
+            {
+                if (e.TouchDevice.Id != _activeTouchId) return;
+                _activeTouchId = -1;
+                if (_stageGrid.TouchesCaptured.Contains(e.TouchDevice))
                 {
-                    _singleClickTimer.Stop();
-                    SnapToScreenEdgeIfNear();
-                    ClampToWorkArea();
-                    SaveConfig();
-                    StartTransient(TransientAction.Jump, 5);
+                    _stageGrid.ReleaseTouchCapture(e.TouchDevice);
                 }
-                else if (_isDoubleClickGesture || e.ClickCount >= 2)
+                if (_isDragging)
                 {
-                    _isDoubleClickGesture = false;
-                    _singleClickTimer.Stop();
-                    StartTransient(TransientAction.Wave, 6);
-                    ShowQuickDispatchWindow();
+                    EndDrag(_isDoubleClickGesture);
                 }
-                else
+                e.Handled = true;
+            };
+
+            _stageGrid.LostTouchCapture += (s, e) =>
+            {
+                if (e.TouchDevice.Id != _activeTouchId) return;
+                _activeTouchId = -1;
+                if (_isDragging)
                 {
-                    _pendingSingleConvId = !string.IsNullOrWhiteSpace(_activeConversationId) ? _activeConversationId : _lastConversationId;
-                    _pendingSingleTitle = _activeTitle;
-                    _singleClickTimer.Stop();
-                    _singleClickTimer.Start();
+                    EndDrag(false);
                 }
             };
+        }
+
+        private void BeginDrag(Point startScreenPos, bool isDoubleClick, bool isTouch)
+        {
+            if (_transient == TransientAction.Walk) CancelWalk();
+            _lastDragWasTouch = isTouch;
+            _isDoubleClickGesture = isDoubleClick;
+            if (_isDoubleClickGesture) _singleClickTimer.Stop();
+            _isDragging = true;
+            _movedDuringDrag = false;
+            _dragStartScreen = startScreenPos;
+            _lastDragScreenX = startScreenPos.X;
+            _dragTargetAngle = 0;
+            _dragStartWindow = new Point(Left, Top);
+        }
+
+        private void UpdateDrag(Point currentScreenPos, double threshold)
+        {
+            double dx = currentScreenPos.X - _dragStartScreen.X;
+            double dy = currentScreenPos.Y - _dragStartScreen.Y;
+            double vx = currentScreenPos.X - _lastDragScreenX;
+            _lastDragScreenX = currentScreenPos.X;
+
+            if (_movedDuringDrag || Math.Abs(dx) > threshold || Math.Abs(dy) > threshold)
+            {
+                _movedDuringDrag = true;
+                _singleClickTimer.Stop();
+                Left = _dragStartWindow.X + dx;
+                Top = _dragStartWindow.Y + dy;
+                _dragTargetAngle = Math.Max(-22.0, Math.Min(22.0, -vx * 0.85));
+                _floorShadow.Opacity = 0.08;
+                RenderCurrentFrame();
+            }
+        }
+
+        private void EndDrag(bool isDoubleClick)
+        {
+            if (!_isDragging) return;
+            _isDragging = false;
+            _dragTargetAngle = 0;
+            _floorShadow.Opacity = 0.22;
+
+            if (_movedDuringDrag)
+            {
+                _singleClickTimer.Stop();
+                SnapToScreenEdgeIfNear();
+                ClampToWorkArea();
+                SaveConfig();
+                StartTransient(TransientAction.Jump, 5);
+            }
+            else if (isDoubleClick)
+            {
+                _isDoubleClickGesture = false;
+                _singleClickTimer.Stop();
+                StartTransient(TransientAction.Wave, 6);
+                ShowQuickDispatchWindow();
+            }
+            else
+            {
+                _singleClickTimer.Stop();
+                _singleClickTimer.Start();
+            }
+        }
+
+        private Point WindowPosToLogicalScreen(Point localPos)
+        {
+            Point devicePt = PointToScreen(localPos);
+            var src = PresentationSource.FromVisual(this);
+            if (src != null && src.CompositionTarget != null)
+            {
+                return src.CompositionTarget.TransformFromDevice.Transform(devicePt);
+            }
+            return devicePt;
         }
 
         private Point GetCursorLogicalPos(MouseEventArgs fallbackArgs)
@@ -1093,7 +1258,7 @@ namespace AntigravityPet
                 }
                 return new Point(pt.X, pt.Y);
             }
-            return PointToScreen(fallbackArgs.GetPosition(this));
+            return WindowPosToLogicalScreen(fallbackArgs.GetPosition(this));
         }
 
         private void StartTransient(TransientAction action, int frameCount)
@@ -1118,7 +1283,7 @@ namespace AntigravityPet
         private void StartRandomWalk()
         {
             if (_currentPack == null) return;
-            var wa = SystemParameters.WorkArea;
+            var wa = GetCurrentMonitorWorkArea();
             double minLeft = wa.Left + 16;
             double maxLeft = wa.Right - Width - 16;
             if (maxLeft - minLeft < 120) return;
@@ -1184,6 +1349,12 @@ namespace AntigravityPet
             // 全屏游戏/视频避让 & 全屏关键提醒贴边出现状态机
             SyncFullscreenAndEdgeState();
 
+            // 兜底校验：分辨率切换/拔掉副屏/DPI变更后确保宠物仍在当前有效屏幕工作区内
+            if (!_isDragging && !_fullscreenPeekActive && IsVisible)
+            {
+                EnsureInsideScreenBounds(false);
+            }
+
             // 吸附在 Antigravity 窗口标题栏右上角边缘
             if (_config.SnapToAgy && IsVisible && !_isDragging && _transient != TransientAction.Walk && !_bubbleExpanded && !_fullscreenPeekActive && string.IsNullOrEmpty(_dockSide))
             {
@@ -1219,6 +1390,16 @@ namespace AntigravityPet
             {
                 foreach (var k in stale) _tasks.Remove(k);
                 RecomputeEffectiveState();
+            }
+
+            if (!string.IsNullOrEmpty(_availableUpdateVersion) && !_isUpdatingSelf &&
+                _config.ReadyTimeoutSec > 0 && (now - _updatePromptShownAt).TotalSeconds >= _config.ReadyTimeoutSec)
+            {
+                _availableUpdateVersion = "";
+                _availableUpdateUrl = "";
+                _availableUpdateZipUrl = "";
+                UpdateVisualState();
+                SyncFullscreenAndEdgeState();
             }
 
             if (_config.AutoWalk && IsVisible && _state == PetState.Idle &&
@@ -1792,6 +1973,21 @@ namespace AntigravityPet
                     mx = logical.X;
                     my = logical.Y;
                 }
+                if (_suppressDockedHoverUntilCursorMoves)
+                {
+                    if (_dockHoverAnchorNeedsCapture)
+                    {
+                        _dockTouchReleaseCursorPos = new Point(mx, my);
+                        _dockHoverAnchorNeedsCapture = false;
+                        return false;
+                    }
+                    if (Math.Abs(mx - _dockTouchReleaseCursorPos.X) < 16.0 &&
+                        Math.Abs(my - _dockTouchReleaseCursorPos.Y) < 16.0)
+                    {
+                        return false;
+                    }
+                    _suppressDockedHoverUntilCursorMoves = false;
+                }
                 var wa = GetCurrentMonitorWorkArea();
                 double minX, maxX;
                 if (!_dockPeekOut)
@@ -1825,7 +2021,13 @@ namespace AntigravityPet
                 }
                 double minY = Top - 8.0;
                 double maxY = Top + Height + 8.0;
-                return mx >= minX && mx <= maxX && my >= minY && my <= maxY;
+                bool inZone = mx >= minX && mx <= maxX && my >= minY && my <= maxY;
+                if (_requireHoverExitBeforePeek)
+                {
+                    if (!inZone) _requireHoverExitBeforePeek = false;
+                    return false;
+                }
+                return inZone;
             }
             catch
             {
@@ -1866,21 +2068,29 @@ namespace AntigravityPet
             double bodyHalfW = _stageGrid.Width * 0.28;
             bool hasCursor = false;
             double cursorX = centerX;
-            try
+            if (_lastDragWasTouch)
             {
-                POINT pt;
-                if (GetCursorPos(out pt))
+                hasCursor = true;
+                cursorX = _lastDragScreenX;
+            }
+            else
+            {
+                try
                 {
-                    hasCursor = true;
-                    cursorX = pt.X;
-                    var src = PresentationSource.FromVisual(this);
-                    if (src != null && src.CompositionTarget != null)
+                    POINT pt;
+                    if (GetCursorPos(out pt))
                     {
-                        cursorX = src.CompositionTarget.TransformFromDevice.Transform(new Point(pt.X, pt.Y)).X;
+                        hasCursor = true;
+                        cursorX = pt.X;
+                        var src = PresentationSource.FromVisual(this);
+                        if (src != null && src.CompositionTarget != null)
+                        {
+                            cursorX = src.CompositionTarget.TransformFromDevice.Transform(new Point(pt.X, pt.Y)).X;
+                        }
                     }
                 }
+                catch { }
             }
-            catch { }
 
             _dockPeekOut = false;
             if ((centerX - bodyHalfW <= wa.Left + 85.0) || (hasCursor && cursorX <= wa.Left + 60.0))
@@ -1900,6 +2110,17 @@ namespace AntigravityPet
                 _dockSide = "";
                 _bubbleHost.HorizontalAlignment = HorizontalAlignment.Center;
             }
+            _requireHoverExitBeforePeek = !string.IsNullOrEmpty(_dockSide);
+            if (_lastDragWasTouch && !string.IsNullOrEmpty(_dockSide))
+            {
+                _suppressDockedHoverUntilCursorMoves = true;
+                _dockHoverAnchorNeedsCapture = true;
+            }
+            else
+            {
+                _suppressDockedHoverUntilCursorMoves = false;
+                _dockHoverAnchorNeedsCapture = false;
+            }
             UpdateVisualState();
             if (!string.IsNullOrEmpty(_dockSide))
             {
@@ -1914,7 +2135,7 @@ namespace AntigravityPet
 
         private bool HasUrgentNotification()
         {
-            return _state == PetState.Ready || _state == PetState.NeedsInput || _state == PetState.Blocked || HasPendingApproval();
+            return _state == PetState.Ready || _state == PetState.NeedsInput || _state == PetState.Blocked || HasPendingApproval() || !string.IsNullOrEmpty(_availableUpdateVersion);
         }
 
         private bool IsOtherAppFullscreen()
@@ -2551,6 +2772,24 @@ namespace AntigravityPet
             }
             if (_approvalBar != null) _approvalBar.Visibility = Visibility.Collapsed;
 
+            if (_isUpdatingSelf || !string.IsNullOrEmpty(_availableUpdateVersion))
+            {
+                _stackBack1.Visibility = Visibility.Collapsed;
+                _stackBack2.Visibility = Visibility.Collapsed;
+                _expandedStackPanel.Visibility = Visibility.Collapsed;
+                _bubbleExpanded = false;
+                _bubbleText.MaxWidth = Math.Round(300 * _config.Scale);
+                _bubbleText.Text = _isUpdatingSelf && !string.IsNullOrEmpty(_selfUpdateStatusMsg)
+                    ? _selfUpdateStatusMsg
+                    : T("发现新版本 v" + _availableUpdateVersion + " · 点击一键更新", "New release v" + _availableUpdateVersion + " · Click to update");
+                _bubbleBorder.Background = new SolidColorBrush(Color.FromArgb(245, 46, 16, 101));
+                _bubbleBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(168, 85, 247));
+                _bubbleBorder.Visibility = Visibility.Visible;
+                double wNeed = Math.Max(baseW, Math.Min(Math.Round(360 * _config.Scale), MeasureBubbleTextWidth(_bubbleText.Text, 11.5) + 42));
+                SetWindowSizeKeepingAnchor(wNeed, _baseWindowHeight);
+                return;
+            }
+
             if (_config.BubbleMode == "off")
             {
                 _bubbleBorder.Visibility = Visibility.Hidden;
@@ -2584,8 +2823,8 @@ namespace AntigravityPet
                     _bubbleBorder.Background = new SolidColorBrush(badgeBg);
                     _bubbleBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(15, 23, 42));
                     _bubbleBorder.Margin = (_dockSide == "right")
-                        ? new Thickness(0, 0, Math.Round(44 * _config.Scale), 0)
-                        : new Thickness(Math.Round(44 * _config.Scale), 0, 0, 0);
+                        ? new Thickness(0, 0, Math.Round(28 * _config.Scale), 0)
+                        : new Thickness(Math.Round(28 * _config.Scale), 0, 0, 0);
                     _bubbleBorder.Visibility = Visibility.Visible;
                 }
                 SetWindowSizeKeepingAnchor(baseW, _baseWindowHeight);
@@ -2717,20 +2956,21 @@ namespace AntigravityPet
 
         private void UpdateVisualState()
         {
+            PetState effectiveState = HasPendingApproval() ? PetState.NeedsInput : _state;
             Color haloColor = Colors.Transparent;
             string badge = "";
             Color badgeBg = Colors.DodgerBlue;
             string defaultMsg = "";
 
-            switch (_state)
+            switch (effectiveState)
             {
                 case PetState.Idle:
                     _badgeBorder.Visibility = Visibility.Collapsed;
                     break;
                 case PetState.Running:
-                    haloColor = _currentPack != null ? _currentPack.ThemeColor : Color.FromRgb(56, 189, 248);
+                    haloColor = Color.FromRgb(56, 189, 248);
                     badge = "⚡";
-                    badgeBg = _currentPack != null ? _currentPack.ThemeColor : Color.FromRgb(14, 165, 233);
+                    badgeBg = Color.FromRgb(14, 165, 233);
                     defaultMsg = T("工作中...", "Working...");
                     break;
                 case PetState.NeedsInput:
@@ -2753,18 +2993,30 @@ namespace AntigravityPet
                     break;
             }
 
+            if (string.IsNullOrEmpty(badge) && !string.IsNullOrEmpty(_availableUpdateVersion))
+            {
+                haloColor = Color.FromRgb(192, 132, 252);
+                badge = "↑";
+                badgeBg = Color.FromRgb(168, 85, 247);
+            }
+
             _statusHalo.Fill = new RadialGradientBrush(
                 Color.FromArgb(135, haloColor.R, haloColor.G, haloColor.B),
                 Color.FromArgb(0, haloColor.R, haloColor.G, haloColor.B));
 
-            if (!string.IsNullOrEmpty(badge))
+            bool isDockedCompact = !string.IsNullOrEmpty(_dockSide) && !_dockPeekOut && !_fullscreenPeekActive && !_bubbleExpanded;
+            if (!string.IsNullOrEmpty(badge) && !isDockedCompact)
             {
                 _badgeText.Text = badge;
                 _badgeBorder.Background = new SolidColorBrush(badgeBg);
                 _badgeBorder.Visibility = Visibility.Visible;
             }
+            else
+            {
+                _badgeBorder.Visibility = Visibility.Collapsed;
+            }
 
-            bool isAlert = (_state == PetState.NeedsInput || _state == PetState.Ready || _state == PetState.Blocked);
+            bool isAlert = (effectiveState == PetState.NeedsInput || effectiveState == PetState.Ready || effectiveState == PetState.Blocked);
             UpdateBubbleDisplay(badgeBg, isAlert, defaultMsg);
         }
 
@@ -2876,215 +3128,219 @@ namespace AntigravityPet
             });
         }
 
+        private static Style _cachedMenuStyle;
+        private static Style _cachedMenuItemStyle;
+        private static Style _cachedSepStyle;
+
+        private static void EnsureContextMenuStyles()
+        {
+            if (_cachedMenuStyle != null && _cachedMenuItemStyle != null && _cachedSepStyle != null) return;
+            try
+            {
+                string menuXaml =
+                    "<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='ContextMenu'>" +
+                    "  <Setter Property='Background' Value='#1D1D21'/>" +
+                    "  <Setter Property='BorderBrush' Value='#34343B'/>" +
+                    "  <Setter Property='BorderThickness' Value='1'/>" +
+                    "  <Setter Property='Foreground' Value='#F4F4F5'/>" +
+                    "  <Setter Property='Padding' Value='4'/>" +
+                    "  <Setter Property='HasDropShadow' Value='True'/>" +
+                    "  <Setter Property='Template'>" +
+                    "    <Setter.Value>" +
+                    "      <ControlTemplate TargetType='ContextMenu'>" +
+                    "        <Border Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='{TemplateBinding BorderThickness}' CornerRadius='8' Padding='{TemplateBinding Padding}'>" +
+                    "          <StackPanel IsItemsHost='True' KeyboardNavigation.DirectionalNavigation='Cycle'/>" +
+                    "        </Border>" +
+                    "      </ControlTemplate>" +
+                    "    </Setter.Value>" +
+                    "  </Setter>" +
+                    "</Style>";
+
+                string itemXaml =
+                    "<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='MenuItem'>" +
+                    "  <Setter Property='Foreground' Value='#F4F4F5'/>" +
+                    "  <Setter Property='FontSize' Value='12.5'/>" +
+                    "  <Setter Property='Padding' Value='10,7'/>" +
+                    "  <Setter Property='MinHeight' Value='30'/>" +
+                    "  <Setter Property='Template'>" +
+                    "    <Setter.Value>" +
+                    "      <ControlTemplate TargetType='MenuItem'>" +
+                    "        <Grid>" +
+                    "          <Border x:Name='Bd' Background='Transparent' CornerRadius='5' Padding='{TemplateBinding Padding}' Margin='1,1'>" +
+                    "            <Grid>" +
+                    "              <Grid.ColumnDefinitions>" +
+                    "                <ColumnDefinition Width='18'/>" +
+                    "                <ColumnDefinition Width='*'/>" +
+                    "                <ColumnDefinition Width='18'/>" +
+                    "              </Grid.ColumnDefinitions>" +
+                    "              <TextBlock x:Name='CheckMark' Grid.Column='0' Text='✓' FontSize='11' FontWeight='Bold' Foreground='#60A5FA' VerticalAlignment='Center' HorizontalAlignment='Left' Visibility='Collapsed'/>" +
+                    "              <ContentPresenter Grid.Column='1' ContentSource='Header' VerticalAlignment='Center' RecognizesAccessKey='True'/>" +
+                    "              <TextBlock x:Name='Arrow' Grid.Column='2' Text='▸' FontSize='11' Foreground='#A1A1AA' VerticalAlignment='Center' HorizontalAlignment='Right' Visibility='Collapsed'/>" +
+                    "            </Grid>" +
+                    "          </Border>" +
+                    "          <Popup x:Name='PART_Popup' Placement='Right' HorizontalOffset='-4' VerticalOffset='-4' IsOpen='{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}' AllowsTransparency='True' Focusable='False' PopupAnimation='Fade'>" +
+                    "            <Border Background='#1D1D21' BorderBrush='#34343B' BorderThickness='1' CornerRadius='8' Padding='4' MinWidth='176'>" +
+                    "              <StackPanel IsItemsHost='True' KeyboardNavigation.DirectionalNavigation='Cycle'/>" +
+                    "            </Border>" +
+                    "          </Popup>" +
+                    "        </Grid>" +
+                    "        <ControlTemplate.Triggers>" +
+                    "          <Trigger Property='Role' Value='SubmenuHeader'>" +
+                    "            <Setter TargetName='Arrow' Property='Visibility' Value='Visible'/>" +
+                    "          </Trigger>" +
+                    "          <Trigger Property='Role' Value='TopLevelHeader'>" +
+                    "            <Setter TargetName='Arrow' Property='Visibility' Value='Visible'/>" +
+                    "          </Trigger>" +
+                    "          <Trigger Property='IsChecked' Value='True'>" +
+                    "            <Setter TargetName='CheckMark' Property='Visibility' Value='Visible'/>" +
+                    "          </Trigger>" +
+                    "          <Trigger Property='IsHighlighted' Value='True'>" +
+                    "            <Setter TargetName='Bd' Property='Background' Value='#2E2E36'/>" +
+                    "          </Trigger>" +
+                    "          <Trigger Property='IsSubmenuOpen' Value='True'>" +
+                    "            <Setter TargetName='Bd' Property='Background' Value='#2E2E36'/>" +
+                    "          </Trigger>" +
+                    "          <Trigger Property='IsEnabled' Value='False'>" +
+                    "            <Setter Property='Foreground' Value='#8E8E98'/>" +
+                    "          </Trigger>" +
+                    "        </ControlTemplate.Triggers>" +
+                    "      </ControlTemplate>" +
+                    "    </Setter.Value>" +
+                    "  </Setter>" +
+                    "</Style>";
+
+                string sepXaml =
+                    "<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Separator'>" +
+                    "  <Setter Property='Height' Value='1'/>" +
+                    "  <Setter Property='Margin' Value='8,4'/>" +
+                    "  <Setter Property='Background' Value='#2E2E35'/>" +
+                    "  <Setter Property='Template'>" +
+                    "    <Setter.Value>" +
+                    "      <ControlTemplate TargetType='Separator'>" +
+                    "        <Border Height='1' Background='{TemplateBinding Background}' Margin='{TemplateBinding Margin}'/>" +
+                    "      </ControlTemplate>" +
+                    "    </Setter.Value>" +
+                    "  </Setter>" +
+                    "</Style>";
+
+                _cachedMenuStyle = (Style)System.Windows.Markup.XamlReader.Parse(menuXaml);
+                _cachedMenuItemStyle = (Style)System.Windows.Markup.XamlReader.Parse(itemXaml);
+                _cachedSepStyle = (Style)System.Windows.Markup.XamlReader.Parse(sepXaml);
+            }
+            catch
+            {
+                _cachedMenuStyle = null;
+                _cachedMenuItemStyle = null;
+                _cachedSepStyle = null;
+            }
+        }
+
+        private void ApplyMenuItemStyle(MenuItem item)
+        {
+            if (item == null || _cachedMenuItemStyle == null) return;
+            item.Style = _cachedMenuItemStyle;
+            foreach (object child in item.Items)
+            {
+                var sub = child as MenuItem;
+                if (sub != null) ApplyMenuItemStyle(sub);
+                else if (child is Separator && _cachedSepStyle != null) ((Separator)child).Style = _cachedSepStyle;
+            }
+        }
+
         private void RebuildContextMenu()
         {
+            EnsureContextMenuStyles();
             var menu = new ContextMenu();
+            if (_cachedMenuStyle != null) menu.Style = _cachedMenuStyle;
 
-            string stateLabel = T("状态: ", "Status: ") + StateToFriendlyLabel(_state) +
-                (_tasks.Count > 1 ? (" (" + _tasks.Count + T("个会话)", " tasks)")) : "");
+            string stateLabel = "● " + StateToFriendlyLabel(_state);
             menu.Items.Add(new MenuItem { Header = stateLabel, IsEnabled = false });
-
-            double mins = Math.Max(0, Math.Round((DateTime.Now - _sessionStart).TotalMinutes));
-            menu.Items.Add(new MenuItem
-            {
-                Header = string.Format(T("📊 已完成 {0} 次 · 工具 {1} 次 · 在线 {2} 分", "📊 Done {0} · Tools {1} · Up {2}m"), _config.CompletedTasksCount, _config.ToolCallsCount, mins),
-                IsEnabled = false
-            });
             menu.Items.Add(new Separator());
 
-            var recentMenu = new MenuItem { Header = T("💬 最近对话 (点击打开)", "💬 Recent Chats (Click)") };
-            if (_recentConversations.Count == 0)
-            {
-                recentMenu.Items.Add(new MenuItem { Header = T("暂无记录（点击打开 Antigravity）", "No history (Open Antigravity)") });
-                ((MenuItem)recentMenu.Items[0]).Click += (s, e) => OpenAntigravityConversation(_lastConversationId, _activeTitle);
-            }
-            else
-            {
-                foreach (var rc in _recentConversations)
-                {
-                    string cid = rc.ConversationId;
-                    string ctitle = rc.Title;
-                    recentMenu.Items.Add(MakeMenuItem(string.Format("[{0}] {1}", rc.UpdatedAt, Shorten(ctitle, 18)), () =>
-                    {
-                        OpenAntigravityConversation(cid, ctitle);
-                    }));
-                }
-            }
-            menu.Items.Add(recentMenu);
+            menu.Items.Add(MakeMenuItem(T("⚡ 快捷派活", "⚡ Quick Dispatch"), () => ShowQuickDispatchWindow()));
 
-            var skinMenu = new MenuItem { Header = T("🎭 切换宠物 (", "🎭 Switch Pet (") + _packs.Count + ")" };
+            var skinHeader = new MenuItem
+            {
+                Header = T("🎭 切换宠物 (", "🎭 Switch Pet (") + _packs.Count + ") ▸",
+                StaysOpenOnClick = true
+            };
+            menu.Items.Add(skinHeader);
+
+            var skinSubItems = new List<UIElement>();
             foreach (var p in _packs.Values.OrderBy(x => GetLocalizedPackName(x)))
             {
                 string pid = p.Id;
                 var item = new MenuItem
                 {
-                    Header = GetLocalizedPackName(p),
+                    Header = "  " + GetLocalizedPackName(p),
                     IsCheckable = true,
-                    IsChecked = (_currentPack != null && _currentPack.Id.Equals(pid, StringComparison.OrdinalIgnoreCase))
+                    IsChecked = (_currentPack != null && _currentPack.Id.Equals(pid, StringComparison.OrdinalIgnoreCase)),
+                    Visibility = Visibility.Collapsed
                 };
                 item.Click += (s, e) => SwitchSkin(pid);
-                skinMenu.Items.Add(item);
+                skinSubItems.Add(item);
+                menu.Items.Add(item);
             }
-            skinMenu.Items.Add(new Separator());
-            skinMenu.Items.Add(MakeMenuItem(T("🔄 刷新宠物列表", "🔄 Refresh Pets"), () =>
+            var refreshPetsItem = MakeMenuItem("  " + T("🔄 刷新宠物列表", "🔄 Refresh Pets"), () =>
             {
                 ReloadPetPacks();
                 RebuildContextMenu();
                 RenderCurrentFrame();
-            }));
-            menu.Items.Add(skinMenu);
+            });
+            refreshPetsItem.Visibility = Visibility.Collapsed;
+            skinSubItems.Add(refreshPetsItem);
+            menu.Items.Add(refreshPetsItem);
 
-            var langMenu = new MenuItem { Header = T("🌐 语言 / Language", "🌐 Language") };
-            langMenu.Items.Add(MakeCheckItem(T("🔄 跟随 Antigravity (自动)", "🔄 Follow Antigravity (Auto)"), (_config.Language ?? "auto") == "auto", () => { _config.Language = "auto"; UpdateVisualState(); SaveConfig(); RebuildContextMenu(); }));
-            langMenu.Items.Add(MakeCheckItem("🇺🇸 English", (_config.Language ?? "auto") == "en", () => { _config.Language = "en"; UpdateVisualState(); SaveConfig(); RebuildContextMenu(); }));
-            langMenu.Items.Add(MakeCheckItem("🇨🇳 简体中文", (_config.Language ?? "auto") == "zh", () => { _config.Language = "zh"; UpdateVisualState(); SaveConfig(); RebuildContextMenu(); }));
-            menu.Items.Add(langMenu);
-
-            var sizeMenu = new MenuItem { Header = T("📐 宠物尺寸", "📐 Pet Size") };
-            sizeMenu.Items.Add(MakeCheckItem(T("小 (0.75x)", "Small (0.75x)"), Math.Abs(_config.Scale - 0.75) < 0.05, () => { ApplyScale(0.75, true); RebuildContextMenu(); }));
-            sizeMenu.Items.Add(MakeCheckItem(T("标准 (1.0x)", "Normal (1.0x)"), Math.Abs(_config.Scale - 1.0) < 0.05, () => { ApplyScale(1.0, true); RebuildContextMenu(); }));
-            sizeMenu.Items.Add(MakeCheckItem(T("大 (1.3x)", "Large (1.3x)"), Math.Abs(_config.Scale - 1.3) < 0.05, () => { ApplyScale(1.3, true); RebuildContextMenu(); }));
-            sizeMenu.Items.Add(MakeCheckItem(T("特大 (1.5x)", "XL (1.5x)"), Math.Abs(_config.Scale - 1.5) < 0.05, () => { ApplyScale(1.5, true); RebuildContextMenu(); }));
-            menu.Items.Add(sizeMenu);
-
-            var bubbleMenu = new MenuItem { Header = T("💭 气泡模式", "💭 Bubble Mode") };
-            bubbleMenu.Items.Add(MakeCheckItem(T("始终显示", "Always Show"), _config.BubbleMode == "always", () => { _config.BubbleMode = "always"; UpdateVisualState(); SaveConfig(); RebuildContextMenu(); }));
-            bubbleMenu.Items.Add(MakeCheckItem(T("仅重要提醒", "Alerts Only"), _config.BubbleMode == "alerts", () => { _config.BubbleMode = "alerts"; UpdateVisualState(); SaveConfig(); RebuildContextMenu(); }));
-            bubbleMenu.Items.Add(MakeCheckItem(T("关闭气泡", "Off"), _config.BubbleMode == "off", () => { _config.BubbleMode = "off"; UpdateVisualState(); SaveConfig(); RebuildContextMenu(); }));
-            bubbleMenu.Items.Add(new Separator());
-            bubbleMenu.Items.Add(MakeCheckItem(T("简易模式", "Simple Mode"), !IsDetailedStyle(), () => { _config.BubbleStyle = "simple"; _bubbleExpanded = false; UpdateVisualState(); SaveConfig(); RebuildContextMenu(); }));
-            bubbleMenu.Items.Add(MakeCheckItem(T("详细模式 (堆叠展开)", "Detailed Mode (Stacked)"), IsDetailedStyle(), () => { _config.BubbleStyle = "detailed"; UpdateVisualState(); SaveConfig(); RebuildContextMenu(); }));
-            bubbleMenu.Items.Add(new Separator());
-            var readyTimerMenu = new MenuItem { Header = T("已完成消失时间", "Ready Auto-Hide") };
-            int[] rtOpts = new int[] { 15, 30, 60, 120, 0 };
-            foreach (int sec in rtOpts)
+            bool skinsExpanded = false;
+            skinHeader.Click += (s, e) =>
             {
-                int captured = sec;
-                string lbl = captured == 0 ? T("不自动消失", "Never") : (captured + T(" 秒", "s") + (captured == 30 ? T(" (默认)", " (Default)") : ""));
-                readyTimerMenu.Items.Add(MakeCheckItem(lbl, _config.ReadyTimeoutSec == captured, () =>
+                skinsExpanded = !skinsExpanded;
+                skinHeader.Header = T("🎭 切换宠物 (", "🎭 Switch Pet (") + _packs.Count + (skinsExpanded ? ") ▾" : ") ▸");
+                Visibility vis = skinsExpanded ? Visibility.Visible : Visibility.Collapsed;
+                foreach (var el in skinSubItems)
                 {
-                    _config.ReadyTimeoutSec = captured;
-                    RecomputeEffectiveState();
-                    SaveConfig();
-                    RebuildContextMenu();
-                }));
-            }
-            bubbleMenu.Items.Add(readyTimerMenu);
-            menu.Items.Add(bubbleMenu);
-
-            menu.Items.Add(MakeCheckItem(T("🐾 待机桌面散步", "🐾 Idle Roaming"), _config.AutoWalk, () =>
-            {
-                _config.AutoWalk = !_config.AutoWalk;
-                if (!_config.AutoWalk) CancelWalk();
-                SaveConfig();
-                RebuildContextMenu();
-            }));
-
-            menu.Items.Add(MakeCheckItem(T("👀 眼神跟随鼠标", "👀 Eye Follow Cursor"), _config.EyeFollow, () =>
-            {
-                _config.EyeFollow = !_config.EyeFollow;
-                SaveConfig();
-                RebuildContextMenu();
-            }));
-
-            menu.Items.Add(MakeMenuItem(T("⚡ 快捷派活 (Skill / 指令)", "⚡ Quick Dispatch (Skill / Prompt)"), () => ShowQuickDispatchWindow()));
-
-            var accMenu = new MenuItem { Header = T("👑 成长配饰", "👑 Accessories") };
-            string[] accIds = { "auto", "none", "glasses", "cap", "coffee", "crown" };
-            string[] accZh = { "自动解锁佩戴", "不佩戴", "极客墨镜 (10任务)", "赛博鸭舌帽 (50任务)", "续命咖啡 (150任务)", "黄金皇冠 (300任务)" };
-            string[] accEn = { "Auto Unlock", "None", "Geek Glasses (10+)", "Cyber Cap (50+)", "Coffee Cup (150+)", "Gold Crown (300+)" };
-            for (int i = 0; i < accIds.Length; i++)
-            {
-                string aid = accIds[i];
-                accMenu.Items.Add(MakeCheckItem(T(accZh[i], accEn[i]), (_config.Accessory ?? "auto") == aid, () =>
-                {
-                    _config.Accessory = aid;
-                    UpdateAccessoryVisual();
-                    SaveConfig();
-                    RebuildContextMenu();
-                }));
-            }
-            menu.Items.Add(accMenu);
-
-            menu.Items.Add(MakeCheckItem(T("📌 始终置顶", "📌 Always on Top"), _config.Topmost, () =>
-            {
-                ApplyTopmost(!_config.Topmost);
-                SaveConfig();
-                RebuildContextMenu();
-            }));
-
-            var dockMenu = new MenuItem { Header = T("📌 屏幕贴边停靠", "📌 Dock to Screen Edge") };
-            dockMenu.Items.Add(MakeCheckItem(T("⬅️ 贴靠屏幕左侧", "⬅️ Dock Left Edge"), _dockSide == "left", () =>
-            {
-                _dockSide = "left"; _dockPeekOut = false; _dockIgnoreHoverUntil = DateTime.Now.AddMilliseconds(700);
-                UpdateVisualState(); Left = GetDockedTargetLeft("left", false); RebuildContextMenu();
-            }));
-            dockMenu.Items.Add(MakeCheckItem(T("➡️ 贴靠屏幕右侧", "➡️ Dock Right Edge"), _dockSide == "right", () =>
-            {
-                _dockSide = "right"; _dockPeekOut = false; _dockIgnoreHoverUntil = DateTime.Now.AddMilliseconds(700);
-                UpdateVisualState(); Left = GetDockedTargetLeft("right", false); RebuildContextMenu();
-            }));
-            dockMenu.Items.Add(MakeCheckItem(T("🔓 取消贴边", "🔓 Undock"), string.IsNullOrEmpty(_dockSide), () =>
-            {
-                ResetToCorner(true); RebuildContextMenu();
-            }));
-            menu.Items.Add(dockMenu);
-
-            menu.Items.Add(MakeCheckItem(T("🧲 吸附 Antigravity 窗口", "🧲 Snap to Antigravity"), _config.SnapToAgy, () =>
-            {
-                _config.SnapToAgy = !_config.SnapToAgy;
-                SaveConfig();
-                RebuildContextMenu();
-            }));
-
-            menu.Items.Add(MakeCheckItem(T("🎮 全屏应用时自动隐藏", "🎮 Hide on Fullscreen"), _config.HideOnFullscreen, () =>
-            {
-                _config.HideOnFullscreen = !_config.HideOnFullscreen;
-                SaveConfig();
-                RebuildContextMenu();
-            }));
-
-            menu.Items.Add(MakeCheckItem(T("🔔 完成提示音效", "🔔 Completion Sound"), _config.SoundAlert, () =>
-            {
-                _config.SoundAlert = !_config.SoundAlert;
-                SaveConfig();
-                RebuildContextMenu();
-            }));
-
-            menu.Items.Add(MakeCheckItem(T("🚀 随 Antigravity 启动", "🚀 Launch with Antigravity"), _config.AutoStartOnBoot, () =>
-            {
-                _config.AutoStartOnBoot = !_config.AutoStartOnBoot;
-                SyncAutoStartRegistry(_config.AutoStartOnBoot);
-                SaveConfig();
-                RebuildContextMenu();
-            }));
-
-            var testMenu = new MenuItem { Header = T("🧪 动作与状态预览", "🧪 Preview States") };
-            testMenu.Items.Add(MakeMenuItem(T("⚡ Running (运行中)", "⚡ Running"), () => ReportTaskState("preview", PetState.Running, T("编写代码中...", "Writing code..."), "", false)));
-            testMenu.Items.Add(MakeMenuItem(T("! Needs Input (需要确认)", "! Needs Input"), () => ReportTaskState("preview", PetState.NeedsInput, T("需要你批准操作!", "Needs your input!"), "", false)));
-            testMenu.Items.Add(MakeMenuItem(T("✓ Ready (已完成)", "✓ Ready"), () => ReportTaskState("preview", PetState.Ready, T("✓ 任务完成 · 点击打开", "✓ Task Ready · Click"), "", false)));
-            testMenu.Items.Add(MakeMenuItem(T("✕ Blocked (报错阻断)", "✕ Blocked"), () => ReportTaskState("preview", PetState.Blocked, T("执行出错 · 点击查看", "Blocked · Click to view"), "", false)));
-            testMenu.Items.Add(MakeMenuItem(T("💤 Idle (恢复待机)", "💤 Idle"), () => { _tasks.Clear(); RecomputeEffectiveState(); }));
-            testMenu.Items.Add(new Separator());
-            testMenu.Items.Add(MakeMenuItem(T("👋 挥手打招呼", "👋 Wave"), () => StartTransient(TransientAction.Wave, 8)));
-            testMenu.Items.Add(MakeMenuItem(T("🦘 开心跳一下", "🦘 Jump"), () => StartTransient(TransientAction.Jump, 5)));
-            testMenu.Items.Add(MakeMenuItem(T("🐾 散步一下", "🐾 Walk"), () => { _tasks.Clear(); RecomputeEffectiveState(); StartRandomWalk(); }));
-            menu.Items.Add(testMenu);
-
-            menu.Items.Add(new Separator());
-            menu.Items.Add(MakeMenuItem(T("📂 打开宠物文件夹", "📂 Open Pets Folder"), () =>
-            {
-                try
-                {
-                    Directory.CreateDirectory(_pluginPetsDir);
-                    Process.Start("explorer.exe", _pluginPetsDir);
+                    el.Visibility = vis;
                 }
-                catch { }
+            };
+
+            if (!string.IsNullOrEmpty(_dockSide))
+            {
+                menu.Items.Add(MakeMenuItem(T("🔓 取消贴边", "🔓 Undock from Edge"), () =>
+                {
+                    ResetToCorner(true);
+                    RebuildContextMenu();
+                }));
+            }
+            else
+            {
+                menu.Items.Add(MakeMenuItem(T("⬅️ 贴靠左侧", "⬅️ Dock Left"), () =>
+                {
+                    _dockSide = "left"; _dockPeekOut = false; _dockIgnoreHoverUntil = DateTime.Now.AddMilliseconds(700); _requireHoverExitBeforePeek = true;
+                    UpdateVisualState(); Left = GetDockedTargetLeft("left", false); RebuildContextMenu();
+                }));
+                menu.Items.Add(MakeMenuItem(T("➡️ 贴靠右侧", "➡️ Dock Right"), () =>
+                {
+                    _dockSide = "right"; _dockPeekOut = false; _dockIgnoreHoverUntil = DateTime.Now.AddMilliseconds(700); _requireHoverExitBeforePeek = true;
+                    UpdateVisualState(); Left = GetDockedTargetLeft("right", false); RebuildContextMenu();
+                }));
+            }
+
+            menu.Items.Add(MakeMenuItem(T("⚙️ 设置 (Antigravity 面板)", "⚙️ Settings (Antigravity)"), () =>
+            {
+                OpenAntigravityConversation("", "");
+                ReportTaskState("settings-hint", PetState.Ready, T("请点右上角 ... → 桌面宠物设置", "Open ... → Antigravity Pet"), "", false);
             }));
-            menu.Items.Add(MakeMenuItem(T("📍 重置到右下角", "📍 Reset Position"), () => ResetToCorner(true)));
+
             menu.Items.Add(new Separator());
             menu.Items.Add(MakeMenuItem(T("🙈 隐藏桌宠 (Win+Alt+P)", "🙈 Hide Pet (Win+Alt+P)"), () => Hide()));
             menu.Items.Add(MakeMenuItem(T("🚪 退出桌宠", "🚪 Quit Pet"), () => { _config.Enabled = false; SaveConfig(); Close(); }));
+
+            foreach (object obj in menu.Items)
+            {
+                var mi = obj as MenuItem;
+                if (mi != null) ApplyMenuItemStyle(mi);
+                else if (obj is Separator && _cachedSepStyle != null) ((Separator)obj).Style = _cachedSepStyle;
+            }
 
             _stageGrid.ContextMenu = menu;
         }
@@ -3259,6 +3515,7 @@ namespace AntigravityPet
                             topmost = _config.Topmost,
                             win32Topmost = win32Topmost,
                             autoStartOnBoot = _config.AutoStartOnBoot,
+                            checkUpdatesOnStartup = _config.CheckUpdatesOnStartup,
                             soundAlert = _config.SoundAlert,
                             language = string.IsNullOrWhiteSpace(_config.Language) ? "auto" : _config.Language,
                             effectiveLanguage = IsEnglish() ? "en" : "zh",
@@ -3375,7 +3632,18 @@ namespace AntigravityPet
                         else if (action == "walk") { _tasks.Clear(); RecomputeEffectiveState(); StartRandomWalk(); }
                         else if (action == "wave") StartTransient(TransientAction.Wave, 8);
                         else if (action == "jump") StartTransient(TransientAction.Jump, 5);
-                        else if (action == "resetpos") ResetToCorner(true);
+                        else if (action == "resetpos") { ResetToCorner(true); RebuildContextMenu(); }
+                        else if (action == "dockleft")
+                        {
+                            _dockSide = "left"; _dockPeekOut = false; _dockIgnoreHoverUntil = DateTime.Now.AddMilliseconds(700); _requireHoverExitBeforePeek = true;
+                            UpdateVisualState(); Left = GetDockedTargetLeft("left", false); RebuildContextMenu();
+                        }
+                        else if (action == "dockright")
+                        {
+                            _dockSide = "right"; _dockPeekOut = false; _dockIgnoreHoverUntil = DateTime.Now.AddMilliseconds(700); _requireHoverExitBeforePeek = true;
+                            UpdateVisualState(); Left = GetDockedTargetLeft("right", false); RebuildContextMenu();
+                        }
+                        else if (action == "undock") { ResetToCorner(true); RebuildContextMenu(); }
                         else if (action == "scale")
                         {
                             double sc;
@@ -3445,6 +3713,11 @@ namespace AntigravityPet
                             SaveConfig();
                             RebuildContextMenu();
                         }
+                        else if (action == "checkupdatesonstartup")
+                        {
+                            _config.CheckUpdatesOnStartup = ParseBoolStr(val, !_config.CheckUpdatesOnStartup);
+                            SaveConfig();
+                        }
                         else if (action == "soundalert")
                         {
                             _config.SoundAlert = ParseBoolStr(val, !_config.SoundAlert);
@@ -3495,6 +3768,16 @@ namespace AntigravityPet
                         else if (action == "updateconfig")
                         {
                             ApplyConfigMap(data);
+                        }
+                        else if (action == "checkupdate") { CheckGitHubReleaseAsync(); }
+                        else if (action == "mockupdate")
+                        {
+                            _availableUpdateVersion = string.IsNullOrWhiteSpace(val) ? "9.9.9" : val.Trim().TrimStart('v', 'V');
+                            _availableUpdateUrl = "https://github.com/Wlaeg/antigravity-pet/releases/latest";
+                            _availableUpdateZipUrl = "";
+                            _updatePromptShownAt = DateTime.Now;
+                            UpdateVisualState();
+                            SyncFullscreenAndEdgeState();
                         }
                         else if (action == "quit")
                         {
@@ -3561,6 +3844,7 @@ namespace AntigravityPet
             if (data.ContainsKey("eyeFollow")) _config.EyeFollow = GetBool(data, "eyeFollow", _config.EyeFollow);
             if (data.ContainsKey("topmost")) ApplyTopmost(GetBool(data, "topmost", _config.Topmost));
             if (data.ContainsKey("autoStartOnBoot")) { _config.AutoStartOnBoot = GetBool(data, "autoStartOnBoot", _config.AutoStartOnBoot); SyncAutoStartRegistry(_config.AutoStartOnBoot); }
+            if (data.ContainsKey("checkUpdatesOnStartup")) _config.CheckUpdatesOnStartup = GetBool(data, "checkUpdatesOnStartup", _config.CheckUpdatesOnStartup);
             if (data.ContainsKey("soundAlert")) _config.SoundAlert = GetBool(data, "soundAlert", _config.SoundAlert);
             if (data.ContainsKey("snapToAgy")) _config.SnapToAgy = GetBool(data, "snapToAgy", _config.SnapToAgy);
             if (data.ContainsKey("hideOnFullscreen")) _config.HideOnFullscreen = GetBool(data, "hideOnFullscreen", _config.HideOnFullscreen);
@@ -3660,21 +3944,226 @@ namespace AntigravityPet
             box.Focus();
         }
 
-        private void SendDispatchToPanel(string message)
+        private string GetLocalPluginVersion()
         {
-            if (string.IsNullOrWhiteSpace(message)) return;
-            string cid = !string.IsNullOrWhiteSpace(_activeConversationId) ? _activeConversationId : _lastConversationId;
+            try
+            {
+                string manifestPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "plugin.json"));
+                if (File.Exists(manifestPath))
+                {
+                    var json = new JavaScriptSerializer();
+                    var dict = json.Deserialize<Dictionary<string, object>>(File.ReadAllText(manifestPath, Encoding.UTF8));
+                    string v = GetStr(dict, "version", "");
+                    if (!string.IsNullOrWhiteSpace(v)) return v.Trim().TrimStart('v', 'V');
+                }
+            }
+            catch { }
+            return "4.0.1";
+        }
+
+        private static int CompareSemVer(string a, string b)
+        {
+            string[] pa = (a ?? "0.0.0").TrimStart('v', 'V').Split('.');
+            string[] pb = (b ?? "0.0.0").TrimStart('v', 'V').Split('.');
+            int len = Math.Max(pa.Length, pb.Length);
+            for (int i = 0; i < len; i++)
+            {
+                int va = 0, vb = 0;
+                if (i < pa.Length) int.TryParse(new string(pa[i].TakeWhile(char.IsDigit).ToArray()), out va);
+                if (i < pb.Length) int.TryParse(new string(pb[i].TakeWhile(char.IsDigit).ToArray()), out vb);
+                if (va != vb) return va.CompareTo(vb);
+            }
+            return 0;
+        }
+
+        private void CheckGitHubReleaseAsync()
+        {
             ThreadPool.QueueUserWorkItem(_ =>
             {
                 try
                 {
-                    string bridgePath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(_configPath), "panel-bridge.json");
+                    Thread.Sleep(1500);
+                    if (_isClosing) return;
+                    ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
+                    string localVer = GetLocalPluginVersion();
+                    var req = (HttpWebRequest)WebRequest.Create("https://api.github.com/repos/Wlaeg/antigravity-pet/releases/latest");
+                    req.Method = "GET";
+                    req.UserAgent = "AntigravityPet/" + localVer;
+                    req.Accept = "application/vnd.github+json";
+                    req.Timeout = 5000;
+                    using (var resp = (HttpWebResponse)req.GetResponse())
+                    using (var st = resp.GetResponseStream())
+                    using (var rd = new StreamReader(st, Encoding.UTF8))
+                    {
+                        string raw = rd.ReadToEnd();
+                        var json = new JavaScriptSerializer();
+                        var data = json.Deserialize<Dictionary<string, object>>(raw);
+                        string tag = GetStr(data, "tag_name", "").Trim().TrimStart('v', 'V');
+                        string htmlUrl = GetStr(data, "html_url", "https://github.com/Wlaeg/antigravity-pet/releases/latest");
+                        string zipUrl = GetStr(data, "zipball_url", "");
+                        if (data != null && data.ContainsKey("assets") && data["assets"] is System.Collections.IEnumerable)
+                        {
+                            foreach (object obj in (System.Collections.IEnumerable)data["assets"])
+                            {
+                                var asset = obj as Dictionary<string, object>;
+                                string aname = GetStr(asset, "name", "");
+                                string dl = GetStr(asset, "browser_download_url", "");
+                                if (!string.IsNullOrEmpty(dl) && aname.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    zipUrl = dl;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!string.IsNullOrEmpty(tag) && CompareSemVer(tag, localVer) > 0)
+                        {
+                            Dispatcher.BeginInvoke(new Action(() =>
+                            {
+                                if (_isClosing) return;
+                                _availableUpdateVersion = tag;
+                                _availableUpdateUrl = htmlUrl;
+                                _availableUpdateZipUrl = zipUrl;
+                                _updatePromptShownAt = DateTime.Now;
+                                if (!IsVisible && _config.Enabled) Show();
+                                UpdateVisualState();
+                                SyncFullscreenAndEdgeState();
+                            }));
+                        }
+                    }
+                }
+                catch { }
+            });
+        }
+
+        private void PerformSelfUpdateAsync(string ver, string zipUrl)
+        {
+            if (_isUpdatingSelf) return;
+            _isUpdatingSelf = true;
+            _selfUpdateStatusMsg = T("正在下载更新 v" + ver + "...", "Downloading v" + ver + "...");
+            UpdateVisualState();
+
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                string tmpRoot = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "agypet-upd-" + Guid.NewGuid().ToString("N"));
+                try
+                {
+                    Directory.CreateDirectory(tmpRoot);
+                    string targetZipUrl = !string.IsNullOrWhiteSpace(zipUrl)
+                        ? zipUrl
+                        : ("https://github.com/Wlaeg/antigravity-pet/releases/download/v" + ver + "/antigravity-pet-v" + ver + ".zip");
+                    string zipFile = System.IO.Path.Combine(tmpRoot, "update.zip");
+                    string extractDir = System.IO.Path.Combine(tmpRoot, "extracted");
+
+                    ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
+                    var req = (HttpWebRequest)WebRequest.Create(targetZipUrl);
+                    req.Method = "GET";
+                    req.UserAgent = "AntigravityPet/" + GetLocalPluginVersion();
+                    req.AllowAutoRedirect = true;
+                    req.Timeout = 30000;
+                    using (var resp = (HttpWebResponse)req.GetResponse())
+                    using (var st = resp.GetResponseStream())
+                    using (var fs = File.Create(zipFile))
+                    {
+                        st.CopyTo(fs);
+                    }
+
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        _selfUpdateStatusMsg = T("正在安装 v" + ver + " 并重启...", "Installing v" + ver + "...");
+                        UpdateVisualState();
+                    }));
+
+                    var expandProc = Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command \"Expand-Archive -LiteralPath '" + zipFile.Replace("'", "''") + "' -DestinationPath '" + extractDir.Replace("'", "''") + "' -Force\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    });
+                    expandProc.WaitForExit(20000);
+                    if (expandProc.ExitCode != 0) throw new Exception("Expand-Archive failed");
+
+                    string srcDir = extractDir;
+                    if (!File.Exists(System.IO.Path.Combine(srcDir, "plugin.json")))
+                    {
+                        string[] subDirs = Directory.GetDirectories(extractDir);
+                        foreach (string sd in subDirs)
+                        {
+                            if (File.Exists(System.IO.Path.Combine(sd, "plugin.json")))
+                            {
+                                srcDir = sd;
+                                break;
+                            }
+                        }
+                    }
+                    if (!File.Exists(System.IO.Path.Combine(srcDir, "plugin.json")))
+                    {
+                        throw new Exception("Invalid package: missing plugin.json");
+                    }
+
+                    string pluginDir = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".."));
+                    string applyScript = System.IO.Path.Combine(tmpRoot, "apply.ps1");
+                    int currentPid = Process.GetCurrentProcess().Id;
+                    string psContent =
+                        "$ErrorActionPreference='SilentlyContinue'\r\n" +
+                        "for($i=0;$i -lt 40;$i++){ if(-not (Get-Process -Id " + currentPid + " -ErrorAction SilentlyContinue)){ break }; Start-Sleep -Milliseconds 100 }\r\n" +
+                        "Stop-Process -Name 'AntigravityPet' -Force -ErrorAction SilentlyContinue\r\n" +
+                        "Start-Sleep -Milliseconds 250\r\n" +
+                        "robocopy '" + srcDir.Replace("'", "''") + "' '" + pluginDir.Replace("'", "''") + "' /E /XD node_modules .git /NFL /NDL /NJH /NJS | Out-Null\r\n" +
+                        "$exe = Join-Path '" + pluginDir.Replace("'", "''") + "' 'app\\AntigravityPet.exe'\r\n" +
+                        "if(-not (Test-Path $exe)){ powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path '" + pluginDir.Replace("'", "''") + "' 'build.ps1') }\r\n" +
+                        "schtasks /Run /TN 'AntigravityPetLauncher' 2>$null | Out-Null\r\n" +
+                        "if($LASTEXITCODE -ne 0 -and (Test-Path $exe)){ Start-Process -FilePath $exe }\r\n" +
+                        "Remove-Item -LiteralPath '" + tmpRoot.Replace("'", "''") + "' -Recurse -Force -ErrorAction SilentlyContinue\r\n";
+                    File.WriteAllText(applyScript, psContent, new UTF8Encoding(false));
+
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + applyScript + "\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    });
+
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        _config.Enabled = true;
+                        SaveConfig();
+                        Close();
+                    }));
+                }
+                catch
+                {
+                    try { if (Directory.Exists(tmpRoot)) Directory.Delete(tmpRoot, true); } catch { }
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        _isUpdatingSelf = false;
+                        _selfUpdateStatusMsg = "";
+                        UpdateVisualState();
+                        ReportTaskState("update-err", PetState.Blocked, T("自动更新失败，请检查网络", "Update failed, check network"), "", false);
+                    }));
+                }
+            });
+        }
+
+        private void SendDispatchToPanel(string message, bool newConversation = false)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return;
+            string cid = newConversation ? "" : (!string.IsNullOrWhiteSpace(_activeConversationId) ? _activeConversationId : _lastConversationId);
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    string bridgePath = System.IO.Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                        ".antigravity-pet", "panel-bridge.json");
                     if (!File.Exists(bridgePath))
                     {
                         Dispatcher.BeginInvoke(new Action(() => OpenAntigravityConversation(cid, _activeTitle)));
                         return;
                     }
-                    var bridge = _json.Deserialize<Dictionary<string, object>>(File.ReadAllText(bridgePath, Encoding.UTF8));
+                    var json = new JavaScriptSerializer();
+                    var bridge = json.Deserialize<Dictionary<string, object>>(File.ReadAllText(bridgePath, Encoding.UTF8));
                     int port = 0;
                     if (bridge != null && bridge.ContainsKey("port")) int.TryParse(bridge["port"].ToString(), out port);
                     string token = GetStr(bridge, "token", "");
@@ -3683,8 +4172,8 @@ namespace AntigravityPet
                     var req = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:" + port + "/api/dispatch");
                     req.Method = "POST";
                     req.ContentType = "application/json; charset=utf-8";
-                    req.Timeout = 3000;
-                    byte[] body = Encoding.UTF8.GetBytes(_json.Serialize(new { token = token, conversationId = cid, message = message }));
+                    req.Timeout = 4000;
+                    byte[] body = Encoding.UTF8.GetBytes(json.Serialize(new { token = token, conversationId = cid, message = message, newConversation = newConversation }));
                     req.ContentLength = body.Length;
                     using (var st = req.GetRequestStream()) st.Write(body, 0, body.Length);
                     using (var resp = req.GetResponse()) { }

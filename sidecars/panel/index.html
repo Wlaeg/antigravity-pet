@@ -13,8 +13,8 @@
     --fg: var(--foreground, var(--color-text-primary, #eceff4));
     --fg-2: var(--muted-foreground, var(--color-text-secondary, #8f98a8));
     --fg-3: rgba(143, 152, 168, 0.72);
-    --line: var(--border, var(--color-border-primary, rgba(255, 255, 255, 0.08)));
-    --line-strong: rgba(255, 255, 255, 0.16);
+    --line: var(--border, var(--color-border-primary, rgba(236, 239, 244, 0.08)));
+    --line-strong: rgba(236, 239, 244, 0.16);
     --accent: #38bdf8;
     --accent-soft: rgba(56, 189, 248, 0.12);
     --ok: #34d399;
@@ -52,7 +52,7 @@
     font-size: 13px; font-weight: 600; color: var(--fg); margin: 0;
     letter-spacing: -0.01em;
   }
-  .sec-title svg { color: var(--fg-2); flex-shrink: 0; }
+  .sec-title svg { color: var(--fg-2); flex-shrink: 0; width: 16px; height: 16px; stroke-width: 1.5; }
 
   /* Header */
   .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -65,22 +65,22 @@
   }
   .title { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: -0.015em; }
   .sub {
-    font-size: 12px; color: var(--fg-2); margin: 3px 0 0;
-    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    font-size: 12px; color: var(--fg-2); margin: 4px 0 0;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   }
   kbd {
     font-family: var(--mono); font-size: 11px; line-height: 1;
-    padding: 3px 6px; border-radius: 5px;
+    padding: 4px 6px; border-radius: 4px;
     background: var(--surface-2); border: 1px solid var(--line-strong);
     color: var(--fg);
   }
   .status-badge {
-    display: inline-flex; align-items: center; gap: 7px;
+    display: inline-flex; align-items: center; gap: 8px;
     padding: 4px 10px; border-radius: 6px;
     font-size: 12px; font-weight: 500; color: var(--fg);
     background: var(--surface-2); border: 1px solid var(--line);
   }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-2); flex-shrink: 0; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fg-2); flex-shrink: 0; }
   .dot.on { background: var(--ok); }
   .dot.hidden { background: var(--warn); }
   .dot.off { background: var(--err); }
@@ -88,49 +88,50 @@
   /* Actions & Controls */
   .toolbar {
     display: flex; align-items: center; justify-content: space-between;
-    gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line);
+    gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line);
     flex-wrap: wrap;
   }
-  .btn-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .btn-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   button {
     appearance: none;
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     border: 1px solid var(--line);
     background: var(--surface-2);
     color: var(--fg);
-    border-radius: 7px;
-    padding: 6px 11px;
+    border-radius: 8px;
+    padding: 6px 12px;
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
     font-family: inherit;
     transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease, transform 0.1s ease;
   }
-  button:hover { background: rgba(255, 255, 255, 0.06); border-color: var(--line-strong); }
+  button:hover { background: rgba(236, 239, 244, 0.06); border-color: var(--line-strong); }
   button:active { transform: scale(0.985); }
+  button:focus-visible, .switch:focus-visible, .num-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   button.primary { background: var(--fg); border-color: var(--fg); color: var(--bg); font-weight: 600; }
   button.primary:hover { opacity: 0.9; background: var(--fg); }
-  button.ghost { background: transparent; border-color: transparent; color: var(--fg-2); padding: 6px 9px; }
+  button.ghost { background: transparent; border-color: transparent; color: var(--fg-2); padding: 6px 8px; }
   button.ghost:hover { background: var(--surface-2); color: var(--fg); border-color: var(--line); }
   button.danger { background: transparent; border-color: rgba(248, 113, 113, 0.28); color: var(--err); }
   button.danger:hover { background: rgba(248, 113, 113, 0.1); border-color: rgba(248, 113, 113, 0.5); }
 
   /* Segmented Control */
   .seg-btns {
-    display: inline-flex; align-items: center; flex-wrap: wrap; gap: 3px;
-    padding: 3px; border-radius: 8px;
+    display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px;
+    padding: 4px; border-radius: 8px;
     background: var(--bg); border: 1px solid var(--line);
   }
   .seg-btns button {
     border: 1px solid transparent; background: transparent; color: var(--fg-2);
-    padding: 4px 10px; border-radius: 5px; font-size: 12px; font-weight: 500;
+    padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500;
   }
-  .seg-btns button:hover { color: var(--fg); background: rgba(255, 255, 255, 0.04); }
+  .seg-btns button:hover { color: var(--fg); background: rgba(236, 239, 244, 0.04); }
   .seg-btns button.active {
     background: var(--surface-2); border-color: var(--line-strong); color: var(--fg); font-weight: 600;
   }
   .num-input {
-    width: 54px; padding: 4px 6px; border-radius: 5px;
+    width: 56px; padding: 4px 6px; border-radius: 4px;
     border: 1px solid var(--line); background: var(--surface);
     color: var(--fg); font-family: var(--mono); font-size: 12px;
     font-variant-numeric: tabular-nums; text-align: center;
@@ -141,21 +142,21 @@
   /* Metrics Strip */
   .stats {
     display: grid; grid-template-columns: repeat(3, 1fr);
-    margin-top: 14px; border: 1px solid var(--line); border-radius: 8px;
+    margin-top: 16px; border: 1px solid var(--line); border-radius: 8px;
     background: var(--bg); overflow: hidden;
   }
-  .stat-box { padding: 10px 12px; border-right: 1px solid var(--line); }
+  .stat-box { padding: 12px; border-right: 1px solid var(--line); }
   .stat-box:last-child { border-right: none; }
   .stat-val {
     font-family: var(--mono); font-size: 16px; font-weight: 600;
     color: var(--fg); font-variant-numeric: tabular-nums;
   }
-  .stat-lbl { font-size: 11px; color: var(--fg-2); margin-top: 2px; }
+  .stat-lbl { font-size: 11px; color: var(--fg-2); margin-top: 4px; }
 
   /* Skin Grid */
   .skin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 8px; }
   .skin-card {
-    text-align: left; padding: 10px 12px; border-radius: 8px;
+    text-align: left; padding: 12px; border-radius: 8px;
     background: var(--bg); border: 1px solid var(--line);
     display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
   }
@@ -164,27 +165,27 @@
     background: var(--accent-soft);
     border-color: rgba(56, 189, 248, 0.55);
   }
-  .skin-top { display: flex; align-items: center; gap: 7px; width: 100%; }
+  .skin-top { display: flex; align-items: center; gap: 8px; width: 100%; }
   .skin-swatch { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
-  .skin-name { font-weight: 600; font-size: 12.5px; color: var(--fg); }
-  .skin-desc { font-size: 11px; color: var(--fg-2); line-height: 1.35; }
+  .skin-name { font-weight: 600; font-size: 13px; color: var(--fg); }
+  .skin-desc { font-size: 11px; color: var(--fg-2); line-height: 1.4; }
 
   /* Rows */
   .seg-row {
     display: flex; align-items: center; justify-content: space-between;
-    gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap;
+    gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap;
   }
-  .seg-row:first-of-type { padding-top: 2px; }
+  .seg-row:first-of-type { padding-top: 4px; }
   .seg-row:last-child { border-bottom: none; padding-bottom: 0; }
   .seg-label { font-weight: 500; font-size: 13px; color: var(--fg); }
-  .seg-sub { font-size: 11.5px; color: var(--fg-2); margin-top: 2px; }
+  .seg-sub { font-size: 12px; color: var(--fg-2); margin-top: 2px; }
 
   .toggle-list { display: flex; flex-direction: column; }
   .toggle-item {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 0; border-bottom: 1px solid var(--line); gap: 16px;
+    padding: 12px 0; border-bottom: 1px solid var(--line); gap: 16px;
   }
-  .toggle-item:first-child { padding-top: 2px; }
+  .toggle-item:first-child { padding-top: 4px; }
   .toggle-item:last-child { border-bottom: none; padding-bottom: 0; }
   .switch {
     position: relative; width: 36px; height: 20px; flex-shrink: 0;
@@ -200,21 +201,21 @@
   .switch.on::after { transform: translateX(16px); background: #0b0f17; }
 
   /* Recent Conversations */
-  .conv-list { display: flex; flex-direction: column; gap: 6px; }
+  .conv-list { display: flex; flex-direction: column; gap: 8px; }
   .conv-item {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
     background: var(--bg); border: 1px solid var(--line);
     border-radius: 8px; padding: 8px 12px;
   }
-  .conv-meta { font-size: 11.5px; color: var(--fg-2); margin-top: 2px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
-  .conv-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .conv-meta { font-size: 11px; color: var(--fg-2); margin-top: 2px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .conv-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
   /* Toast */
   .toast {
-    position: fixed; bottom: 14px; right: 14px;
+    position: fixed; bottom: 16px; right: 16px;
     background: var(--surface-2); color: var(--fg);
     border: 1px solid var(--line-strong);
-    padding: 7px 12px; border-radius: 7px; font-size: 12px; font-weight: 500;
+    padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 500;
     opacity: 0; pointer-events: none; transition: opacity 0.18s ease;
   }
   .toast.show { opacity: 1; }
@@ -309,7 +310,11 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span data-i18n="appearSec">Appearance & Bubbles</span>
       </h2>
-      <button class="ghost" onclick="act('resetPos')" data-i18n="btnResetPos">Reset Position</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="ghost" onclick="act('dockLeft')" data-i18n="btnDockLeft">Dock Left</button>
+        <button class="ghost" onclick="act('dockRight')" data-i18n="btnDockRight">Dock Right</button>
+        <button class="ghost" onclick="act('resetPos')" data-i18n="btnResetPos">Reset Position</button>
+      </div>
     </div>
 
     <div class="seg-row">
@@ -405,7 +410,14 @@
           <div class="seg-label" data-i18n="tBoot">Launch with Antigravity</div>
           <div class="seg-sub" data-i18n="tBootSub">Start when Antigravity opens and exit automatically when it closes</div>
         </div>
-        <div class="switch" id="swAutoStart" onclick="toggleOpt('autoStartOnBoot')"></div>
+        <div class="switch" id="swAutoStart" role="switch" tabindex="0" onclick="toggleOpt('autoStartOnBoot')"></div>
+      </div>
+      <div class="toggle-item">
+        <div>
+          <div class="seg-label" data-i18n="tUpdates">Check for Updates on Startup</div>
+          <div class="seg-sub" data-i18n="tUpdatesSub">Check GitHub Releases on launch and show an update prompt if newer</div>
+        </div>
+        <div class="switch" id="swCheckUpdates" role="switch" tabindex="0" onclick="toggleOpt('checkUpdatesOnStartup')"></div>
       </div>
       <div class="toggle-item">
         <div>
@@ -447,7 +459,7 @@
           <div class="seg-label" data-i18n="tFs">Hide on Fullscreen</div>
           <div class="seg-sub" data-i18n="tFsSub">Automatically hide when a fullscreen game or video is active</div>
         </div>
-        <div class="switch" id="swFs" onclick="toggleOpt('hideOnFullscreen')"></div>
+        <div class="switch" id="swFs" role="switch" tabindex="0" onclick="toggleOpt('hideOnFullscreen')"></div>
       </div>
     </div>
   </div>
@@ -507,6 +519,8 @@
       btnReload: 'Reload',
       btnImportZip: 'Import .zip',
       appearSec: 'Appearance & Bubbles',
+      btnDockLeft: 'Dock Left',
+      btnDockRight: 'Dock Right',
       btnResetPos: 'Reset Position',
       langLabel: 'Interface Language',
       langSub: 'Syncs with Antigravity locale by default',
@@ -548,6 +562,8 @@
       tSnapSub: 'Dock the pet to the top-right edge of the active Antigravity window',
       tFs: 'Hide on Fullscreen',
       tFsSub: 'Automatically hide when a fullscreen game or video is active',
+      tUpdates: 'Check for Updates on Startup',
+      tUpdatesSub: 'Check GitHub Releases on launch and prompt when a newer version is available',
       recentSec: 'Recent Conversations',
       noRecent: 'No recent chats recorded',
       pinBtn: 'Pin',
@@ -584,6 +600,8 @@
       btnReload: '刷新列表',
       btnImportZip: '导入宠物包',
       appearSec: '外观与气泡',
+      btnDockLeft: '左贴边',
+      btnDockRight: '右贴边',
       btnResetPos: '重置位置',
       langLabel: '界面语言',
       langSub: '默认自动跟随 Antigravity 语言设置',
@@ -625,6 +643,8 @@
       tSnapSub: '空闲时自动吸附停靠在 Antigravity 窗口右上角边缘',
       tFs: '全屏自动隐身',
       tFsSub: '检测到全屏游戏或全屏视频时自动隐藏避让',
+      tUpdates: '启动时检查版本更新',
+      tUpdatesSub: '启动时自动检测 GitHub 新发版并在气泡提示一键更新',
       recentSec: '最近关联对话',
       noRecent: '暂无会话记录',
       pinBtn: '固定',
@@ -776,6 +796,7 @@
     setSw('swSound', !!data.soundAlert);
     setSw('swSnap', !!data.snapToAgy);
     setSw('swFs', data.hideOnFullscreen !== false);
+    setSw('swCheckUpdates', data.checkUpdatesOnStartup !== false);
 
     var convList = document.getElementById('convList');
     var recent = Array.isArray(data.recentConversations) ? data.recentConversations : [];

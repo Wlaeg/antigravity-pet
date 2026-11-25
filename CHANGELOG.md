@@ -5,6 +5,35 @@ All notable changes to **Antigravity Pet** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-11-25
+
+### Added
+- **GitHub Self-Update Checker & One-Click In-Place Updater (`app/AntigravityPet.cs`)**:
+  - Checks `releases/latest` on startup (controlled by the new **Check for Updates on Startup** toggle in Settings).
+  - Displays a purple update bubble (`New release vX.Y.Z · Click to update`) that follows `ReadyTimeoutSec` auto-hide rules; clicking downloads the `.zip` release, replaces plugin files in place, and relaunches `AntigravityPet.exe` automatically.
+- **Windows Tablet Touch Dragging (`app/AntigravityPet.cs`)**:
+  - Added native WPF `TouchDown` / `TouchMove` / `TouchUp` / `LostTouchCapture` support with press-and-hold/flick suppression and logical DPI coordinate conversion, plus 350ms double-tap quick dispatch.
+- **Settings Entry in Context Menu & Panel Edge Docking (`app/AntigravityPet.cs`, `sidecars/panel/`)**:
+  - Added **Settings (Antigravity)** in the pet context menu to focus Antigravity and guide users to the sidecar panel, and added **Dock Left** / **Dock Right** buttons in `sidecars/panel/index.html`.
+
+### Changed
+- **Streamlined Context Menu with Inline Pet Switcher (`app/AntigravityPet.cs`)**:
+  - Replaced hover-based submenu popups with an inline click-to-expand `Switch Pet` list (`StaysOpenOnClick`), eliminating accidental submenu dismissal on diagonal cursor movement, and trimmed the menu to essential high-frequency actions.
+- **Click Behavior Split (`app/AntigravityPet.cs`)**:
+  - Clicking the pet body now plays playful Jump/Wave animations only, while clicking the status bubble opens the corresponding Antigravity conversation.
+- **Bubble Spacing & Unified Running Color (`app/AntigravityPet.cs`)**:
+  - Tightened bubble-to-pet spacing via `1* / Auto` grid rows, unified `Running` state badges and docked blocks to `#0EA5E9` blue, and prioritized pending approvals (`!`) on the corner badge.
+- **Settings UI Polish (`sidecars/panel/index.html`, `ui/settings.html`)**:
+  - Refined spacing to a strict `4px` grid, nested `8px/12px` radii, normalized type scale, `1.5px` monochrome icons, and `:focus-visible` keyboard rings per `unslop` guidelines.
+
+### Fixed
+- **Display / Resolution Change Bounds Clamping (`app/AntigravityPet.cs`)**:
+  - Listens to `WM_DISPLAYCHANGE`, `WM_DPICHANGED`, and `SystemEvents.DisplaySettingsChanged`, clamping coordinates to the nearest active monitor work area via `GetCurrentMonitorWorkArea()` so the pet never gets stranded off-screen after resolution or monitor changes.
+- **Docked Edge Auto-Peek Lock (`app/AntigravityPet.cs`)**:
+  - Added `_requireHoverExitBeforePeek` and touch-release cursor anchor suppression so docked pets stay tucked after mouse or touch release until the cursor leaves and re-enters the edge zone.
+- **Panel Dispatch Bridge Path & SDK Alignment (`app/AntigravityPet.cs`, `sidecars/panel/server.mjs`)**:
+  - Unified `panel-bridge.json` lookup to `~/.antigravity-pet/panel-bridge.json` and wired `startConversation` support in `server.mjs`.
+
 ## [4.0.1] - 2026-11-25
 
 ### Fixed
