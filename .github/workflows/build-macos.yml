@@ -1,0 +1,40 @@
+name: Build macOS App
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'app/AntigravityPet.swift'
+      - 'build.sh'
+      - '.github/workflows/build-macos.yml'
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Universal Binary (arm64 + x86_64)
+        run: |
+          set -euo pipefail
+          bash ./build.sh
+          mkdir -p build-tmp
+          swiftc -O -target arm64-apple-macosx12.0 app/AntigravityPet.swift -framework AppKit -framework Carbon -o build-tmp/AntigravityPet-arm64
+          swiftc -O -target x86_64-apple-macosx12.0 app/AntigravityPet.swift -framework AppKit -framework Carbon -o build-tmp/AntigravityPet-x86_64
+          lipo -create build-tmp/AntigravityPet-arm64 build-tmp/AntigravityPet-x86_64 -output app/AntigravityPet.app/Contents/MacOS/AntigravityPet
+          chmod +x app/AntigravityPet.app/Contents/MacOS/AntigravityPet
+          lipo -info app/AntigravityPet.app/Contents/MacOS/AntigravityPet
+          rm -rf build-tmp
+
+      - name: Package AntigravityPet.app
+        run: |
+          mkdir -p dist
+          ditto -c -k --sequesterRsrc --keepParent app/AntigravityPet.app dist/AntigravityPet-macOS-universal.zip
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AntigravityPet-macOS-universal
+          path: dist/AntigravityPet-macOS-universal.zip
