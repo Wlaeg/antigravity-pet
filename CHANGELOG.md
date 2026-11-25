@@ -5,6 +5,22 @@ All notable changes to **Antigravity Pet** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.0] - 2026-11-25
+
+### Added
+- **5-Tab Modern Settings Redesign (`sidecars/panel/index.html`, `ui/settings.html`)**:
+  - Reorganized settings into a sticky 5-tab layout (**Characters**, **Behavior**, **Bubbles**, **System**, **Updates**) with a fixed compact overview header, equal-height 2-column pet cards, modern `#0EA5E9` toggles/sliders, single-line timeout selector, and a collapsible Developer Debug accordion.
+- **Dedicated Updates Tab & Live GitHub Releases (`sidecars/panel/server.mjs`, `scripts/pet-mcp-server.mjs`, `sidecars/panel/index.html`, `ui/settings.html`)**:
+  - Added `/api/github-releases` and MCP `githubReleases` action (60s cache) to fetch and render real-time release notes and downloadable assets from `Wlaeg/antigravity-pet`.
+- **Standalone Settings App Window (`app/AntigravityPet.cs`, `sidecars/panel/server.mjs`)**:
+  - Right-click **Settings** now launches a dedicated standalone window (`node sidecars/panel/server.mjs --standalone` + Edge/Chrome `--app` mode at `460×800`) instead of focusing Antigravity.
+- **11-Locale Full-Stack Localization (`sidecars/panel/`, `ui/settings.html`, `scripts/pet-mcp-server.mjs`, `app/AntigravityPet.cs`)**:
+  - Added full UI, pet pack metadata, approval bubble, and right-click context menu translations for **11 locales**: `en`, `zh`, `zh-tw`, `fr`, `de`, `ja`, `ko`, `hi`, `th`, `es`, and `es-mx`.
+
+### Changed
+- **Streamlined Custom Pet Creation (`sidecars/panel/index.html`, `ui/settings.html`)**:
+  - Simplified the custom pet studio flow so users can submit an image directly to the local `hatch-pet` agent workflow.
+
 ## [4.3.0] - 2026-11-25
 
 ### Added

@@ -343,6 +343,8 @@ namespace AntigravityPet
         private string _pendingSingleConvId = "";
         private string _pendingSingleTitle = "";
         private Border _approvalBar;
+        private TextBlock _btnAllowText;
+        private TextBlock _btnDenyText;
         private StackPanel _bubbleWrapperPanel;
         private string _availableUpdateVersion = "";
         private string _availableUpdateUrl = "";
@@ -499,7 +501,7 @@ namespace AntigravityPet
                 Padding = new Thickness(8, 2, 8, 2),
                 Margin = new Thickness(0, 0, 6, 0),
                 Cursor = Cursors.Hand,
-                Child = new TextBlock { Text = "✓ 允许", Foreground = Brushes.White, FontSize = 10.5, FontWeight = FontWeights.Bold, FontFamily = new FontFamily("Consolas, Microsoft YaHei UI") }
+                Child = (_btnAllowText = new TextBlock { Text = T("✓ 允许", "✓ Allow"), Foreground = Brushes.White, FontSize = 10.5, FontWeight = FontWeights.Bold, FontFamily = new FontFamily("Consolas, Microsoft YaHei UI") })
             };
             var btnDeny = new Border
             {
@@ -509,7 +511,7 @@ namespace AntigravityPet
                 CornerRadius = new CornerRadius(2),
                 Padding = new Thickness(8, 2, 8, 2),
                 Cursor = Cursors.Hand,
-                Child = new TextBlock { Text = "✕ 拒绝", Foreground = Brushes.White, FontSize = 10.5, FontWeight = FontWeights.Bold, FontFamily = new FontFamily("Consolas, Microsoft YaHei UI") }
+                Child = (_btnDenyText = new TextBlock { Text = T("✕ 拒绝", "✕ Deny"), Foreground = Brushes.White, FontSize = 10.5, FontWeight = FontWeights.Bold, FontFamily = new FontFamily("Consolas, Microsoft YaHei UI") })
             };
             btnAllow.MouseLeftButtonUp += (s, e) => { e.Handled = true; ResolveCurrentApproval("allow"); };
             btnDeny.MouseLeftButtonUp += (s, e) => { e.Handled = true; ResolveCurrentApproval("deny"); };
@@ -532,7 +534,7 @@ namespace AntigravityPet
                 Visibility = Visibility.Hidden,
                 IsHitTestVisible = true,
                 Cursor = Cursors.Hand,
-                ToolTip = "点击打开对应 Antigravity 对话",
+                ToolTip = T("点击打开对应 Antigravity 对话", "Click to open active Antigravity chat"),
                 Effect = new DropShadowEffect { BlurRadius = 0, ShadowDepth = 3, Direction = 315, Color = Colors.Black, Opacity = 0.85 }
             };
             _bubbleHost.Children.Add(_bubbleBorder);
@@ -3326,15 +3328,29 @@ namespace AntigravityPet
             return s.Length <= maxLen ? s : (s.Substring(0, maxLen) + "…");
         }
 
-        private bool IsEnglish()
+        private static string NormalizeLocaleCode(string raw)
         {
-            string mode = (_config.Language ?? "auto").Trim().ToLowerInvariant();
-            if (mode == "en" || mode.StartsWith("en-")) return true;
-            if (mode == "zh" || mode.StartsWith("zh-")) return false;
+            string s = (raw ?? "").Trim().ToLowerInvariant().Replace('_', '-');
+            if (string.IsNullOrEmpty(s) || s == "auto") return "";
+            if (s == "zh-tw" || s == "zh-hk" || s == "zh-mo" || s.Contains("hant")) return "zh-tw";
+            if (s == "zh" || s.StartsWith("zh-")) return "zh";
+            if (s == "es-mx" || s == "es-419") return "es-mx";
+            if (s == "es" || s.StartsWith("es-")) return "es";
+            string[] langs = { "fr", "de", "ja", "ko", "hi", "th", "en" };
+            foreach (string code in langs)
+            {
+                if (s == code || s.StartsWith(code + "-")) return code;
+            }
+            return "";
+        }
 
-            string agyLoc = (_config.AgyDetectedLocale ?? "").Trim().ToLowerInvariant();
-            if (agyLoc.StartsWith("en")) return true;
-            if (agyLoc.StartsWith("zh")) return false;
+        private string GetEffectiveLanguage()
+        {
+            string mode = NormalizeLocaleCode(_config.Language);
+            if (!string.IsNullOrEmpty(mode)) return mode;
+
+            string agyLoc = NormalizeLocaleCode(_config.AgyDetectedLocale);
+            if (!string.IsNullOrEmpty(agyLoc)) return agyLoc;
 
             try
             {
@@ -3343,23 +3359,32 @@ namespace AntigravityPet
                 if (File.Exists(storagePath))
                 {
                     string raw = File.ReadAllText(storagePath, Encoding.UTF8);
-                    if (raw.IndexOf("\"locale\":\"zh", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        raw.IndexOf("\"language\":\"zh", StringComparison.OrdinalIgnoreCase) >= 0) return false;
-                    if (raw.IndexOf("\"locale\":\"en", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        raw.IndexOf("\"language\":\"en", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+                    var m = System.Text.RegularExpressions.Regex.Match(raw, "\"(?:locale|language)\":\"([^\"]+)\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (m.Success)
+                    {
+                        string det = NormalizeLocaleCode(m.Groups[1].Value);
+                        if (!string.IsNullOrEmpty(det)) return det;
+                    }
                 }
                 string locPrefs = System.IO.Path.Combine(appData, "Antigravity", "localization-prefs.json");
                 if (File.Exists(locPrefs))
                 {
                     string rawPrefs = File.ReadAllText(locPrefs, Encoding.UTF8);
-                    if (rawPrefs.IndexOf("\"useTw\":true", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        rawPrefs.IndexOf("chinese", StringComparison.OrdinalIgnoreCase) >= 0) return false;
-                    if (rawPrefs.IndexOf("english", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+                    if (rawPrefs.IndexOf("\"useTw\":true", StringComparison.OrdinalIgnoreCase) >= 0) return "zh-tw";
+                    if (rawPrefs.IndexOf("chinese", StringComparison.OrdinalIgnoreCase) >= 0) return "zh";
+                    if (rawPrefs.IndexOf("english", StringComparison.OrdinalIgnoreCase) >= 0) return "en";
                 }
             }
             catch { }
 
-            return System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("en", StringComparison.OrdinalIgnoreCase);
+            string ui = NormalizeLocaleCode(System.Globalization.CultureInfo.CurrentUICulture.Name);
+            return string.IsNullOrEmpty(ui) ? "en" : ui;
+        }
+
+        private bool IsEnglish()
+        {
+            string lang = GetEffectiveLanguage();
+            return lang != "zh" && lang != "zh-tw";
         }
 
         private string T(string zh, string en)
@@ -3367,11 +3392,130 @@ namespace AntigravityPet
             return IsEnglish() ? en : zh;
         }
 
+        private static readonly Dictionary<string, Dictionary<string, string>> UiMenuStrings = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "state.running", new Dictionary<string, string> {
+                { "zh", "⚡ 运行中" }, { "zh-tw", "⚡ 執行中" }, { "en", "⚡ Running" },
+                { "fr", "⚡ En cours" }, { "de", "⚡ Aktiv" }, { "ja", "⚡ 実行中" },
+                { "ko", "⚡ 실행 중" }, { "hi", "⚡ चल रहा है" }, { "th", "⚡ กำลังทำงาน" },
+                { "es", "⚡ En ejecución" }, { "es-mx", "⚡ En ejecución" }
+            }},
+            { "state.needsInput", new Dictionary<string, string> {
+                { "zh", "! 需要输入" }, { "zh-tw", "! 需要輸入" }, { "en", "! Needs Input" },
+                { "fr", "! Action requise" }, { "de", "! Eingabe nötig" }, { "ja", "! 入力待ち" },
+                { "ko", "! 입력 필요" }, { "hi", "! इनपुट आवश्यक" }, { "th", "! รอการยืนยัน" },
+                { "es", "! Requiere entrada" }, { "es-mx", "! Requiere respuesta" }
+            }},
+            { "state.ready", new Dictionary<string, string> {
+                { "zh", "✓ 已完成" }, { "zh-tw", "✓ 已完成" }, { "en", "✓ Ready" },
+                { "fr", "✓ Terminé" }, { "de", "✓ Bereit" }, { "ja", "✓ 完了" },
+                { "ko", "✓ 완료" }, { "hi", "✓ तैयार" }, { "th", "✓ เสร็จสิ้น" },
+                { "es", "✓ Listo" }, { "es-mx", "✓ Listo" }
+            }},
+            { "state.blocked", new Dictionary<string, string> {
+                { "zh", "✕ 出错阻断" }, { "zh-tw", "✕ 錯誤阻斷" }, { "en", "✕ Blocked" },
+                { "fr", "✕ Bloqué" }, { "de", "✕ Blockiert" }, { "ja", "✕ ブロック" },
+                { "ko", "✕ 차단됨" }, { "hi", "✕ अवरुद्ध" }, { "th", "✕ ถูกบล็อก" },
+                { "es", "✕ Bloqueado" }, { "es-mx", "✕ Bloqueado" }
+            }},
+            { "state.idle", new Dictionary<string, string> {
+                { "zh", "💤 待机休息" }, { "zh-tw", "💤 待機休息" }, { "en", "💤 Idle" },
+                { "fr", "💤 Inactif" }, { "de", "💤 Inaktiv" }, { "ja", "💤 待機中" },
+                { "ko", "💤 대기 중" }, { "hi", "💤 निष्क्रिय" }, { "th", "💤 พร้อมใช้งาน" },
+                { "es", "💤 En reposo" }, { "es-mx", "💤 En reposo" }
+            }},
+            { "menu.quickDispatch", new Dictionary<string, string> {
+                { "zh", "⚡ 快捷派活" }, { "zh-tw", "⚡ 快速派工" }, { "en", "⚡ Quick Dispatch" },
+                { "fr", "⚡ Tâche rapide" }, { "de", "⚡ Schnellauftrag" }, { "ja", "⚡ クイック指示" },
+                { "ko", "⚡ 빠른 작업" }, { "hi", "⚡ त्वरित कार्य" }, { "th", "⚡ สั่งงานด่วน" },
+                { "es", "⚡ Envío rápido" }, { "es-mx", "⚡ Envío rápido" }
+            }},
+            { "menu.switchPetPrefix", new Dictionary<string, string> {
+                { "zh", "🎭 切换宠物 (" }, { "zh-tw", "🎭 切換寵物 (" }, { "en", "🎭 Switch Pet (" },
+                { "fr", "🎭 Changer d'animal (" }, { "de", "🎭 Begleiter wechseln (" }, { "ja", "🎭 ペット切替 (" },
+                { "ko", "🎭 펫 변경 (" }, { "hi", "🎭 पालतू बदलें (" }, { "th", "🎭 เปลี่ยนสัตว์เลี้ยง (" },
+                { "es", "🎭 Cambiar mascota (" }, { "es-mx", "🎭 Cambiar mascota (" }
+            }},
+            { "menu.refreshPets", new Dictionary<string, string> {
+                { "zh", "🔄 刷新宠物列表" }, { "zh-tw", "🔄 重新整理寵物" }, { "en", "🔄 Refresh Pets" },
+                { "fr", "🔄 Actualiser" }, { "de", "🔄 Aktualisieren" }, { "ja", "🔄 一覧を更新" },
+                { "ko", "🔄 목록 새로고침" }, { "hi", "🔄 सूची रीफ़्रेश करें" }, { "th", "🔄 รีเฟรชรายการ" },
+                { "es", "🔄 Actualizar lista" }, { "es-mx", "🔄 Actualizar lista" }
+            }},
+            { "menu.undock", new Dictionary<string, string> {
+                { "zh", "🔓 取消贴边" }, { "zh-tw", "🔓 取消貼邊" }, { "en", "🔓 Undock from Edge" },
+                { "fr", "🔓 Détacher du bord" }, { "de", "🔓 Vom Rand lösen" }, { "ja", "🔓 ドック解除" },
+                { "ko", "🔓 고정 해제" }, { "hi", "🔓 किनारे से हटाएं" }, { "th", "🔓 เลิกชิดขอบ" },
+                { "es", "🔓 Desacoplar del borde" }, { "es-mx", "🔓 Desacoplar del borde" }
+            }},
+            { "menu.dockLeft", new Dictionary<string, string> {
+                { "zh", "⬅️ 贴靠左侧" }, { "zh-tw", "⬅️ 貼靠左側" }, { "en", "⬅️ Dock Left" },
+                { "fr", "⬅️ Ancrer à gauche" }, { "de", "⬅️ Links andocken" }, { "ja", "⬅️ 左に固定" },
+                { "ko", "⬅️ 왼쪽 고정" }, { "hi", "⬅️ बाएँ डॉक करें" }, { "th", "⬅️ ชิดขอบซ้าย" },
+                { "es", "⬅️ Acoplar a la izquierda" }, { "es-mx", "⬅️ Acoplar a la izquierda" }
+            }},
+            { "menu.dockRight", new Dictionary<string, string> {
+                { "zh", "➡️ 贴靠右侧" }, { "zh-tw", "➡️ 貼靠右側" }, { "en", "➡️ Dock Right" },
+                { "fr", "➡️ Ancrer à droite" }, { "de", "➡️ Rechts andocken" }, { "ja", "➡️ 右に固定" },
+                { "ko", "➡️ 오른쪽 고정" }, { "hi", "➡️ दाएँ डॉक करें" }, { "th", "➡️ ชิดขอบขวา" },
+                { "es", "➡️ Acoplar a la derecha" }, { "es-mx", "➡️ Acoplar a la derecha" }
+            }},
+            { "menu.settings", new Dictionary<string, string> {
+                { "zh", "⚙️ 设置" }, { "zh-tw", "⚙️ 設定" }, { "en", "⚙️ Settings" },
+                { "fr", "⚙️ Paramètres" }, { "de", "⚙️ Einstellungen" }, { "ja", "⚙️ 設定" },
+                { "ko", "⚙️ 설정" }, { "hi", "⚙️ सेटिंग्स" }, { "th", "⚙️ การตั้งค่า" },
+                { "es", "⚙️ Configuración" }, { "es-mx", "⚙️ Configuración" }
+            }},
+            { "menu.hide", new Dictionary<string, string> {
+                { "zh", "🙈 隐藏桌宠 (Win+Alt+P)" }, { "zh-tw", "🙈 隱藏桌寵 (Win+Alt+P)" }, { "en", "🙈 Hide Pet (Win+Alt+P)" },
+                { "fr", "🙈 Masquer (Win+Alt+P)" }, { "de", "🙈 Ausblenden (Win+Alt+P)" }, { "ja", "🙈 非表示 (Win+Alt+P)" },
+                { "ko", "🙈 숨기기 (Win+Alt+P)" }, { "hi", "🙈 छुपाएं (Win+Alt+P)" }, { "th", "🙈 ซ่อนสัตว์เลี้ยง (Win+Alt+P)" },
+                { "es", "🙈 Ocultar (Win+Alt+P)" }, { "es-mx", "🙈 Ocultar (Win+Alt+P)" }
+            }},
+            { "menu.quit", new Dictionary<string, string> {
+                { "zh", "🚪 退出桌宠" }, { "zh-tw", "🚪 結束桌寵" }, { "en", "🚪 Quit Pet" },
+                { "fr", "🚪 Quitter" }, { "de", "🚪 Beenden" }, { "ja", "🚪 終了" },
+                { "ko", "🚪 종료" }, { "hi", "🚪 बाहर निकलें" }, { "th", "🚪 ออกจากโปรแกรม" },
+                { "es", "🚪 Salir" }, { "es-mx", "🚪 Salir" }
+            }}
+        };
+
+        private string L(string key)
+        {
+            string lang = GetEffectiveLanguage();
+            Dictionary<string, string> dict;
+            if (UiMenuStrings.TryGetValue(key, out dict))
+            {
+                string val;
+                if (dict.TryGetValue(lang, out val)) return val;
+                if (lang == "es-mx" && dict.TryGetValue("es", out val)) return val;
+                if (dict.TryGetValue("en", out val)) return val;
+            }
+            return key;
+        }
+
         private string GetLocalizedPackName(PetPack p)
         {
             if (p == null) return "";
-            if (!IsEnglish()) return p.DisplayName;
-            switch ((p.Id ?? "").ToLowerInvariant())
+            string lang = GetEffectiveLanguage();
+            if (lang == "zh") return p.DisplayName;
+            string pid = (p.Id ?? "").ToLowerInvariant();
+            if (lang == "zh-tw")
+            {
+                switch (pid)
+                {
+                    case "cyber-fox": return "賽博狐";
+                    case "astro-bot": return "宇航員";
+                    case "shadow-cat": return "影貓";
+                    case "byte-ghost": return "像素幽靈";
+                    case "shiba-dog": return "柴犬";
+                    case "pixel-dragon": return "像素龍";
+                    case "android-bugdroid": return "Android 機器人";
+                    case "flutter-dash": return "Flutter Dash";
+                    default: return p.DisplayName;
+                }
+            }
+            switch (pid)
             {
                 case "cyber-fox": return "CyberFox";
                 case "astro-bot": return "AstroBot";
@@ -4153,11 +4297,11 @@ namespace AntigravityPet
             menu.Items.Add(new MenuItem { Header = stateLabel, IsEnabled = false });
             menu.Items.Add(new Separator());
 
-            menu.Items.Add(MakeMenuItem(T("⚡ 快捷派活", "⚡ Quick Dispatch"), () => ShowQuickDispatchWindow()));
+            menu.Items.Add(MakeMenuItem(L("menu.quickDispatch"), () => ShowQuickDispatchWindow()));
 
             var skinHeader = new MenuItem
             {
-                Header = T("🎭 切换宠物 (", "🎭 Switch Pet (") + _packs.Count + ") ▸",
+                Header = L("menu.switchPetPrefix") + _packs.Count + ") ▸",
                 StaysOpenOnClick = true
             };
             menu.Items.Add(skinHeader);
@@ -4177,7 +4321,7 @@ namespace AntigravityPet
                 skinSubItems.Add(item);
                 menu.Items.Add(item);
             }
-            var refreshPetsItem = MakeMenuItem("  " + T("🔄 刷新宠物列表", "🔄 Refresh Pets"), () =>
+            var refreshPetsItem = MakeMenuItem("  " + L("menu.refreshPets"), () =>
             {
                 ReloadPetPacks();
                 RebuildContextMenu();
@@ -4191,7 +4335,7 @@ namespace AntigravityPet
             skinHeader.Click += (s, e) =>
             {
                 skinsExpanded = !skinsExpanded;
-                skinHeader.Header = T("🎭 切换宠物 (", "🎭 Switch Pet (") + _packs.Count + (skinsExpanded ? ") ▾" : ") ▸");
+                skinHeader.Header = L("menu.switchPetPrefix") + _packs.Count + (skinsExpanded ? ") ▾" : ") ▸");
                 Visibility vis = skinsExpanded ? Visibility.Visible : Visibility.Collapsed;
                 foreach (var el in skinSubItems)
                 {
@@ -4201,7 +4345,7 @@ namespace AntigravityPet
 
             if (!string.IsNullOrEmpty(_dockSide))
             {
-                menu.Items.Add(MakeMenuItem(T("🔓 取消贴边", "🔓 Undock from Edge"), () =>
+                menu.Items.Add(MakeMenuItem(L("menu.undock"), () =>
                 {
                     ResetToCorner(true);
                     RebuildContextMenu();
@@ -4209,27 +4353,26 @@ namespace AntigravityPet
             }
             else
             {
-                menu.Items.Add(MakeMenuItem(T("⬅️ 贴靠左侧", "⬅️ Dock Left"), () =>
+                menu.Items.Add(MakeMenuItem(L("menu.dockLeft"), () =>
                 {
                     _dockSide = "left"; _dockPeekOut = false; _dockIgnoreHoverUntil = DateTime.Now.AddMilliseconds(700); _requireHoverExitBeforePeek = true;
                     UpdateVisualState(); Left = GetDockedTargetLeft("left", false); RebuildContextMenu();
                 }));
-                menu.Items.Add(MakeMenuItem(T("➡️ 贴靠右侧", "➡️ Dock Right"), () =>
+                menu.Items.Add(MakeMenuItem(L("menu.dockRight"), () =>
                 {
                     _dockSide = "right"; _dockPeekOut = false; _dockIgnoreHoverUntil = DateTime.Now.AddMilliseconds(700); _requireHoverExitBeforePeek = true;
                     UpdateVisualState(); Left = GetDockedTargetLeft("right", false); RebuildContextMenu();
                 }));
             }
 
-            menu.Items.Add(MakeMenuItem(T("⚙️ 设置 (Antigravity 面板)", "⚙️ Settings (Antigravity)"), () =>
+            menu.Items.Add(MakeMenuItem(L("menu.settings"), () =>
             {
-                OpenAntigravityConversation("", "");
-                ReportTaskState("settings-hint", PetState.Ready, T("请点右上角 ... → 桌面宠物设置", "Open ... → Antigravity Pet"), "", false);
+                OpenStandaloneSettingsWindow();
             }));
 
             menu.Items.Add(new Separator());
-            menu.Items.Add(MakeMenuItem(T("🙈 隐藏桌宠 (Win+Alt+P)", "🙈 Hide Pet (Win+Alt+P)"), () => Hide()));
-            menu.Items.Add(MakeMenuItem(T("🚪 退出桌宠", "🚪 Quit Pet"), () => { _config.Enabled = false; SaveConfig(); Close(); }));
+            menu.Items.Add(MakeMenuItem(L("menu.hide"), () => Hide()));
+            menu.Items.Add(MakeMenuItem(L("menu.quit"), () => { _config.Enabled = false; SaveConfig(); Close(); }));
 
             foreach (object obj in menu.Items)
             {
@@ -4263,6 +4406,193 @@ namespace AntigravityPet
                 Show();
                 StartTransient(TransientAction.Wave, 8);
             }
+        }
+
+        private static bool PingStandalonePanel(int port)
+        {
+            if (port <= 0 || port > 65535) return false;
+            try
+            {
+                var req = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:" + port + "/api/ping");
+                req.Method = "GET";
+                req.Timeout = 400;
+                req.ReadWriteTimeout = 400;
+                using (var resp = (HttpWebResponse)req.GetResponse())
+                using (var sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                {
+                    string body = sr.ReadToEnd();
+                    return body.Contains("antigravity-pet-panel");
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static int ReadStandalonePanelPort(string infoPath)
+        {
+            try
+            {
+                if (!File.Exists(infoPath)) return 0;
+                string raw = File.ReadAllText(infoPath, Encoding.UTF8);
+                var ser = new JavaScriptSerializer();
+                var obj = ser.Deserialize<Dictionary<string, object>>(raw);
+                if (obj != null && obj.ContainsKey("port"))
+                    return Convert.ToInt32(obj["port"]);
+            }
+            catch { }
+            return 0;
+        }
+
+        private static string FindNodeExecutable()
+        {
+            var candidates = new List<string>();
+            string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+            foreach (string dir in pathEnv.Split(';'))
+            {
+                string trimmed = (dir ?? "").Trim();
+                if (!string.IsNullOrEmpty(trimmed))
+                    candidates.Add(System.IO.Path.Combine(trimmed, "node.exe"));
+            }
+            candidates.Add(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs", "node.exe"));
+            candidates.Add(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "nodejs", "node.exe"));
+            candidates.Add(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "nodejs", "node.exe"));
+
+            foreach (string p in candidates)
+            {
+                try
+                {
+                    if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
+                }
+                catch { }
+            }
+            return null;
+        }
+
+        private static string FindAppModeBrowser()
+        {
+            string pf86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+            string pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var candidates = new[]
+            {
+                System.IO.Path.Combine(pf86, "Microsoft", "Edge", "Application", "msedge.exe"),
+                System.IO.Path.Combine(pf, "Microsoft", "Edge", "Application", "msedge.exe"),
+                System.IO.Path.Combine(local, "Microsoft", "Edge", "Application", "msedge.exe"),
+                System.IO.Path.Combine(pf, "Google", "Chrome", "Application", "chrome.exe"),
+                System.IO.Path.Combine(pf86, "Google", "Chrome", "Application", "chrome.exe"),
+                System.IO.Path.Combine(local, "Google", "Chrome", "Application", "chrome.exe")
+            };
+            foreach (string p in candidates)
+            {
+                try
+                {
+                    if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
+                }
+                catch { }
+            }
+            return null;
+        }
+
+        private void OpenStandaloneSettingsWindow()
+        {
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                    string dataDir = System.IO.Path.Combine(localAppData, "AntigravityPet");
+                    Directory.CreateDirectory(dataDir);
+                    string infoPath = System.IO.Path.Combine(dataDir, "panel-server.json");
+
+                    int port = ReadStandalonePanelPort(infoPath);
+                    if (!PingStandalonePanel(port))
+                    {
+                        port = PingStandalonePanel(47822) ? 47822 : 0;
+                    }
+
+                    if (port == 0)
+                    {
+                        string serverJs = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "sidecars", "panel", "server.mjs"));
+                        string nodeExe = FindNodeExecutable();
+                        if (!File.Exists(serverJs) || string.IsNullOrEmpty(nodeExe))
+                        {
+                            Dispatcher.BeginInvoke(new Action(() =>
+                            {
+                                ReportTaskState("settings-err", PetState.Blocked, T("找不到设置服务或 Node.js", "Settings server or Node.js not found"), "", false);
+                            }));
+                            return;
+                        }
+
+                        var psiNode = new ProcessStartInfo
+                        {
+                            FileName = nodeExe,
+                            Arguments = "\"" + serverJs + "\" --standalone",
+                            WorkingDirectory = System.IO.Path.GetDirectoryName(serverJs),
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            WindowStyle = ProcessWindowStyle.Hidden
+                        };
+                        Process.Start(psiNode);
+
+                        DateTime deadline = DateTime.UtcNow.AddSeconds(4);
+                        while (DateTime.UtcNow < deadline)
+                        {
+                            Thread.Sleep(150);
+                            int candidate = ReadStandalonePanelPort(infoPath);
+                            if (candidate > 0 && PingStandalonePanel(candidate))
+                            {
+                                port = candidate;
+                                break;
+                            }
+                            if (PingStandalonePanel(47822))
+                            {
+                                port = 47822;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (port <= 0)
+                    {
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            ReportTaskState("settings-err", PetState.Blocked, T("设置窗口服务启动超时", "Settings window timed out"), "", false);
+                        }));
+                        return;
+                    }
+
+                    string url = "http://127.0.0.1:" + port + "/";
+                    string browserExe = FindAppModeBrowser();
+                    if (!string.IsNullOrEmpty(browserExe))
+                    {
+                        string profileDir = System.IO.Path.Combine(dataDir, "PanelProfile");
+                        Directory.CreateDirectory(profileDir);
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = browserExe,
+                            Arguments = "--app=\"" + url + "\" --window-size=460,800 --user-data-dir=\"" + profileDir + "\"",
+                            UseShellExecute = false
+                        });
+                    }
+                    else
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = url,
+                            UseShellExecute = true
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        ReportTaskState("settings-err", PetState.Blocked, T("打开设置窗口失败", "Failed to open settings"), ex.Message, false);
+                    }));
+                }
+            });
         }
 
         private static readonly string[] AntigravityProcessNames = new[] { "Antigravity", "Antigravity IDE" };
@@ -4416,7 +4746,7 @@ namespace AntigravityPet
                             checkUpdatesOnStartup = _config.CheckUpdatesOnStartup,
                             soundAlert = _config.SoundAlert,
                             language = string.IsNullOrWhiteSpace(_config.Language) ? "auto" : _config.Language,
-                            effectiveLanguage = IsEnglish() ? "en" : "zh",
+                            effectiveLanguage = GetEffectiveLanguage(),
                             activeTasks = _tasks.Count,
                             completedTasksCount = _config.CompletedTasksCount,
                             toolCallsCount = _config.ToolCallsCount,
@@ -4662,9 +4992,13 @@ namespace AntigravityPet
                         else if (action == "language")
                         {
                             string lval = (val ?? "auto").Trim().ToLowerInvariant();
-                            if (lval == "auto" || lval == "en" || lval == "zh")
+                            string norm = NormalizeLocaleCode(lval);
+                            if (lval == "auto" || !string.IsNullOrEmpty(norm))
                             {
-                                _config.Language = lval;
+                                _config.Language = lval == "auto" ? "auto" : norm;
+                                if (_btnAllowText != null) _btnAllowText.Text = T("✓ 允许", "✓ Allow");
+                                if (_btnDenyText != null) _btnDenyText.Text = T("✕ 拒绝", "✕ Deny");
+                                if (_bubbleBorder != null) _bubbleBorder.ToolTip = T("点击打开对应 Antigravity 对话", "Click to open active Antigravity chat");
                                 UpdateVisualState();
                                 SaveConfig();
                                 RebuildContextMenu();
@@ -5153,11 +5487,11 @@ namespace AntigravityPet
         {
             switch (st)
             {
-                case PetState.Running: return T("⚡ 运行中 (Running)", "⚡ Running");
-                case PetState.NeedsInput: return T("! 需要输入 (Needs Input)", "! Needs Input");
-                case PetState.Ready: return T("✓ 已完成 (Ready)", "✓ Ready");
-                case PetState.Blocked: return T("✕ 出错阻断 (Blocked)", "✕ Blocked");
-                default: return T("💤 待机休息 (Idle)", "💤 Idle");
+                case PetState.Running: return L("state.running");
+                case PetState.NeedsInput: return L("state.needsInput");
+                case PetState.Ready: return L("state.ready");
+                case PetState.Blocked: return L("state.blocked");
+                default: return L("state.idle");
             }
         }
 

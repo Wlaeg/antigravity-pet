@@ -4,7 +4,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getCommunityPets, importPetPack, installCommunityPet } from '../sidecars/panel/server.mjs';
+import { getCommunityPets, getGithubReleases, importPetPack, installCommunityPet } from '../sidecars/panel/server.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = path.resolve(__dirname, '..');
@@ -79,13 +79,24 @@ function writeOfflineConfig(patch) {
   }
 }
 
+function normalizeLocaleCode(raw) {
+  const s = String(raw || '').trim().toLowerCase().replace(/_/g, '-');
+  if (!s || s === 'auto') return '';
+  if (s === 'zh-tw' || s === 'zh-hk' || s === 'zh-mo' || s.includes('hant')) return 'zh-tw';
+  if (s === 'zh' || s.startsWith('zh-')) return 'zh';
+  if (s === 'es-mx' || s === 'es-419') return 'es-mx';
+  if (s === 'es' || s.startsWith('es-')) return 'es';
+  for (const code of ['fr', 'de', 'ja', 'ko', 'hi', 'th', 'en']) {
+    if (s === code || s.startsWith(code + '-')) return code;
+  }
+  return '';
+}
+
 function detectEffectiveLang(cfg) {
-  const mode = String(cfg?.Language || 'auto').trim().toLowerCase();
-  if (mode === 'en' || mode.startsWith('en-')) return 'en';
-  if (mode === 'zh' || mode.startsWith('zh-')) return 'zh';
-  const agy = String(cfg?.AgyDetectedLocale || '').trim().toLowerCase();
-  if (agy.startsWith('en')) return 'en';
-  if (agy.startsWith('zh')) return 'zh';
+  const mode = normalizeLocaleCode(cfg?.Language);
+  if (mode) return mode;
+  const agy = normalizeLocaleCode(cfg?.AgyDetectedLocale);
+  if (agy) return agy;
   try {
     const agyDataDir = IS_MAC
       ? path.join(os.homedir(), 'Library', 'Application Support', 'Antigravity')
@@ -93,18 +104,31 @@ function detectEffectiveLang(cfg) {
     const sp = path.join(agyDataDir, 'app_storage.json');
     if (fs.existsSync(sp)) {
       const raw = fs.readFileSync(sp, 'utf8');
-      if (/"(?:locale|language)":"zh/i.test(raw)) return 'zh';
-      if (/"(?:locale|language)":"en/i.test(raw)) return 'en';
+      const m = raw.match(/"(?:locale|language)":"([^"]+)"/i);
+      const det = m ? normalizeLocaleCode(m[1]) : '';
+      if (det) return det;
     }
     const lp = path.join(agyDataDir, 'localization-prefs.json');
     if (fs.existsSync(lp)) {
       const raw = fs.readFileSync(lp, 'utf8');
-      if (/"useTw"\s*:\s*true/i.test(raw) || /chinese/i.test(raw)) return 'zh';
+      if (/"useTw"\s*:\s*true/i.test(raw)) return 'zh-tw';
+      if (/chinese/i.test(raw)) return 'zh';
       if (/english/i.test(raw)) return 'en';
     }
   } catch {}
   return 'en';
 }
+
+const TW_PET_META = {
+  'cyber-fox': { name: '小藍狐 CyberFox', desc: '賽博藍色小狐狸（預設）' },
+  'astro-bot': { name: '像素太空人 Astro', desc: '帶發光面罩的迷你太空人' },
+  'shadow-cat': { name: '小黑貓 ShadowCat', desc: '金色大眼的靈動黑貓' },
+  'byte-ghost': { name: '電子幽靈 ByteGhost', desc: '呆萌漂浮的霓虹小幽靈' },
+  'shiba-dog': { name: '像素柴犬 Shiba', desc: '暖黃捲尾的豆豆眉小柴犬' },
+  'pixel-dragon': { name: '像素小青龍 Dragon', desc: '長著金角小翅膀的翡翠青龍' },
+  'android-bugdroid': { name: '安卓小綠人 Bugdroid', desc: 'Google Android 官方經典綠色小機器人' },
+  'flutter-dash': { name: 'Flutter 小藍鳥 Dash', desc: 'Google Flutter & Dart 官方吉祥物小藍鳥' }
+};
 
 const EN_PET_META = {
   'cyber-fox': { name: 'CyberFox', desc: 'Cyber blue fox companion (Default)' },
@@ -130,10 +154,13 @@ function scanPetPacks(lang = 'zh') {
           const meta = JSON.parse(fs.readFileSync(manifest, 'utf8'));
           const id = meta.id || entry.name;
           const enInfo = EN_PET_META[id];
+          const twInfo = TW_PET_META[id];
+          const useZh = lang === 'zh';
+          const useTw = lang === 'zh-tw';
           map.set(id, {
             id,
-            displayName: (lang === 'en' && enInfo) ? enInfo.name : (meta.displayName || id),
-            description: (lang === 'en' && enInfo) ? enInfo.desc : (meta.description || ''),
+            displayName: useTw && twInfo ? twInfo.name : (!useZh && !useTw && enInfo ? enInfo.name : (meta.displayName || id)),
+            description: useTw && twInfo ? twInfo.desc : (!useZh && !useTw && enInfo ? enInfo.desc : (meta.description || '')),
             version: meta.spriteVersionNumber || 2
           });
         } catch {
@@ -431,6 +458,10 @@ async function applySetting(args = {}) {
     const comm = await getCommunityPets();
     const snap = await getSnapshot();
     return { ...snap, communityPets: comm.pets, communitySource: comm.source };
+  } else if (action === 'githubReleases') {
+    const githubReleases = await getGithubReleases(Boolean(args.force));
+    const snap = await getSnapshot();
+    return { ...snap, githubReleases };
   } else if (action === 'installCommunityPet') {
     const res = await installCommunityPet({ id: args.id || value, zipUrl: args.zipUrl, localZip: args.localZip });
     const comm = await getCommunityPets();
@@ -441,6 +472,7 @@ async function applySetting(args = {}) {
       zipBase64: args.zipBase64,
       zipUrl: args.zipUrl,
       petJson: args.petJson,
+      idleImageBase64: args.idleImageBase64,
       spritesheetBase64: args.spritesheetBase64
     });
     const snap = res.snapshot || await getSnapshot();

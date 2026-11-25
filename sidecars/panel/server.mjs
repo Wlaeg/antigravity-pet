@@ -84,13 +84,24 @@ function writeOfflineConfig(patch) {
   }
 }
 
+function normalizeLocaleCode(raw) {
+  const s = String(raw || '').trim().toLowerCase().replace(/_/g, '-');
+  if (!s || s === 'auto') return '';
+  if (s === 'zh-tw' || s === 'zh-hk' || s === 'zh-mo' || s.includes('hant')) return 'zh-tw';
+  if (s === 'zh' || s.startsWith('zh-')) return 'zh';
+  if (s === 'es-mx' || s === 'es-419') return 'es-mx';
+  if (s === 'es' || s.startsWith('es-')) return 'es';
+  for (const code of ['fr', 'de', 'ja', 'ko', 'hi', 'th', 'en']) {
+    if (s === code || s.startsWith(code + '-')) return code;
+  }
+  return '';
+}
+
 function detectEffectiveLang(cfg) {
-  const mode = String(cfg?.Language || 'auto').trim().toLowerCase();
-  if (mode === 'en' || mode.startsWith('en-')) return 'en';
-  if (mode === 'zh' || mode.startsWith('zh-')) return 'zh';
-  const agy = String(cfg?.AgyDetectedLocale || '').trim().toLowerCase();
-  if (agy.startsWith('en')) return 'en';
-  if (agy.startsWith('zh')) return 'zh';
+  const mode = normalizeLocaleCode(cfg?.Language);
+  if (mode) return mode;
+  const agy = normalizeLocaleCode(cfg?.AgyDetectedLocale);
+  if (agy) return agy;
   try {
     const agyDataDir = IS_MAC
       ? path.join(os.homedir(), 'Library', 'Application Support', 'Antigravity')
@@ -98,18 +109,31 @@ function detectEffectiveLang(cfg) {
     const sp = path.join(agyDataDir, 'app_storage.json');
     if (fs.existsSync(sp)) {
       const raw = fs.readFileSync(sp, 'utf8');
-      if (/"(?:locale|language)":"zh/i.test(raw)) return 'zh';
-      if (/"(?:locale|language)":"en/i.test(raw)) return 'en';
+      const m = raw.match(/"(?:locale|language)":"([^"]+)"/i);
+      const det = m ? normalizeLocaleCode(m[1]) : '';
+      if (det) return det;
     }
     const lp = path.join(agyDataDir, 'localization-prefs.json');
     if (fs.existsSync(lp)) {
       const raw = fs.readFileSync(lp, 'utf8');
-      if (/"useTw"\s*:\s*true/i.test(raw) || /chinese/i.test(raw)) return 'zh';
+      if (/"useTw"\s*:\s*true/i.test(raw)) return 'zh-tw';
+      if (/chinese/i.test(raw)) return 'zh';
       if (/english/i.test(raw)) return 'en';
     }
   } catch {}
   return 'en';
 }
+
+const TW_PET_META = {
+  'cyber-fox': { name: '小藍狐 CyberFox', desc: '賽博藍色小狐狸（預設）' },
+  'astro-bot': { name: '像素太空人 Astro', desc: '帶發光面罩的迷你太空人' },
+  'shadow-cat': { name: '小黑貓 ShadowCat', desc: '金色大眼的靈動黑貓' },
+  'byte-ghost': { name: '電子幽靈 ByteGhost', desc: '呆萌漂浮的霓虹小幽靈' },
+  'shiba-dog': { name: '像素柴犬 Shiba', desc: '暖黃捲尾的豆豆眉小柴犬' },
+  'pixel-dragon': { name: '像素小青龍 Dragon', desc: '長著金角小翅膀的翡翠青龍' },
+  'android-bugdroid': { name: '安卓小綠人 Bugdroid', desc: 'Google Android 官方經典綠色小機器人' },
+  'flutter-dash': { name: 'Flutter 小藍鳥 Dash', desc: 'Google Flutter & Dart 官方吉祥物小藍鳥' }
+};
 
 const EN_PET_META = {
   'cyber-fox': { name: 'CyberFox', desc: 'Cyber blue fox companion (Default)' },
@@ -135,10 +159,13 @@ function scanPetPacks(lang = 'zh') {
           const meta = JSON.parse(fs.readFileSync(manifest, 'utf8'));
           const id = meta.id || entry.name;
           const enInfo = EN_PET_META[id];
+          const twInfo = TW_PET_META[id];
+          const useZh = lang === 'zh';
+          const useTw = lang === 'zh-tw';
           map.set(id, {
             id,
-            displayName: (lang === 'en' && enInfo) ? enInfo.name : (meta.displayName || id),
-            description: (lang === 'en' && enInfo) ? enInfo.desc : (meta.description || ''),
+            displayName: useTw && twInfo ? twInfo.name : (!useZh && !useTw && enInfo ? enInfo.name : (meta.displayName || id)),
+            description: useTw && twInfo ? twInfo.desc : (!useZh && !useTw && enInfo ? enInfo.desc : (meta.description || '')),
             version: meta.spriteVersionNumber || 2
           });
         } catch {
@@ -539,17 +566,20 @@ export async function importPetPack(args = {}) {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-pet-import-'));
   try {
     let sourceDir = null;
-    if (args.petJson && args.spritesheetBase64) {
+    if (args.petJson && (args.idleImageBase64 || args.spritesheetBase64)) {
       const metaObj = typeof args.petJson === 'string' ? JSON.parse(args.petJson) : args.petJson;
-      const cleanPng = String(args.spritesheetBase64).replace(/^data:image\/png;base64,/, '');
-      const pngBuf = Buffer.from(cleanPng, 'base64');
-      if (pngBuf.length === 0 || pngBuf.length > 12 * 1024 * 1024) {
-        return { ok: false, error: '无效的 spritesheet PNG 数据' };
+      const rawB64 = String(args.idleImageBase64 || args.spritesheetBase64).replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '');
+      const imgBuf = Buffer.from(rawB64, 'base64');
+      if (imgBuf.length === 0 || imgBuf.length > 12 * 1024 * 1024) {
+        return { ok: false, error: '无效的图片数据' };
       }
       sourceDir = path.join(tmpRoot, 'studio');
       fs.mkdirSync(sourceDir, { recursive: true });
       fs.writeFileSync(path.join(sourceDir, 'pet.json'), JSON.stringify(metaObj, null, 2), 'utf8');
-      fs.writeFileSync(path.join(sourceDir, metaObj.spritesheetPath || 'spritesheet.png'), pngBuf);
+      const targetImg = args.idleImageBase64
+        ? (metaObj.idleImage || 'idle.png')
+        : (metaObj.spritesheetPath || 'spritesheet.png');
+      fs.writeFileSync(path.join(sourceDir, targetImg), imgBuf);
     } else if (args.zipBase64) {
       const cleanB64 = String(args.zipBase64).replace(/^data:[^;]+;base64,/, '');
       const zipPath = path.join(tmpRoot, 'pack.zip');
@@ -700,6 +730,53 @@ function startLocalDispatchBridge(app) {
   });
 }
 
+let _releasesCache = { ts: 0, data: null };
+
+export async function getGithubReleases(forceRefresh = false) {
+  let currentVersion = '0.0.0';
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(PLUGIN_ROOT, 'plugin.json'), 'utf8'));
+    if (manifest && manifest.version) currentVersion = String(manifest.version);
+  } catch {}
+  const now = Date.now();
+  if (!forceRefresh && _releasesCache.data && (now - _releasesCache.ts) < 60000) {
+    return { ..._releasesCache.data, currentVersion };
+  }
+  try {
+    const buf = await downloadHttpsBuffer('https://api.github.com/repos/Wlaeg/antigravity-pet/releases?per_page=8', 2 * 1024 * 1024, 10000);
+    const list = JSON.parse(buf.toString('utf8'));
+    const releases = Array.isArray(list) ? list.filter((r) => r && !r.draft).map((r) => ({
+      tag: String(r.tag_name || ''),
+      name: String(r.name || r.tag_name || ''),
+      body: String(r.body || ''),
+      publishedAt: String(r.published_at || r.created_at || ''),
+      htmlUrl: String(r.html_url || ''),
+      prerelease: Boolean(r.prerelease),
+      assets: Array.isArray(r.assets) ? r.assets.map((a) => ({
+        name: String(a.name || ''),
+        size: Number(a.size || 0),
+        downloadUrl: String(a.browser_download_url || '')
+      })) : []
+    })) : [];
+    const result = {
+      ok: true,
+      currentVersion,
+      repoUrl: 'https://github.com/Wlaeg/antigravity-pet/releases',
+      releases
+    };
+    _releasesCache = { ts: now, data: result };
+    return result;
+  } catch (err) {
+    return {
+      ok: false,
+      currentVersion,
+      repoUrl: 'https://github.com/Wlaeg/antigravity-pet/releases',
+      error: err && err.message ? err.message : String(err),
+      releases: _releasesCache.data ? _releasesCache.data.releases : []
+    };
+  }
+}
+
 async function loadSidecarSdk() {
   const candidates = [
     () => import('sidecar_sdk'),
@@ -720,8 +797,10 @@ async function loadSidecarSdk() {
 const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
 
 if (isDirectRun) {
-  const SidecarApp = await loadSidecarSdk();
+  const forceStandalone = process.argv.includes('--standalone');
+  const SidecarApp = forceStandalone ? null : await loadSidecarSdk();
   const hasSidecarEnv = Boolean(
+    !forceStandalone &&
     SidecarApp &&
     process.env.ANTIGRAVITY_LS_ADDRESS &&
     process.env.ANTIGRAVITY_CSRF_TOKEN &&
@@ -739,11 +818,18 @@ if (isDirectRun) {
     app.api('/api/import-pet', async (data) => await importPetPack(data || {}), 'POST');
     app.api('/api/community-pets', async () => await getCommunityPets(), 'POST');
     app.api('/api/install-community-pet', async (data) => await installCommunityPet(data || {}), 'POST');
+    app.api('/api/github-releases', async (data) => await getGithubReleases(Boolean(data && data.force)), 'POST');
     await app.run();
     console.log('[antigravity-pet panel] sidecar registered and running');
   } else {
     const server = http.createServer(async (req, res) => {
       const url = new URL(req.url, 'http://127.0.0.1');
+      if (req.method === 'GET' && url.pathname === '/api/ping') {
+        const addr = server.address();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, app: 'antigravity-pet-panel', port: addr ? addr.port : 0 }));
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(fs.readFileSync(HTML_PATH, 'utf8'));
@@ -759,7 +845,8 @@ if (isDirectRun) {
         url.pathname === '/api/apply' ||
         url.pathname === '/api/import-pet' ||
         url.pathname === '/api/community-pets' ||
-        url.pathname === '/api/install-community-pet'
+        url.pathname === '/api/install-community-pet' ||
+        url.pathname === '/api/github-releases'
       )) {
         let raw = '';
         req.on('data', (c) => (raw += c));
@@ -771,6 +858,7 @@ if (isDirectRun) {
           else if (url.pathname === '/api/import-pet') result = await importPetPack(data);
           else if (url.pathname === '/api/community-pets') result = await getCommunityPets();
           else if (url.pathname === '/api/install-community-pet') result = await installCommunityPet(data);
+          else if (url.pathname === '/api/github-releases') result = await getGithubReleases(Boolean(data && data.force));
           else result = await applySetting(data);
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify(result));
@@ -780,9 +868,27 @@ if (isDirectRun) {
       res.writeHead(404);
       res.end('Not Found');
     });
-    const port = Number(process.env.PET_PANEL_PORT || 0);
-    server.listen(port, '127.0.0.1', () => {
+    const preferredPort = Number(process.env.PET_PANEL_PORT || 47822);
+    let retriedRandomPort = false;
+    server.on('error', (err) => {
+      if (err && err.code === 'EADDRINUSE' && !retriedRandomPort && preferredPort !== 0) {
+        retriedRandomPort = true;
+        server.listen(0, '127.0.0.1');
+        return;
+      }
+      console.error('[antigravity-pet panel] standalone server error:', err && err.message ? err.message : err);
+    });
+    server.listen(preferredPort, '127.0.0.1', () => {
       const addr = server.address();
+      const infoPath = path.join(path.dirname(getConfigPath()), 'panel-server.json');
+      try {
+        fs.writeFileSync(infoPath, JSON.stringify({
+          port: addr.port,
+          pid: process.pid,
+          url: `http://127.0.0.1:${addr.port}/`,
+          updatedAt: new Date().toISOString()
+        }, null, 2), 'utf8');
+      } catch {}
       console.log(`[antigravity-pet panel] standalone listening on http://127.0.0.1:${addr.port}`);
     });
   }

@@ -16,7 +16,21 @@ description: >-
 - `C:\Users\Nelson\.gemini\config\plugins\antigravity-pet\pets\<pet-id>\`
 - 或 `%USERPROFILE%\.antigravity-pet\pets\<pet-id>\`
 
-每个宠物包仅需两个文件：
+### 模式 A：极简单图模式（推荐快速孵化，最少 2 个文件）
+桌面端程序已内置程序化动画引擎（待机呼吸、抛物线跳跃、果冻回弹、`ScaleX = -1` 翻转），因此用户提供单张参考图或仅需快速生成时，**只需 `pet.json` + `idle.png`**：
+```json
+{
+  "id": "<pet-id>",
+  "displayName": "<中文或英文显示名>",
+  "description": "<简短介绍>",
+  "spriteVersionNumber": 3,
+  "themeColor": "#06B6D4",
+  "idleImage": "idle.png"
+}
+```
+
+### 模式 B：完整 8×11 精灵图模式（多帧精细动作）
+每个宠物包包含 `pet.json` 与 `spritesheet.png`：
 
 ### 1. `pet.json`
 ```json
