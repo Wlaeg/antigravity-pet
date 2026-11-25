@@ -5,6 +5,24 @@ All notable changes to **Antigravity Pet** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.0] - 2026-11-25
+
+### Added
+- **Minimal Single-Image Pet Fallback & On-Demand Memory Management (`app/AntigravityPet.cs`, `sidecars/panel/server.mjs`, `CUSTOM_PET_SPEC.md`)**:
+  - Pets now require as few as **1 base idle image** (`idle.png` / `pet.png` / `avatar.png` or `pet.json` `idleImage`/`image`), automatically falling back from spritesheets and action folders while preserving full v1–v3 backwards compatibility.
+  - Added on-demand decoding (`EnsurePackLoaded`) and automatic asset release (`UnloadAssets`) on skin switches to avoid holding unused spritesheets in memory.
+- **Procedural Animation Engine (`app/AntigravityPet.cs`)**:
+  - Switched `_spriteImage.RenderTransformOrigin` to bottom-center `(0.5, 1.0)` with a 6-layer `TransformGroup` (`_facingScale`, `_animScale`, `_dragScale`, `_animRotate`, `_dragRotate`, `_animTranslate`) compatible with DPI scaling.
+  - Added smooth procedural breathing (Idle), parabolic hopping + sway + `ScaleX = -1` flipping (Walk), damped Squash & Stretch bounce (Click/Interact), gentle nodding/hopping (Running), and hardware-accelerated `BitmapScalingMode.HighQuality` anti-aliasing.
+- **Tiered Boredom State Machine & Privacy-First Keyboard/Mouse Interaction (`app/AntigravityPet.cs`, `sidecars/panel/`, `ui/settings.html`, `scripts/pet-mcp-server.mjs`)**:
+  - Added 3-tier idle progression (`0–2m` breathing → `2–10m` random hops/look-around/roam & overhead pixel cues `...` / `?` / `♪` → `10m+` squashed slow-breathing sleep with floating `Zzz`), with ~0.3s wake-up hop on task arrival, drag/click, or typing.
+  - Added Windows Raw Input (`RIDEV_INPUTSINK`) typing rhythm interaction using a 1.5s sliding key-count window (zero key-code/content logging), frequency-scaled squash/bounce impact, and a dedicated orbiting 3-star dizzy canvas (`_dizzyCanvas`) at >5 keys/s, plus 100ms cursor facing with dead-zone and 0.5s flip cooldown.
+  - Added independent `boredomIdle` and `keyMouseInteract` toggles in both Settings UIs (unregisters Raw Input when disabled).
+
+### Fixed
+- **Docked Edge Behavior & Status Block Visibility (`app/AntigravityPet.cs`)**:
+  - Paused procedural idle/boredom wobble while docked compact, compensated `GetDockedTargetLeft` half-peek offset (`dockInset = 0.03 * StageWidth`), pulled out the docked compact status block (`Margin = 58 * Scale`) so it is never clipped off-screen, and fixed/enhanced `_statusHalo` visibility.
+
 ## [4.2.0] - 2026-11-25
 
 ### Added

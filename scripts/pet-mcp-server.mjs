@@ -275,6 +275,8 @@ async function getSnapshot() {
     readyTimeoutSec: typeof cfg.ReadyTimeoutSec === 'number' ? cfg.ReadyTimeoutSec : 30,
     autoWalk: cfg.AutoWalk !== false,
     eyeFollow: cfg.EyeFollow !== false,
+    boredomIdle: cfg.BoredomIdle !== false,
+    keyMouseInteract: cfg.KeyMouseInteract !== false,
     topmost: cfg.Topmost !== false,
     autoStartOnBoot: cfg.AutoStartOnBoot !== false,
     checkUpdatesOnStartup: cfg.CheckUpdatesOnStartup !== false,
@@ -363,6 +365,14 @@ async function applySetting(args = {}) {
     const b = parseBool(value, true);
     writeOfflineConfig({ EyeFollow: b });
     if (isRunning) await httpRequest('POST', '/control', { action: 'eyeFollow', value: String(b) });
+  } else if (action === 'boredomIdle') {
+    const b = parseBool(value, true);
+    writeOfflineConfig({ BoredomIdle: b });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'boredomIdle', value: String(b) });
+  } else if (action === 'keyMouseInteract') {
+    const b = parseBool(value, true);
+    writeOfflineConfig({ KeyMouseInteract: b });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'keyMouseInteract', value: String(b) });
   } else if (action === 'topmost') {
     const b = parseBool(value, true);
     writeOfflineConfig({ Topmost: b });
@@ -443,6 +453,8 @@ async function applySetting(args = {}) {
     if (args.language !== undefined) patch.Language = String(args.language).toLowerCase();
     if (args.autoWalk !== undefined) patch.AutoWalk = parseBool(args.autoWalk, true);
     if (args.eyeFollow !== undefined) patch.EyeFollow = parseBool(args.eyeFollow, true);
+    if (args.boredomIdle !== undefined) patch.BoredomIdle = parseBool(args.boredomIdle, true);
+    if (args.keyMouseInteract !== undefined) patch.KeyMouseInteract = parseBool(args.keyMouseInteract, true);
     if (args.topmost !== undefined) patch.Topmost = parseBool(args.topmost, true);
     if (args.autoStartOnBoot !== undefined) {
       patch.AutoStartOnBoot = parseBool(args.autoStartOnBoot, true);
@@ -461,6 +473,8 @@ async function applySetting(args = {}) {
           language: patch.Language,
           autoWalk: patch.AutoWalk,
           eyeFollow: patch.EyeFollow,
+          boredomIdle: patch.BoredomIdle,
+          keyMouseInteract: patch.KeyMouseInteract,
           topmost: patch.Topmost,
           autoStartOnBoot: patch.AutoStartOnBoot,
           checkUpdatesOnStartup: patch.CheckUpdatesOnStartup,
@@ -488,6 +502,8 @@ const TOOLS = [
         language: { type: 'string', description: 'Language: auto/en/zh' },
         autoWalk: { type: 'boolean', description: 'Idle roaming toggle' },
         eyeFollow: { type: 'boolean', description: '16-direction eye follow cursor toggle' },
+        boredomIdle: { type: 'boolean', description: 'Tiered boredom idle & sleeping Zzz toggle' },
+        keyMouseInteract: { type: 'boolean', description: 'Typing rhythm & cursor facing interaction toggle' },
         topmost: { type: 'boolean', description: 'Always on top toggle' },
         autoStartOnBoot: { type: 'boolean', description: 'Launch at login toggle' },
         soundAlert: { type: 'boolean', description: 'Completion sound alert toggle' }

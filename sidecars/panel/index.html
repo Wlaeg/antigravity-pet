@@ -564,6 +564,20 @@
       </div>
       <div class="toggle-item">
         <div>
+          <div class="seg-label" data-i18n="tBoredom">Idle Boredom & Sleep</div>
+          <div class="seg-sub" data-i18n="tBoredomSub">Show playful idle motions after 2 min and sleep Zzz after 10 min</div>
+        </div>
+        <div class="switch" id="swBoredomIdle" role="switch" tabindex="0" onclick="toggleOpt('boredomIdle')"></div>
+      </div>
+      <div class="toggle-item">
+        <div>
+          <div class="seg-label" data-i18n="tKeyMouse">Keyboard & Cursor Interaction</div>
+          <div class="seg-sub" data-i18n="tKeyMouseSub">React to typing rhythm (key count only) and face cursor direction</div>
+        </div>
+        <div class="switch" id="swKeyMouse" role="switch" tabindex="0" onclick="toggleOpt('keyMouseInteract')"></div>
+      </div>
+      <div class="toggle-item">
+        <div>
           <div class="seg-label" data-i18n="tTop">Always on Top</div>
           <div class="seg-sub" data-i18n="tTopSub">Keep the overlay pinned above active windows</div>
         </div>
@@ -699,6 +713,10 @@
       tWalkSub: 'Walk along the bottom work area during idle intervals',
       tEye: '16-Direction Eye Tracking',
       tEyeSub: 'Pupils follow cursor movement within range',
+      tBoredom: 'Idle Boredom & Sleep',
+      tBoredomSub: 'Show playful idle motions after 2 min and sleep Zzz after 10 min',
+      tKeyMouse: 'Keyboard & Cursor Interaction',
+      tKeyMouseSub: 'React to typing rhythm (key count only) and face cursor direction',
       tTop: 'Always on Top',
       tTopSub: 'Keep the overlay pinned above active windows',
       tSound: 'Completion Sound Cue',
@@ -796,6 +814,10 @@
       tWalkSub: '空闲时定期在工作区底部左右漫步',
       tEye: '16 方向眼神跟随',
       tEyeSub: '光标靠近时瞳孔实时注视指针方向',
+      tBoredom: '开启无聊待机动作',
+      tBoredomSub: '空闲 2 分钟后偶发小动作，超过 10 分钟进入睡觉并飘出 Zzz',
+      tKeyMouse: '开启键鼠互动',
+      tKeyMouseSub: '随打字节奏微动并朝向鼠标（仅统计按键次数，不记录按键内容）',
       tTop: '始终置顶',
       tTopSub: '保持桌宠悬浮在其他活动窗口之上',
       tSound: '状态提示音',
@@ -956,6 +978,8 @@
     setSw('swAutoStart', data.autoStartOnBoot !== false);
     setSw('swAutoWalk', data.autoWalk !== false);
     setSw('swEyeFollow', data.eyeFollow !== false);
+    setSw('swBoredomIdle', data.boredomIdle !== false);
+    setSw('swKeyMouse', data.keyMouseInteract !== false);
     setSw('swTopmost', data.topmost !== false);
     setSw('swSound', !!data.soundAlert);
     setSw('swSnap', !!data.snapToAgy);

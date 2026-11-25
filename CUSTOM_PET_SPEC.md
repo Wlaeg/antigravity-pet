@@ -8,7 +8,7 @@
 
 ## English
 
-**Antigravity Pet** supports hot-reloading and one-click `.zip` importing of custom pixel-art characters. Both **Sprite Sheet (`1536×2288`)** and **Per-Action Frame Folders** are supported on Windows & macOS.
+**Antigravity Pet** supports hot-reloading and one-click `.zip` importing of custom pixel-art characters. On Windows & macOS, you can provide a **Sprite Sheet (`1536×2288`)**, **Per-Action Frame Folders**, or even a **Minimal Single Base Image** (`idle.png` / `pet.png` / `avatar.png`). Missing actions automatically fall back to the idle image with procedural squash-and-stretch, parabolic hopping, breathing, and `ScaleX = -1` horizontal flipping.
 
 ### 1. Directory Layout
 
@@ -82,7 +82,7 @@ my-custom-pet/
 
 ## 简体中文
 
-**Antigravity Pet** 支持通过设置面板一键导入 `.zip` 自定义宠物包或热重载本地角色目录，Windows 与 macOS 双端同时兼容 **整图精灵图集（`1536×2288`）** 与 **分动作序列帧目录** 两种资源形式。
+**Antigravity Pet** 支持通过设置面板一键导入 `.zip` 自定义宠物包或热重载本地角色目录，Windows 与 macOS 双端同时兼容 **整图精灵图集（`1536×2288`）**、**分动作序列帧目录** 以及 **极简单张基础图（如 `idle.png` / `pet.png` / `avatar.png`）**。未提供的动作与向左朝向会自动回退至基础待机图，并由程序化动画引擎自动驱动呼吸、抛物线跳跃、果冻回弹与 `ScaleX = -1` 水平翻转。
 
 ### 1. 目录结构
 

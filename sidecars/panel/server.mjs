@@ -284,6 +284,8 @@ export async function getSnapshot() {
     effectiveAccessory: cfg.Accessory && cfg.Accessory !== 'auto' ? cfg.Accessory : (cfg.CompletedTasksCount >= 100 ? 'crown' : cfg.CompletedTasksCount >= 50 ? 'coffee' : cfg.CompletedTasksCount >= 20 ? 'cap' : cfg.CompletedTasksCount >= 5 ? 'glasses' : 'none'),
     autoWalk: cfg.AutoWalk !== false,
     eyeFollow: cfg.EyeFollow !== false,
+    boredomIdle: cfg.BoredomIdle !== false,
+    keyMouseInteract: cfg.KeyMouseInteract !== false,
     topmost: cfg.Topmost !== false,
     autoStartOnBoot: cfg.AutoStartOnBoot !== false,
     checkUpdatesOnStartup: cfg.CheckUpdatesOnStartup !== false,
@@ -372,6 +374,14 @@ export async function applySetting(args = {}) {
     const b = parseBool(value, true);
     writeOfflineConfig({ EyeFollow: b });
     if (isRunning) await httpRequest('POST', '/control', { action: 'eyeFollow', value: String(b) });
+  } else if (action === 'boredomIdle') {
+    const b = parseBool(value, true);
+    writeOfflineConfig({ BoredomIdle: b });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'boredomIdle', value: String(b) });
+  } else if (action === 'keyMouseInteract') {
+    const b = parseBool(value, true);
+    writeOfflineConfig({ KeyMouseInteract: b });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'keyMouseInteract', value: String(b) });
   } else if (action === 'topmost') {
     const b = parseBool(value, true);
     writeOfflineConfig({ Topmost: b });
@@ -592,8 +602,11 @@ export async function importPetPack(args = {}) {
     const safeId = rawId.replace(/[^a-z0-9-_]/g, '-').replace(/^-+|-+$/g, '') || 'custom-pet';
     const hasSheet = fs.existsSync(path.join(sourceDir, meta.spritesheetPath || 'spritesheet.png'));
     const hasIdleFrames = fs.existsSync(path.join(sourceDir, 'idle'));
-    if (!hasSheet && !hasIdleFrames) {
-      return { ok: false, error: '宠物包缺少 spritesheet.png 或 idle/ 序列帧目录' };
+    const singleCandidates = [meta.idleImage, meta.image, 'idle.png', 'idle.webp', 'pet.png', 'pet.webp', 'avatar.png', 'avatar.webp'].filter(Boolean);
+    const hasSingleDeclared = singleCandidates.some((rel) => fs.existsSync(path.join(sourceDir, String(rel))));
+    const hasRootImage = fs.readdirSync(sourceDir).some((f) => /\.(png|webp)$/i.test(f));
+    if (!hasSheet && !hasIdleFrames && !hasSingleDeclared && !hasRootImage) {
+      return { ok: false, error: '宠物包缺少 spritesheet.png、idle/ 序列帧目录或基础单图（如 idle.png）' };
     }
 
     const destDir = path.join(USER_PETS_DIR, safeId);

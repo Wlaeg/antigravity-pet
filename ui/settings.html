@@ -378,6 +378,8 @@
       <div class="toggle-item"><div><div class="seg-label" data-i18n="tUpdates">Check for Updates on Startup</div><div class="seg-sub" data-i18n="tUpdatesSub">Check GitHub Releases on launch and prompt when a newer version is available</div></div><div class="switch" id="swCheckUpdates" role="switch" tabindex="0" onclick="toggleOpt('checkUpdatesOnStartup')"></div></div>
       <div class="toggle-item"><div><div class="seg-label" data-i18n="tWalk">Idle Roaming</div><div class="seg-sub" data-i18n="tWalkSub">Walk along the bottom work area during idle intervals</div></div><div class="switch" id="swAutoWalk" onclick="toggleOpt('autoWalk')"></div></div>
       <div class="toggle-item"><div><div class="seg-label" data-i18n="tEye">16-Direction Eye Tracking</div><div class="seg-sub" data-i18n="tEyeSub">Pupils follow cursor movement within range</div></div><div class="switch" id="swEyeFollow" onclick="toggleOpt('eyeFollow')"></div></div>
+      <div class="toggle-item"><div><div class="seg-label" data-i18n="tBoredom">Idle Boredom & Sleep</div><div class="seg-sub" data-i18n="tBoredomSub">Show playful idle motions after 2 min and sleep Zzz after 10 min</div></div><div class="switch" id="swBoredomIdle" role="switch" tabindex="0" onclick="toggleOpt('boredomIdle')"></div></div>
+      <div class="toggle-item"><div><div class="seg-label" data-i18n="tKeyMouse">Keyboard & Cursor Interaction</div><div class="seg-sub" data-i18n="tKeyMouseSub">React to typing rhythm (key count only) and face cursor direction</div></div><div class="switch" id="swKeyMouse" role="switch" tabindex="0" onclick="toggleOpt('keyMouseInteract')"></div></div>
       <div class="toggle-item"><div><div class="seg-label" data-i18n="tTop">Always on Top</div><div class="seg-sub" data-i18n="tTopSub">Keep the overlay pinned above active windows</div></div><div class="switch" id="swTopmost" onclick="toggleOpt('topmost')"></div></div>
       <div class="toggle-item"><div><div class="seg-label" data-i18n="tSound">Completion Sound Cue</div><div class="seg-sub" data-i18n="tSoundSub">Play subtle system chime on Ready or Needs Input</div></div><div class="switch" id="swSound" onclick="toggleOpt('soundAlert')"></div></div>
       <div class="toggle-item"><div><div class="seg-label" data-i18n="tSnap">Snap to Antigravity Window</div><div class="seg-sub" data-i18n="tSnapSub">Dock the pet to the top-right edge of the active Antigravity window</div></div><div class="switch" id="swSnap" onclick="toggleOpt('snapToAgy')"></div></div>
@@ -448,6 +450,8 @@
       tBoot: 'Launch with Antigravity', tBootSub: 'Start when Antigravity opens and exit automatically when it closes',
       tWalk: 'Idle Roaming', tWalkSub: 'Walk along the bottom work area during idle intervals',
       tEye: '16-Direction Eye Tracking', tEyeSub: 'Pupils follow cursor movement within range',
+      tBoredom: 'Idle Boredom & Sleep', tBoredomSub: 'Show playful idle motions after 2 min and sleep Zzz after 10 min',
+      tKeyMouse: 'Keyboard & Cursor Interaction', tKeyMouseSub: 'React to typing rhythm (key count only) and face cursor direction',
       tTop: 'Always on Top', tTopSub: 'Keep the overlay pinned above active windows',
       accLabel: 'Growth Accessory', accSub: 'Auto-unlocks pixel gear by completed task milestones',
       accAuto: 'Auto', accNone: 'None', accGlasses: 'Glasses', accCap: 'Cap', accCoffee: 'Coffee', accCrown: 'Crown',
@@ -486,6 +490,8 @@
       tBoot: '随 Antigravity 启动', tBootSub: '打开客户端时自动拉起，关闭客户端时自动退出',
       tWalk: '待机桌面散步', tWalkSub: '空闲时定期在工作区底部左右漫步',
       tEye: '16 方向眼神跟随', tEyeSub: '光标靠近时瞳孔实时注视指针方向',
+      tBoredom: '开启无聊待机动作', tBoredomSub: '空闲 2 分钟后偶发小动作，超过 10 分钟进入睡觉并飘出 Zzz',
+      tKeyMouse: '开启键鼠互动', tKeyMouseSub: '随打字节奏微动并朝向鼠标（仅统计按键次数，不记录按键内容）',
       tTop: '始终置顶', tTopSub: '保持桌宠悬浮在其他活动窗口之上',
       accLabel: '成长像素配饰', accSub: '随累计完成任务数自动解锁（5/20/50/100）',
       accAuto: '自动', accNone: '无', accGlasses: '墨镜', accCap: '鸭舌帽', accCoffee: '咖啡', accCrown: '皇冠',
@@ -603,6 +609,8 @@
     setSw('swAutoStart', data.autoStartOnBoot !== false);
     setSw('swAutoWalk', data.autoWalk !== false);
     setSw('swEyeFollow', data.eyeFollow !== false);
+    setSw('swBoredomIdle', data.boredomIdle !== false);
+    setSw('swKeyMouse', data.keyMouseInteract !== false);
     setSw('swTopmost', data.topmost !== false);
     setSw('swSound', !!data.soundAlert);
     setSw('swSnap', !!data.snapToAgy);
