@@ -4,6 +4,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getCommunityPets, importPetPack, installCommunityPet } from '../sidecars/panel/server.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = path.resolve(__dirname, '..');
@@ -416,6 +417,24 @@ async function applySetting(args = {}) {
       state: String(args.state || 'idle'),
       message: String(args.message || '')
     });
+  } else if (action === 'communityPets') {
+    const comm = await getCommunityPets();
+    const snap = await getSnapshot();
+    return { ...snap, communityPets: comm.pets, communitySource: comm.source };
+  } else if (action === 'installCommunityPet') {
+    const res = await installCommunityPet({ id: args.id || value, zipUrl: args.zipUrl, localZip: args.localZip });
+    const comm = await getCommunityPets();
+    const snap = res.snapshot || await getSnapshot();
+    return { ...snap, importResult: res, communityPets: comm.pets, communitySource: comm.source };
+  } else if (action === 'importPet') {
+    const res = await importPetPack({
+      zipBase64: args.zipBase64,
+      zipUrl: args.zipUrl,
+      petJson: args.petJson,
+      spritesheetBase64: args.spritesheetBase64
+    });
+    const snap = res.snapshot || await getSnapshot();
+    return { ...snap, importResult: res };
   } else {
     const patch = {};
     if (args.skin !== undefined) patch.Skin = String(args.skin);

@@ -121,6 +121,40 @@
   .skin-swatch { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
   .skin-name { font-weight: 600; font-size: 13px; color: var(--fg); }
   .skin-desc { font-size: 11px; color: var(--fg-2); line-height: 1.4; }
+  .comm-card { padding: 12px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+  .comm-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+  .comm-author { font-size: 11px; color: var(--fg-3); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .studio-box { margin-top: 12px; padding: 16px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); display: none; flex-direction: column; gap: 12px; }
+  .studio-box.open { display: flex; }
+  .studio-grid { display: grid; grid-template-columns: 148px 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 560px) { .studio-grid { grid-template-columns: 1fr; } }
+  .studio-preview-col { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .studio-canvas-wrap {
+    width: 144px; height: 156px; border-radius: 8px; border: 1px solid var(--line);
+    background-color: var(--surface);
+    background-image: linear-gradient(45deg, rgba(255,255,255,0.025) 25%, transparent 25%),
+      linear-gradient(-45deg, rgba(255,255,255,0.025) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.025) 75%),
+      linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.025) 75%);
+    background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .studio-canvas { width: 128px; height: 138px; image-rendering: pixelated; }
+  .studio-acts { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+  .studio-acts button { padding: 4px 8px; font-size: 11px; border-radius: 4px; }
+  .studio-acts button.active { background: var(--accent-soft); border-color: rgba(56, 189, 248, 0.55); color: var(--fg); }
+  .drop-zone { border: 1px dashed var(--line-strong); border-radius: 8px; padding: 12px; text-align: center; cursor: pointer; background: var(--surface); }
+  .drop-zone:hover, .drop-zone.drag { border-color: var(--accent); background: var(--accent-soft); }
+  .drop-title { font-size: 12px; font-weight: 500; color: var(--fg); }
+  .drop-sub { font-size: 11px; color: var(--fg-2); margin-top: 4px; }
+  .thumb-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; justify-content: center; }
+  .thumb-item { width: 32px; height: 32px; border-radius: 4px; border: 1px solid var(--line-strong); object-fit: contain; background: var(--bg); image-rendering: pixelated; }
+  .studio-fields { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 8px; align-items: center; }
+  .text-input { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font-family: inherit; font-size: 12px; outline: none; }
+  .text-input:focus { border-color: var(--accent); }
+  .color-pick { width: 32px; height: 30px; padding: 2px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
+  .studio-meta-hint { font-size: 11px; color: var(--fg-3); font-family: var(--mono); margin-top: 4px; }
+  .studio-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   .seg-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   .seg-row:first-of-type { padding-top: 4px; }
   .seg-row:last-child { border-bottom: none; padding-bottom: 0; }
@@ -197,13 +231,75 @@
   <div class="card">
     <div class="sec-head">
       <h2 class="sec-title">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
         <span data-i18n="skinSec">Characters</span>
         <span style="color:var(--fg-2);font-family:var(--mono);font-size:12px" id="petCount">0</span>
       </h2>
-      <button class="ghost" onclick="act('reload')" data-i18n="btnReload">Reload</button>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div class="seg-btns" id="charTabBtns">
+          <button class="active" data-ctab="installed" onclick="switchCharTab('installed')" data-i18n="tabInstalled">Installed</button>
+          <button data-ctab="community" onclick="switchCharTab('community')" data-i18n="tabCommunity">Community</button>
+        </div>
+        <button class="ghost" onclick="toggleStudio()" data-i18n="btnStudio">Pack Studio</button>
+        <input type="file" id="petZipInput" accept=".zip" style="display:none" onchange="handleImportZip(this)" />
+        <button class="ghost" onclick="document.getElementById('petZipInput').click()" data-i18n="btnImportZip">Import .zip</button>
+        <button class="ghost" onclick="refreshCharView()" data-i18n="btnReload">Reload</button>
+      </div>
     </div>
+
+    <div class="studio-box" id="studioBox">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div>
+          <div class="seg-label" data-i18n="studioTitle">Quick Pet Pack Studio</div>
+          <div class="seg-sub" data-i18n="studioSub">Drop 1 or more images to auto-generate a v3 spritesheet, preview animations, and install or export .zip</div>
+        </div>
+        <button class="ghost" onclick="toggleStudio(false)" data-i18n="btnClose">Close</button>
+      </div>
+      <div class="studio-grid">
+        <div class="studio-preview-col">
+          <div class="studio-canvas-wrap">
+            <canvas class="studio-canvas" id="studioPreview" width="192" height="208"></canvas>
+          </div>
+          <div class="studio-acts" id="studioActBtns">
+            <button class="active" data-sact="0" onclick="setStudioAct(0)" data-i18n="pvIdle">Idle</button>
+            <button data-sact="1" onclick="setStudioAct(1)" data-i18n="pvWalk">Walk</button>
+            <button data-sact="7" onclick="setStudioAct(7)" data-i18n="pvRun">Running</button>
+            <button data-sact="8" onclick="setStudioAct(8)" data-i18n="pvReady">Ready</button>
+            <button data-sact="4" onclick="setStudioAct(4)" data-i18n="pvJump">Jump</button>
+          </div>
+        </div>
+        <div>
+          <input type="file" id="studioImgInput" accept="image/*" multiple style="display:none" onchange="handleStudioFiles(this.files)" />
+          <div class="drop-zone" id="studioDropZone" onclick="document.getElementById('studioImgInput').click()">
+            <div class="drop-title" data-i18n="dropTitle">Drop images here or click to select</div>
+            <div class="drop-sub" data-i18n="dropSub">Supports 1 static image, multi-frame PNGs, or a 1536x2288 v3 spritesheet</div>
+            <div class="thumb-strip" id="studioThumbs"></div>
+          </div>
+          <div class="studio-fields">
+            <input type="text" class="text-input" id="studioName" placeholder="Pet name (e.g. Pixel Fox)" oninput="updateStudioMetaHint()" />
+            <input type="color" class="color-pick" id="studioColor" value="#38BDF8" title="Theme color" />
+          </div>
+          <div class="studio-fields" style="grid-template-columns:1fr auto">
+            <input type="text" class="text-input" id="studioDesc" placeholder="Short description (optional)" />
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--fg-2);cursor:pointer;user-select:none">
+              <input type="checkbox" id="studioPixelated" checked onchange="rebuildStudioSheet()" />
+              <span data-i18n="pixelMode">Pixelated</span>
+            </label>
+          </div>
+          <div class="studio-meta-hint" id="studioMetaHint">id: custom-pet · 8x11 v3 spritesheet</div>
+          <div class="studio-foot">
+            <button class="ghost" onclick="clearStudio()" data-i18n="btnClear">Clear</button>
+            <div class="btn-group">
+              <button onclick="exportStudioZip()" data-i18n="btnExportZip">Export .zip</button>
+              <button class="primary" onclick="installStudioPet()" data-i18n="btnInstallUse">Install & Use</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="skin-grid" id="skinGrid"></div>
+    <div class="skin-grid" id="communityGrid" style="display:none"></div>
   </div>
 
   <div class="card">
@@ -332,7 +428,14 @@
       title: 'Desktop Pet', subtitle: 'Zero taskbar/Dock footprint · Click bubble to jump',
       btnStart: 'Show Pet', btnHide: 'Hide', btnQuit: 'Quit', btnOpenChat: 'Open Active Chat', btnRefresh: 'Refresh',
       statDone: 'Tasks Completed', statTools: 'Tool Calls', statUp: 'Session Uptime',
-      skinSec: 'Characters', btnReload: 'Reload',
+      skinSec: 'Characters', tabInstalled: 'Installed', tabCommunity: 'Community', btnStudio: 'Pack Studio',
+      studioTitle: 'Quick Pet Pack Studio',
+      studioSub: 'Drop 1 or more images to auto-generate a v3 spritesheet, preview animations, and install or export .zip',
+      btnClose: 'Close', dropTitle: 'Drop images here or click to select',
+      dropSub: 'Supports 1 static image, multi-frame PNGs, or a 1536x2288 v3 spritesheet',
+      pixelMode: 'Pixelated', btnClear: 'Clear', btnExportZip: 'Export .zip', btnInstallUse: 'Install & Use',
+      commInstall: 'Install', commInstalled: 'Installed', commInstalling: 'Installing...', commEmpty: 'No community packs found',
+      btnImportZip: 'Import .zip', btnReload: 'Reload',
       appearSec: 'Appearance & Bubbles', btnResetPos: 'Reset Position',
       langLabel: 'Interface Language', langSub: 'Syncs with Antigravity locale by default', langAuto: 'Auto',
       sizeLabel: 'Window Scale', sizeSub: 'Adjust floating pet sprite dimensions',
@@ -363,7 +466,14 @@
       title: '桌面宠物设置', subtitle: '不占任务栏/Dock 图标 · 点击气泡直达对话',
       btnStart: '显示桌宠', btnHide: '隐藏', btnQuit: '退出进程', btnOpenChat: '打开当前对话', btnRefresh: '刷新',
       statDone: '完成任务', statTools: '工具调用', statUp: '运行时长',
-      skinSec: '宠物角色', btnReload: '刷新列表',
+      skinSec: '宠物角色', tabInstalled: '已安装', tabCommunity: '社区宠物库', btnStudio: '制作宠物包',
+      studioTitle: '极简宠物包制作工坊',
+      studioSub: '拖入 1 张或多张图片，自动合成 v3 精灵图集并实时预览，支持直接安装或导出 .zip',
+      btnClose: '收起', dropTitle: '将图片拖到此处，或点击选择文件',
+      dropSub: '支持单张立绘（自动生成呼吸/跳动/镜像）、多张序列帧或 1536x2288 标准图集',
+      pixelMode: '像素风近邻', btnClear: '清空', btnExportZip: '导出 .zip', btnInstallUse: '直接安装启用',
+      commInstall: '一键安装', commInstalled: '已安装', commInstalling: '安装中...', commEmpty: '暂无社区宠物包',
+      btnImportZip: '导入宠物包', btnReload: '刷新列表',
       appearSec: '外观与气泡', btnResetPos: '重置位置',
       langLabel: '界面语言', langSub: '默认自动跟随 Antigravity 语言设置', langAuto: '自动跟随',
       sizeLabel: '窗口缩放', sizeSub: '调整桌面悬浮窗显示比例',
@@ -587,6 +697,259 @@
   window.setOpt = function (key, value) { callPetTool({ action: key, value: String(value) }); };
   window.toggleOpt = function (key) { callPetTool({ action: key, value: String(!(currentData ? currentData[key] : true)) }); };
   window.previewState = function (st, msg) { callPetTool({ action: 'testState', state: st, message: msg }); };
+
+  window.handleImportZip = function (input) {
+    var file = input && input.files && input.files[0];
+    if (!file) return;
+    var r = new FileReader();
+    r.onload = function () {
+      callPetTool({ action: 'importPet', zipBase64: r.result }, true).then(function (res) {
+        input.value = '';
+        var sc = res && res.structuredContent;
+        if (sc && sc.importResult && !sc.importResult.ok) alert(sc.importResult.error || 'Import failed');
+        else showToast(getLangPack(sc).toastOk);
+      }).catch(function () { input.value = ''; });
+    };
+    r.readAsDataURL(file);
+  };
+
+  var _charTab = 'installed';
+  var _communityList = [];
+  var _studioImages = [];
+  var _studioSheetCanvas = null;
+  var _studioActRow = 0;
+  var _studioFrameIdx = 0;
+  var _studioTimer = null;
+  var _ROW_COUNTS = [6, 8, 8, 4, 5, 8, 6, 6, 6, 8, 8];
+
+  window.switchCharTab = function (tab) {
+    _charTab = tab === 'community' ? 'community' : 'installed';
+    document.querySelectorAll('#charTabBtns button').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-ctab') === _charTab);
+    });
+    document.getElementById('skinGrid').style.display = _charTab === 'installed' ? 'grid' : 'none';
+    document.getElementById('communityGrid').style.display = _charTab === 'community' ? 'grid' : 'none';
+    if (_charTab === 'community') loadCommunityPets();
+    setTimeout(reportSize, 40);
+  };
+  window.refreshCharView = function () {
+    if (_charTab === 'community') loadCommunityPets();
+    else window.act('reload');
+  };
+  function loadCommunityPets() {
+    callPetTool({ action: 'communityPets' }, true).then(function (res) {
+      var sc = res && res.structuredContent;
+      if (sc && Array.isArray(sc.communityPets)) {
+        _communityList = sc.communityPets;
+        renderCommunityPets();
+      }
+    }).catch(function () {});
+  }
+  function renderCommunityPets() {
+    var grid = document.getElementById('communityGrid');
+    if (!grid) return;
+    var L = getLangPack(currentData);
+    var isZh = currentData && currentData.effectiveLanguage === 'zh';
+    if (!_communityList.length) {
+      grid.innerHTML = '<div class="conv-meta">' + escapeHtml(L.commEmpty || 'No community packs') + '</div>';
+      return;
+    }
+    grid.innerHTML = '';
+    _communityList.forEach(function (p) {
+      var card = document.createElement('div');
+      card.className = 'comm-card';
+      var title = (isZh && p.displayNameZh) ? p.displayNameZh : (p.displayName || p.id);
+      var desc = (isZh && p.descriptionZh) ? p.descriptionZh : (p.description || '');
+      card.innerHTML =
+        '<div><div class="skin-top"><span class="skin-swatch" style="background:' + escapeHtml(p.themeColor || '#38BDF8') + '"></span><span class="skin-name">' + escapeHtml(title) + '</span></div>' +
+        '<div class="skin-desc" style="margin-top:4px">' + escapeHtml(desc) + '</div></div>' +
+        '<div class="comm-foot"><span class="comm-author">' + escapeHtml(p.author || 'Community') + '</span></div>';
+      var btn = document.createElement('button');
+      if (p.installed) {
+        btn.textContent = L.commInstalled || 'Installed';
+        btn.className = 'ghost';
+        btn.onclick = function () { window.setOpt('skin', p.id); window.switchCharTab('installed'); };
+      } else {
+        btn.textContent = L.commInstall || 'Install';
+        btn.className = 'primary';
+        btn.onclick = function () {
+          btn.disabled = true;
+          btn.textContent = L.commInstalling || 'Installing...';
+          callPetTool({ action: 'installCommunityPet', id: p.id, zipUrl: p.zipUrl, localZip: p.localZip }, true).then(function (res) {
+            var sc = res && res.structuredContent;
+            if (sc && sc.importResult && !sc.importResult.ok) {
+              btn.disabled = false; btn.textContent = L.commInstall || 'Install';
+              alert(sc.importResult.error || 'Install failed');
+            } else {
+              if (sc && Array.isArray(sc.communityPets)) _communityList = sc.communityPets;
+              else p.installed = true;
+              renderCommunityPets();
+              showToast(L.toastOk);
+            }
+          }).catch(function () { btn.disabled = false; btn.textContent = L.commInstall || 'Install'; });
+        };
+      }
+      card.querySelector('.comm-foot').appendChild(btn);
+      grid.appendChild(card);
+    });
+    setTimeout(reportSize, 40);
+  }
+  window.toggleStudio = function (forceOpen) {
+    var box = document.getElementById('studioBox');
+    if (!box) return;
+    var next = typeof forceOpen === 'boolean' ? forceOpen : !box.classList.contains('open');
+    box.classList.toggle('open', next);
+    if (next) {
+      if (!_studioSheetCanvas) window.rebuildStudioSheet();
+      if (_studioTimer) clearInterval(_studioTimer);
+      _studioTimer = setInterval(function () { _studioFrameIdx = (_studioFrameIdx + 1) % (_ROW_COUNTS[_studioActRow] || 6); drawStudioPreviewFrame(); }, 180);
+    } else if (_studioTimer) { clearInterval(_studioTimer); _studioTimer = null; }
+    setTimeout(reportSize, 40);
+  };
+  window.setStudioAct = function (row) {
+    _studioActRow = Number(row) || 0; _studioFrameIdx = 0;
+    document.querySelectorAll('#studioActBtns button').forEach(function (b) { b.classList.toggle('active', Number(b.getAttribute('data-sact')) === _studioActRow); });
+    drawStudioPreviewFrame();
+  };
+  function slugifyPetId(name) {
+    var s = String(name || '').trim().toLowerCase().replace(/[^a-z0-9-_]+/g, '-').replace(/^-+|-+$/g, '');
+    return s || ('custom-pet-' + Math.floor(Date.now() / 1000).toString(36).slice(-4));
+  }
+  window.updateStudioMetaHint = function () {
+    var el = document.getElementById('studioMetaHint');
+    var nameEl = document.getElementById('studioName');
+    if (el) el.textContent = 'id: ' + slugifyPetId(nameEl ? nameEl.value : '') + ' · 8x11 v3 spritesheet (1536x2288)';
+  };
+  window.handleStudioFiles = function (fileList) {
+    if (!fileList || !fileList.length) return;
+    var files = Array.prototype.slice.call(fileList).filter(function (f) { return /^image\//i.test(f.type); });
+    if (!files.length) return;
+    Promise.all(files.map(function (f) {
+      return new Promise(function (resolve) {
+        var r = new FileReader();
+        r.onload = function () {
+          var img = new Image();
+          img.onload = function () { resolve({ name: f.name, src: r.result, img: img }); };
+          img.onerror = function () { resolve(null); };
+          img.src = r.result;
+        };
+        r.readAsDataURL(f);
+      });
+    })).then(function (loaded) {
+      var valid = loaded.filter(Boolean);
+      if (!valid.length) return;
+      _studioImages = valid;
+      var ni = document.getElementById('studioName');
+      if (ni && !ni.value.trim()) { ni.value = valid[0].name.replace(/\.[^.]+$/, ''); window.updateStudioMetaHint(); }
+      var strip = document.getElementById('studioThumbs');
+      if (strip) {
+        strip.innerHTML = '';
+        _studioImages.slice(0, 8).forEach(function (it) { var im = document.createElement('img'); im.className = 'thumb-item'; im.src = it.src; strip.appendChild(im); });
+      }
+      window.rebuildStudioSheet();
+    });
+  };
+  window.clearStudio = function () {
+    _studioImages = [];
+    var inp = document.getElementById('studioImgInput'); if (inp) inp.value = '';
+    var strip = document.getElementById('studioThumbs'); if (strip) strip.innerHTML = '';
+    window.rebuildStudioSheet();
+  };
+  window.rebuildStudioSheet = function () {
+    var sheet = document.createElement('canvas'); sheet.width = 1536; sheet.height = 2288;
+    var ctx = sheet.getContext('2d');
+    var px = document.getElementById('studioPixelated') ? document.getElementById('studioPixelated').checked : true;
+    ctx.imageSmoothingEnabled = !px;
+    if (_studioImages.length === 1 && _studioImages[0].img.width >= 1400 && _studioImages[0].img.height >= 2000) {
+      ctx.drawImage(_studioImages[0].img, 0, 0, 1536, 2288);
+    } else if (_studioImages.length > 0) {
+      for (var r = 0; r < 11; r++) {
+        var cnt = _ROW_COUNTS[r];
+        for (var c = 0; c < cnt; c++) {
+          var srcImg = _studioImages[(r + c) % _studioImages.length].img;
+          var ratio = Math.min(176 / srcImg.width, 190 / srcImg.height);
+          var dw = Math.max(1, Math.round(srcImg.width * ratio)), dh = Math.max(1, Math.round(srcImg.height * ratio));
+          var dyOff = (_studioImages.length === 1) ? ((r === 0 || r === 7) ? ((c % 2 === 1) ? 4 : 0) : (r === 4 ? ((c === 1 || c === 2) ? -14 : -4) : (r === 8 ? ((c % 2 === 1) ? -8 : 0) : 0))) : 0;
+          ctx.save();
+          if (r === 2) {
+            ctx.translate(c * 192 + 192, r * 208); ctx.scale(-1, 1);
+            ctx.drawImage(srcImg, Math.round((192 - dw) / 2), Math.round((208 - dh) / 2) + dyOff, dw, dh);
+          } else {
+            ctx.drawImage(srcImg, c * 192 + Math.round((192 - dw) / 2), r * 208 + Math.round((208 - dh) / 2) + dyOff, dw, dh);
+          }
+          ctx.restore();
+        }
+      }
+    }
+    _studioSheetCanvas = sheet; drawStudioPreviewFrame();
+  };
+  function drawStudioPreviewFrame() {
+    var pv = document.getElementById('studioPreview');
+    if (!pv || !_studioSheetCanvas) return;
+    var pctx = pv.getContext('2d'); pctx.clearRect(0, 0, 192, 208); pctx.imageSmoothingEnabled = false;
+    var col = _studioFrameIdx % (_ROW_COUNTS[_studioActRow] || 6);
+    pctx.drawImage(_studioSheetCanvas, col * 192, _studioActRow * 208, 192, 208, 0, 0, 192, 208);
+  }
+  function buildStudioPayload() {
+    if (!_studioImages.length || !_studioSheetCanvas) {
+      alert(currentData && currentData.effectiveLanguage === 'zh' ? '请先拖入或选择至少 1 张宠物图片' : 'Please drop or select at least 1 image first');
+      return null;
+    }
+    var displayName = (document.getElementById('studioName').value || '').trim() || 'Custom Pet';
+    return {
+      petJson: {
+        id: slugifyPetId(displayName),
+        displayName: displayName,
+        description: (document.getElementById('studioDesc').value || '').trim() || 'Created with Antigravity Pet Studio',
+        themeColor: (document.getElementById('studioColor').value || '#38BDF8').toUpperCase(),
+        spriteVersionNumber: 3,
+        spritesheetPath: 'spritesheet.png'
+      },
+      spritesheetDataUrl: _studioSheetCanvas.toDataURL('image/png')
+    };
+  }
+  window.installStudioPet = function () {
+    var payload = buildStudioPayload(); if (!payload) return;
+    callPetTool({ action: 'importPet', petJson: payload.petJson, spritesheetBase64: payload.spritesheetDataUrl }, true).then(function (res) {
+      var sc = res && res.structuredContent;
+      if (sc && sc.importResult && !sc.importResult.ok) alert(sc.importResult.error || 'Install failed');
+      else { showToast(getLangPack(sc).toastOk); window.switchCharTab('installed'); }
+    }).catch(function (err) { alert(String(err || 'Install failed')); });
+  };
+  window.exportStudioZip = function () {
+    var payload = buildStudioPayload(); if (!payload) return;
+    var b64 = payload.spritesheetDataUrl.split(',')[1], bin = atob(b64), pngBytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) pngBytes[i] = bin.charCodeAt(i);
+    var jsonBytes = new TextEncoder().encode(JSON.stringify(payload.petJson, null, 2));
+    var id = payload.petJson.id;
+    var crcTable = new Uint32Array(256);
+    for (var t = 0; t < 256; t++) { var c = t; for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); crcTable[t] = c >>> 0; }
+    function crc32(bytes) { var cr = 0xFFFFFFFF; for (var j = 0; j < bytes.length; j++) cr = crcTable[(cr ^ bytes[j]) & 0xFF] ^ (cr >>> 8); return (cr ^ 0xFFFFFFFF) >>> 0; }
+    var enc = new TextEncoder(), locals = [], centrals = [], offset = 0;
+    [{ name: id + '/pet.json', data: jsonBytes }, { name: id + '/spritesheet.png', data: pngBytes }].forEach(function (ent) {
+      var nb = enc.encode(ent.name), dt = ent.data, cr = crc32(dt);
+      var lfh = new Uint8Array(30 + nb.length), dv = new DataView(lfh.buffer);
+      dv.setUint32(0, 0x04034b50, true); dv.setUint16(4, 20, true); dv.setUint32(14, cr, true);
+      dv.setUint32(18, dt.length, true); dv.setUint32(22, dt.length, true); dv.setUint16(26, nb.length, true);
+      lfh.set(nb, 30); locals.push(lfh, dt);
+      var cdh = new Uint8Array(46 + nb.length), cdv = new DataView(cdh.buffer);
+      cdv.setUint32(0, 0x02014b50, true); cdv.setUint16(4, 20, true); cdv.setUint16(6, 20, true);
+      cdv.setUint32(16, cr, true); cdv.setUint32(20, dt.length, true); cdv.setUint32(24, dt.length, true);
+      cdv.setUint16(28, nb.length, true); cdv.setUint32(42, offset, true); cdh.set(nb, 46);
+      centrals.push(cdh); offset += lfh.length + dt.length;
+    });
+    var cs = centrals.reduce(function (s, a) { return s + a.length; }, 0), eocd = new Uint8Array(22), edv = new DataView(eocd.buffer);
+    edv.setUint32(0, 0x06054b50, true); edv.setUint16(8, 2, true); edv.setUint16(10, 2, true); edv.setUint32(12, cs, true); edv.setUint32(16, offset, true);
+    var blob = new Blob(locals.concat(centrals, [eocd]), { type: 'application/zip' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = id + '.zip'; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  };
+  (function () {
+    var dz = document.getElementById('studioDropZone'); if (!dz) return;
+    dz.addEventListener('dragover', function (e) { e.preventDefault(); dz.classList.add('drag'); });
+    dz.addEventListener('dragleave', function () { dz.classList.remove('drag'); });
+    dz.addEventListener('drop', function (e) { e.preventDefault(); dz.classList.remove('drag'); if (e.dataTransfer && e.dataTransfer.files) window.handleStudioFiles(e.dataTransfer.files); });
+  })();
 
   window.addEventListener('message', function (ev) {
     var msg = ev.data;

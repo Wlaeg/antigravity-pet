@@ -5,6 +5,19 @@ All notable changes to **Antigravity Pet** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-11-25
+
+### Added
+- **Quick Pet Pack Studio (`sidecars/panel/index.html`, `ui/settings.html`)**:
+  - Added an inline **Pack Studio** inside the Characters section where users can drop 1 or more images (or an existing `1536×2288` sheet) to auto-generate a v3 `8×11` spritesheet via Canvas, preview animations (`Idle` / `Walk` / `Running` / `Ready` / `Jump`), install directly with one click, or export a `.zip` pack.
+- **Community Pet Library (`community-pets.json`, `community/packs/`, `sidecars/panel/server.mjs`, `scripts/pet-mcp-server.mjs`)**:
+  - Added an **Installed / Community** switcher in Settings to browse community pet packs (synced from GitHub with local fallback) and install them in one click (`cyber-panda`, `pixel-octopus`, `coffee-slime`).
+
+### Changed
+- **macOS Parity Alignment (`app/AntigravityPet.swift`)**:
+  - Expanded scale bounds from `0.6–2.0` to `0.33–3.0` to match the 3x logarithmic slider.
+  - Added `CheckUpdatesOnStartup` (`PetConfig` backwards-compatible `Codable`), `dockLeft` / `dockRight` / `checkUpdatesOnStartup` / `updateConfig` `/control` actions, `http-bridge.json` 128-bit token verification on `POST /approval`, click-behavior split, streamlined context menu, and startup GitHub release check + one-click self-update.
+
 ## [4.1.1] - 2026-11-25
 
 ### Fixed

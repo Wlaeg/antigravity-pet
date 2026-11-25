@@ -2,6 +2,7 @@ import { execFile, spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
+import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -17,6 +18,8 @@ const MAC_BUILD_SH = path.join(PLUGIN_ROOT, 'build.sh');
 const HTML_PATH = path.join(__dirname, 'index.html');
 const PETS_DIR = path.join(PLUGIN_ROOT, 'pets');
 const USER_PETS_DIR = path.join(os.homedir(), '.antigravity-pet', 'pets');
+const COMMUNITY_MANIFEST_PATH = path.join(PLUGIN_ROOT, 'community-pets.json');
+const COMMUNITY_MANIFEST_URL = 'https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community-pets.json';
 const PORT = 47821;
 const TASK_NAME = 'AntigravityPetLauncher';
 
@@ -453,23 +456,121 @@ function copyDirRecursive(src, dst) {
   }
 }
 
+function downloadHttpsBuffer(targetUrl, maxBytes = 20 * 1024 * 1024, timeoutMs = 10000, redirectsLeft = 3) {
+  return new Promise((resolve, reject) => {
+    let parsed;
+    try { parsed = new URL(String(targetUrl || '')); } catch { return reject(new Error('Invalid URL')); }
+    if (parsed.protocol !== 'https:') return reject(new Error('Only HTTPS URLs are allowed'));
+    const req = https.get(parsed, { headers: { 'User-Agent': 'AntigravityPet-Panel' }, timeout: timeoutMs }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirectsLeft > 0) {
+        res.resume();
+        const nextUrl = new URL(res.headers.location, parsed).toString();
+        downloadHttpsBuffer(nextUrl, maxBytes, timeoutMs, redirectsLeft - 1).then(resolve, reject);
+        return;
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        res.resume();
+        return reject(new Error(`HTTP ${res.statusCode}`));
+      }
+      const chunks = [];
+      let total = 0;
+      res.on('data', (chunk) => {
+        total += chunk.length;
+        if (total > maxBytes) {
+          req.destroy(new Error('File exceeds maximum allowed size'));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('error', reject);
+    });
+    req.on('timeout', () => req.destroy(new Error('Request timeout')));
+    req.on('error', reject);
+  });
+}
+
+async function extractZipToDir(zipPath, extractDir) {
+  fs.mkdirSync(extractDir, { recursive: true });
+  await new Promise((resolve, reject) => {
+    if (IS_WIN) {
+      execFile('powershell.exe', ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${extractDir.replace(/'/g, "''")}' -Force`], { timeout: 15000, windowsHide: true }, (err) => (err ? reject(err) : resolve()));
+    } else {
+      execFile('unzip', ['-o', zipPath, '-d', extractDir], { timeout: 15000 }, (err) => (err ? reject(err) : resolve()));
+    }
+  });
+}
+
+export async function getCommunityPets() {
+  let manifest = null;
+  let source = 'local';
+  try {
+    const buf = await downloadHttpsBuffer(COMMUNITY_MANIFEST_URL, 1024 * 1024, 3500);
+    const parsed = JSON.parse(buf.toString('utf8'));
+    if (parsed && Array.isArray(parsed.pets)) {
+      manifest = parsed;
+      source = 'remote';
+    }
+  } catch {}
+  if (!manifest && fs.existsSync(COMMUNITY_MANIFEST_PATH)) {
+    try {
+      manifest = JSON.parse(fs.readFileSync(COMMUNITY_MANIFEST_PATH, 'utf8'));
+    } catch {}
+  }
+  const installedIds = new Set(scanPetPacks().map((p) => String(p.id || '').toLowerCase()));
+  const pets = (manifest && Array.isArray(manifest.pets) ? manifest.pets : []).map((p) => ({
+    ...p,
+    installed: installedIds.has(String(p.id || '').toLowerCase())
+  }));
+  return { ok: true, source, pets };
+}
+
 export async function importPetPack(args = {}) {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-pet-import-'));
   try {
     let sourceDir = null;
-    if (args.zipBase64) {
+    if (args.petJson && args.spritesheetBase64) {
+      const metaObj = typeof args.petJson === 'string' ? JSON.parse(args.petJson) : args.petJson;
+      const cleanPng = String(args.spritesheetBase64).replace(/^data:image\/png;base64,/, '');
+      const pngBuf = Buffer.from(cleanPng, 'base64');
+      if (pngBuf.length === 0 || pngBuf.length > 12 * 1024 * 1024) {
+        return { ok: false, error: '无效的 spritesheet PNG 数据' };
+      }
+      sourceDir = path.join(tmpRoot, 'studio');
+      fs.mkdirSync(sourceDir, { recursive: true });
+      fs.writeFileSync(path.join(sourceDir, 'pet.json'), JSON.stringify(metaObj, null, 2), 'utf8');
+      fs.writeFileSync(path.join(sourceDir, metaObj.spritesheetPath || 'spritesheet.png'), pngBuf);
+    } else if (args.zipBase64) {
       const cleanB64 = String(args.zipBase64).replace(/^data:[^;]+;base64,/, '');
       const zipPath = path.join(tmpRoot, 'pack.zip');
       const extractDir = path.join(tmpRoot, 'extracted');
       fs.writeFileSync(zipPath, Buffer.from(cleanB64, 'base64'));
-      fs.mkdirSync(extractDir, { recursive: true });
-      await new Promise((resolve, reject) => {
-        if (IS_WIN) {
-          execFile('powershell.exe', ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${extractDir.replace(/'/g, "''")}' -Force`], { timeout: 15000, windowsHide: true }, (err) => (err ? reject(err) : resolve()));
-        } else {
-          execFile('unzip', ['-o', zipPath, '-d', extractDir], { timeout: 15000 }, (err) => (err ? reject(err) : resolve()));
+      await extractZipToDir(zipPath, extractDir);
+      sourceDir = findPetManifestDir(extractDir);
+    } else if (args.zipUrl || args.localZip) {
+      const zipPath = path.join(tmpRoot, 'community.zip');
+      let downloaded = false;
+      if (args.zipUrl) {
+        try {
+          const buf = await downloadHttpsBuffer(args.zipUrl);
+          fs.writeFileSync(zipPath, buf);
+          downloaded = true;
+        } catch {}
+      }
+      if (!downloaded && args.localZip) {
+        const rel = String(args.localZip).replace(/^[\\/]+/, '');
+        const resolved = path.resolve(PLUGIN_ROOT, rel);
+        const communityRoot = path.resolve(PLUGIN_ROOT, 'community');
+        if (resolved.startsWith(communityRoot) && fs.existsSync(resolved)) {
+          fs.copyFileSync(resolved, zipPath);
+          downloaded = true;
         }
-      });
+      }
+      if (!downloaded) {
+        return { ok: false, error: '拉取社区宠物包失败，请检查网络连接' };
+      }
+      const extractDir = path.join(tmpRoot, 'extracted');
+      await extractZipToDir(zipPath, extractDir);
       sourceDir = findPetManifestDir(extractDir);
     } else if (args.localPath) {
       const lp = path.resolve(String(args.localPath));
@@ -477,14 +578,7 @@ export async function importPetPack(args = {}) {
         sourceDir = findPetManifestDir(lp);
       } else if (fs.existsSync(lp) && lp.toLowerCase().endsWith('.zip')) {
         const extractDir = path.join(tmpRoot, 'extracted');
-        fs.mkdirSync(extractDir, { recursive: true });
-        await new Promise((resolve, reject) => {
-          if (IS_WIN) {
-            execFile('powershell.exe', ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${lp.replace(/'/g, "''")}' -DestinationPath '${extractDir.replace(/'/g, "''")}' -Force`], { timeout: 15000, windowsHide: true }, (err) => (err ? reject(err) : resolve()));
-          } else {
-            execFile('unzip', ['-o', lp, '-d', extractDir], { timeout: 15000 }, (err) => (err ? reject(err) : resolve()));
-          }
-        });
+        await extractZipToDir(lp, extractDir);
         sourceDir = findPetManifestDir(extractDir);
       }
     }
@@ -519,6 +613,21 @@ export async function importPetPack(args = {}) {
   } finally {
     try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch {}
   }
+}
+
+export async function installCommunityPet(args = {}) {
+  const id = String(args.id || '').trim().toLowerCase();
+  let target = null;
+  if (id) {
+    const listRes = await getCommunityPets();
+    target = (listRes.pets || []).find((p) => String(p.id || '').toLowerCase() === id) || null;
+  }
+  const zipUrl = (target && target.zipUrl) || args.zipUrl || '';
+  const localZip = (target && target.localZip) || args.localZip || '';
+  if (!zipUrl && !localZip) {
+    return { ok: false, error: '未找到对应的社区宠物包下载地址' };
+  }
+  return await importPetPack({ zipUrl, localZip });
 }
 
 function startLocalDispatchBridge(app) {
@@ -615,6 +724,8 @@ if (isDirectRun) {
     app.api('/api/status', async () => await getSnapshot(), 'POST');
     app.api('/api/apply', async (data) => await applySetting(data || {}), 'POST');
     app.api('/api/import-pet', async (data) => await importPetPack(data || {}), 'POST');
+    app.api('/api/community-pets', async () => await getCommunityPets(), 'POST');
+    app.api('/api/install-community-pet', async (data) => await installCommunityPet(data || {}), 'POST');
     await app.run();
     console.log('[antigravity-pet panel] sidecar registered and running');
   } else {
@@ -630,15 +741,24 @@ if (isDirectRun) {
         res.end('');
         return;
       }
-      if (req.method === 'POST' && (url.pathname === '/api/status' || url.pathname === '/api/apply' || url.pathname === '/api/import-pet')) {
+      if (req.method === 'POST' && (
+        url.pathname === '/api/status' ||
+        url.pathname === '/api/apply' ||
+        url.pathname === '/api/import-pet' ||
+        url.pathname === '/api/community-pets' ||
+        url.pathname === '/api/install-community-pet'
+      )) {
         let raw = '';
         req.on('data', (c) => (raw += c));
         req.on('end', async () => {
           let data = {};
           try { if (raw) data = JSON.parse(raw); } catch {}
-          const result = url.pathname === '/api/status'
-            ? await getSnapshot()
-            : (url.pathname === '/api/import-pet' ? await importPetPack(data) : await applySetting(data));
+          let result;
+          if (url.pathname === '/api/status') result = await getSnapshot();
+          else if (url.pathname === '/api/import-pet') result = await importPetPack(data);
+          else if (url.pathname === '/api/community-pets') result = await getCommunityPets();
+          else if (url.pathname === '/api/install-community-pet') result = await installCommunityPet(data);
+          else result = await applySetting(data);
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify(result));
         });

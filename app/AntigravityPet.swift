@@ -26,7 +26,44 @@ struct PetConfig: Codable {
     var ToolCallsCount: Int = 0
     var SnapToAgy: Bool = false
     var HideOnFullscreen: Bool = true
+    var CheckUpdatesOnStartup: Bool = true
     var Accessory: String = "auto"
+
+    init() {}
+
+    enum CodingKeys: String, CodingKey {
+        case Enabled, Skin, Left, Top, Topmost, BubbleMode, BubbleStyle
+        case PinnedConversationId, ReadyTimeoutSec, Scale, AutoWalk, EyeFollow
+        case AutoStartOnBoot, SoundAlert, Language, AgyDetectedLocale
+        case CompletedTasksCount, ToolCallsCount, SnapToAgy, HideOnFullscreen
+        case CheckUpdatesOnStartup, Accessory
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        Enabled = (try? c.decodeIfPresent(Bool.self, forKey: .Enabled)) ?? true
+        Skin = (try? c.decodeIfPresent(String.self, forKey: .Skin)) ?? "cyber-fox"
+        Left = (try? c.decodeIfPresent(Double.self, forKey: .Left)) ?? -1
+        Top = (try? c.decodeIfPresent(Double.self, forKey: .Top)) ?? -1
+        Topmost = (try? c.decodeIfPresent(Bool.self, forKey: .Topmost)) ?? true
+        BubbleMode = (try? c.decodeIfPresent(String.self, forKey: .BubbleMode)) ?? "always"
+        BubbleStyle = (try? c.decodeIfPresent(String.self, forKey: .BubbleStyle)) ?? "simple"
+        PinnedConversationId = (try? c.decodeIfPresent(String.self, forKey: .PinnedConversationId)) ?? ""
+        ReadyTimeoutSec = (try? c.decodeIfPresent(Int.self, forKey: .ReadyTimeoutSec)) ?? 30
+        Scale = (try? c.decodeIfPresent(Double.self, forKey: .Scale)) ?? 1.0
+        AutoWalk = (try? c.decodeIfPresent(Bool.self, forKey: .AutoWalk)) ?? true
+        EyeFollow = (try? c.decodeIfPresent(Bool.self, forKey: .EyeFollow)) ?? true
+        AutoStartOnBoot = (try? c.decodeIfPresent(Bool.self, forKey: .AutoStartOnBoot)) ?? true
+        SoundAlert = (try? c.decodeIfPresent(Bool.self, forKey: .SoundAlert)) ?? false
+        Language = (try? c.decodeIfPresent(String.self, forKey: .Language)) ?? "auto"
+        AgyDetectedLocale = (try? c.decodeIfPresent(String.self, forKey: .AgyDetectedLocale)) ?? ""
+        CompletedTasksCount = (try? c.decodeIfPresent(Int.self, forKey: .CompletedTasksCount)) ?? 0
+        ToolCallsCount = (try? c.decodeIfPresent(Int.self, forKey: .ToolCallsCount)) ?? 0
+        SnapToAgy = (try? c.decodeIfPresent(Bool.self, forKey: .SnapToAgy)) ?? false
+        HideOnFullscreen = (try? c.decodeIfPresent(Bool.self, forKey: .HideOnFullscreen)) ?? true
+        CheckUpdatesOnStartup = (try? c.decodeIfPresent(Bool.self, forKey: .CheckUpdatesOnStartup)) ?? true
+        Accessory = (try? c.decodeIfPresent(String.self, forKey: .Accessory)) ?? "auto"
+    }
 }
 
 struct PetPack {
@@ -288,6 +325,28 @@ final class PetCanvasView: NSView {
             denyStr.draw(in: NSRect(x: denyRect.minX + (btnW - denyStr.size().width) / 2.0, y: denyRect.minY + 3.0, width: btnW, height: 16.0))
             approvalHitRects.append((allowRect, "allow"))
             approvalHitRects.append((denyRect, "deny"))
+            return
+        }
+
+        if ctrl.isUpdatingSelf || !ctrl.availableUpdateVersion.isEmpty {
+            let isEn = I18n.effectiveLanguage(config: ctrl.config) == "en"
+            let label = ctrl.isUpdatingSelf && !ctrl.selfUpdateStatusMsg.isEmpty
+                ? ctrl.selfUpdateStatusMsg
+                : (isEn ? "New release v\(ctrl.availableUpdateVersion) · Click to update" : "发现新版本 v\(ctrl.availableUpdateVersion) · 点击一键更新")
+            let font = NSFont.monospacedSystemFont(ofSize: 11.0, weight: .bold)
+            let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+            let attrStr = NSAttributedString(string: label, attributes: attrs)
+            let textSize = attrStr.size()
+            let padX: CGFloat = 12.0
+            let padY: CGFloat = 6.0
+            let bw = min(bounds.width - 12.0, max(150.0, textSize.width + padX * 2))
+            let bh = max(28.0, ceil(textSize.height) + padY * 2)
+            let bx = (bounds.width - bw) / 2.0
+            let by = max(8.0, spriteY - bh - 10.0)
+            let rect = NSRect(x: bx, y: by, width: bw, height: bh)
+            drawPixelBox(rect: rect, fill: NSColor(calibratedRed: 0.18, green: 0.06, blue: 0.40, alpha: 0.96), border: NSColor(calibratedRed: 0.66, green: 0.33, blue: 0.97, alpha: 1.0), lineWidth: 2.0)
+            attrStr.draw(in: NSRect(x: bx + padX, y: by + (bh - textSize.height) / 2.0, width: bw - padX * 2, height: textSize.height + 2.0))
+            bubbleHitRects.append((rect, "__self_update__"))
             return
         }
 
@@ -614,7 +673,11 @@ final class PetCanvasView: NSView {
             } else if let hit = bubbleHitRects.first(where: { $0.0.contains(pt) }) {
                 pendingClickWork?.cancel()
                 pendingClickWork = nil
-                controller?.openConversation(hit.1)
+                if hit.1 == "__self_update__" {
+                    controller?.performSelfUpdate()
+                } else {
+                    controller?.openConversation(hit.1)
+                }
             } else if event.clickCount >= 2 {
                 pendingClickWork?.cancel()
                 pendingClickWork = nil
@@ -689,6 +752,12 @@ final class PetController: NSObject, NSApplicationDelegate {
     let port: UInt16 = 47821
     var serverSocket: Int32 = -1
     var hotKeyRef: EventHotKeyRef?
+    var httpBridgeToken: String = ""
+    var availableUpdateVersion: String = ""
+    var availableUpdateZipUrl: String = ""
+    var updatePromptShownAt: Date = Date.distantPast
+    var isUpdatingSelf: Bool = false
+    var selfUpdateStatusMsg: String = ""
 
     lazy var pluginRoot: URL = {
         let exeUrl = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
@@ -731,6 +800,9 @@ final class PetController: NSObject, NSApplicationDelegate {
         agyCheckTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { [weak self] _ in
             self?.checkAntigravityAlive()
         }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.checkGitHubReleaseIfNeeded()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -747,7 +819,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             return
         }
         config = decoded
-        if !config.Scale.isFinite || config.Scale < 0.5 || config.Scale > 2.5 { config.Scale = 1.0 }
+        if !config.Scale.isFinite || config.Scale < 0.33 || config.Scale > 3.0 { config.Scale = 1.0 }
         if !config.Left.isFinite { config.Left = -1 }
         if !config.Top.isFinite { config.Top = -1 }
     }
@@ -872,7 +944,8 @@ final class PetController: NSObject, NSApplicationDelegate {
     }
 
     func applyScale(_ newScale: Double) {
-        let s = min(2.0, max(0.6, newScale))
+        let clamped = min(3.0, max(0.33, newScale))
+        let s = (clamped * 100.0).rounded() / 100.0
         config.Scale = s
         let oldFrame = window.frame
         let sz = windowSizeForScale(s)
@@ -926,10 +999,9 @@ final class PetController: NSObject, NSApplicationDelegate {
     }
 
     func handleLeftClick() {
-        overrideRow = PetAnimRow.wave.rawValue
+        overrideRow = Bool.random() ? PetAnimRow.jump.rawValue : PetAnimRow.wave.rawValue
         overrideUntil = Date().addingTimeInterval(0.9)
-        let targetId = activeConvId != "default" ? activeConvId : lastConvId
-        openConversation(targetId)
+        canvasView.needsDisplay = true
     }
 
     func openConversation(_ convId: String) {
@@ -1194,8 +1266,17 @@ final class PetController: NSObject, NSApplicationDelegate {
         lastTick = now
         animTime += dt
 
+        if !availableUpdateVersion.isEmpty && !isUpdatingSelf && config.ReadyTimeoutSec > 0 {
+            if now.timeIntervalSince(updatePromptShownAt) >= Double(config.ReadyTimeoutSec) {
+                availableUpdateVersion = ""
+                availableUpdateZipUrl = ""
+                canvasView.needsDisplay = true
+                syncWindowSizeForBubbles()
+            }
+        }
+
         let st = currentEffectiveState()
-        let urgentState = (st == "ready" || st == "needs_input" || st == "blocked" || currentApproval != nil)
+        let urgentState = (st == "ready" || st == "needs_input" || st == "blocked" || currentApproval != nil || !availableUpdateVersion.isEmpty || isUpdatingSelf)
         var restAngle: CGFloat = 0.0
         if !isDragging && !dockSide.isEmpty && !fullscreenPeekActive {
             let hoverAllowed = now >= dockIgnoreHoverUntil
@@ -1472,35 +1553,19 @@ final class PetController: NSObject, NSApplicationDelegate {
         dispatchItem.target = self
         menu.addItem(dispatchItem)
 
-        let accMenu = NSMenu()
-        let accOpts: [(String, String)] = [
-            ("auto", isEn ? "Auto Unlock" : "自动解锁"),
-            ("none", isEn ? "None" : "不佩戴"),
-            ("glasses", isEn ? "Pixel Glasses (5+)" : "像素墨镜 (5+)"),
-            ("cap", isEn ? "Dev Cap (20+)" : "开发者鸭舌帽 (20+)"),
-            ("coffee", isEn ? "Coffee Cup (50+)" : "咖啡杯 (50+)"),
-            ("crown", isEn ? "Gold Crown (100+)" : "黄金皇冠 (100+)")
-        ]
-        for (k, label) in accOpts {
-            let mi = NSMenuItem(title: label, action: #selector(menuSelectAccessory(_:)), keyEquivalent: "")
-            mi.representedObject = k
-            mi.state = (config.Accessory.lowercased() == k) ? .on : .off
-            mi.target = self
-            accMenu.addItem(mi)
-        }
-        let accRoot = NSMenuItem(title: isEn ? "Accessory" : "成长配饰", action: nil, keyEquivalent: "")
-        accRoot.submenu = accMenu
-        menu.addItem(accRoot)
+        let dockLeftItem = NSMenuItem(title: isEn ? "Dock Left" : "左贴边隐藏", action: #selector(menuDockLeft), keyEquivalent: "")
+        dockLeftItem.state = (dockSide == "left") ? .on : .off
+        dockLeftItem.target = self
+        menu.addItem(dockLeftItem)
 
-        let snapItem = NSMenuItem(title: isEn ? "Snap to Antigravity" : "吸附 Antigravity 窗口", action: #selector(menuToggleSnap), keyEquivalent: "")
-        snapItem.state = config.SnapToAgy ? .on : .off
-        snapItem.target = self
-        menu.addItem(snapItem)
+        let dockRightItem = NSMenuItem(title: isEn ? "Dock Right" : "右贴边隐藏", action: #selector(menuDockRight), keyEquivalent: "")
+        dockRightItem.state = (dockSide == "right") ? .on : .off
+        dockRightItem.target = self
+        menu.addItem(dockRightItem)
 
-        let fsItem = NSMenuItem(title: isEn ? "Hide on Fullscreen" : "全屏自动隐身", action: #selector(menuToggleFullscreen), keyEquivalent: "")
-        fsItem.state = config.HideOnFullscreen ? .on : .off
-        fsItem.target = self
-        menu.addItem(fsItem)
+        let settingsItem = NSMenuItem(title: isEn ? "Settings (Antigravity)..." : "设置 (Antigravity 面板)...", action: #selector(menuOpenSettingsHint), keyEquivalent: "")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
 
         menu.addItem(.separator())
 
@@ -1515,6 +1580,24 @@ final class PetController: NSObject, NSApplicationDelegate {
         menu.addItem(quitItem)
 
         NSMenu.popUpContextMenu(menu, with: event, for: view)
+    }
+
+    @objc func menuDockLeft() {
+        dockSide = "left"; dockPeekOut = false
+        dockIgnoreHoverUntil = Date().addingTimeInterval(0.7)
+        window.setFrameOrigin(NSPoint(x: dockedTargetX(side: "left", peekOut: false), y: window.frame.origin.y))
+        canvasView.needsDisplay = true
+    }
+
+    @objc func menuDockRight() {
+        dockSide = "right"; dockPeekOut = false
+        dockIgnoreHoverUntil = Date().addingTimeInterval(0.7)
+        window.setFrameOrigin(NSPoint(x: dockedTargetX(side: "right", peekOut: false), y: window.frame.origin.y))
+        canvasView.needsDisplay = true
+    }
+
+    @objc func menuOpenSettingsHint() {
+        openConversation("")
     }
 
     @objc func menuSelectSkin(_ sender: NSMenuItem) {
@@ -1615,6 +1698,7 @@ final class PetController: NSObject, NSApplicationDelegate {
                 return
             }
             self.serverSocket = fd
+            self.writeHttpBridgeInfo()
 
             while true {
                 let client = Darwin.accept(fd, nil, nil)
@@ -1623,6 +1707,17 @@ final class PetController: NSObject, NSApplicationDelegate {
                     self.handleClient(client)
                 }
             }
+        }
+    }
+
+    func writeHttpBridgeInfo() {
+        let token = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        httpBridgeToken = token
+        let bridgeDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".antigravity-pet")
+        try? FileManager.default.createDirectory(at: bridgeDir, withIntermediateDirectories: true)
+        let info: [String: Any] = ["port": Int(port), "token": token]
+        if let data = try? JSONSerialization.data(withJSONObject: info) {
+            try? data.write(to: bridgeDir.appendingPathComponent("http-bridge.json"))
         }
     }
 
@@ -1642,9 +1737,13 @@ final class PetController: NSObject, NSApplicationDelegate {
         let path = (reqLine.count > 1 ? reqLine[1] : "/").components(separatedBy: "?").first ?? "/"
 
         var contentLength = 0
+        var headerToken = ""
         for line in lines.dropFirst() {
-            if line.lowercased().hasPrefix("content-length:") {
+            let lower = line.lowercased()
+            if lower.hasPrefix("content-length:") {
                 contentLength = Int(line.dropFirst(15).trimmingCharacters(in: .whitespaces)) ?? 0
+            } else if lower.hasPrefix("x-pet-token:") {
+                headerToken = String(line.dropFirst(12)).trimmingCharacters(in: .whitespaces)
             }
         }
         while bodyStr.utf8.count < contentLength {
@@ -1660,6 +1759,12 @@ final class PetController: NSObject, NSApplicationDelegate {
         }
 
         if path == "/approval" && method == "POST" {
+            let bodyToken = (jsonBody["token"] as? String) ?? ""
+            let reqToken = !headerToken.isEmpty ? headerToken : bodyToken
+            if !httpBridgeToken.isEmpty && reqToken != httpBridgeToken {
+                sendHttpResponse(client, status: "403 Forbidden", body: "{\"ok\":false,\"error\":\"forbidden\"}")
+                return
+            }
             let toolName = (jsonBody["toolName"] as? String) ?? "Tool"
             let summary = (jsonBody["summary"] as? String) ?? ""
             let cid = (jsonBody["conversationId"] as? String) ?? "default"
@@ -1834,8 +1939,30 @@ final class PetController: NSObject, NSApplicationDelegate {
                 config.HideOnFullscreen = (val.lowercased() == "true" || val == "1"); saveConfig()
             case "accessory":
                 config.Accessory = val.isEmpty ? "auto" : val.lowercased(); saveConfig()
+            case "checkupdatesonstartup":
+                config.CheckUpdatesOnStartup = (val.lowercased() == "true" || val == "1"); saveConfig()
+            case "dockleft":
+                dockSide = "left"; dockPeekOut = false
+                dockIgnoreHoverUntil = Date().addingTimeInterval(0.7)
+                window.setFrameOrigin(NSPoint(x: dockedTargetX(side: "left", peekOut: false), y: window.frame.origin.y))
+            case "dockright":
+                dockSide = "right"; dockPeekOut = false
+                dockIgnoreHoverUntil = Date().addingTimeInterval(0.7)
+                window.setFrameOrigin(NSPoint(x: dockedTargetX(side: "right", peekOut: false), y: window.frame.origin.y))
             case "quickdispatch":
                 DispatchQueue.main.async { self.showQuickDispatchWindow() }
+            case "updateconfig":
+                if let sk = body["skin"] as? String, packs[sk] != nil { config.Skin = sk }
+                if let sc = body["scale"] as? Double { applyScale(sc) }
+                if let bm = body["bubbleMode"] as? String { config.BubbleMode = bm }
+                if let lg = body["language"] as? String { config.Language = lg.lowercased() }
+                if let aw = body["autoWalk"] as? Bool { config.AutoWalk = aw }
+                if let ef = body["eyeFollow"] as? Bool { config.EyeFollow = ef }
+                if let tm = body["topmost"] as? Bool { config.Topmost = tm; window.level = tm ? .floating : .normal }
+                if let ab = body["autoStartOnBoot"] as? Bool { config.AutoStartOnBoot = ab }
+                if let cu = body["checkUpdatesOnStartup"] as? Bool { config.CheckUpdatesOnStartup = cu }
+                if let sa = body["soundAlert"] as? Bool { config.SoundAlert = sa }
+                saveConfig()
             default: break
             }
             canvasView.needsDisplay = true
@@ -1885,6 +2012,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             "eyeFollow": config.EyeFollow,
             "topmost": config.Topmost,
             "autoStartOnBoot": config.AutoStartOnBoot,
+            "checkUpdatesOnStartup": config.CheckUpdatesOnStartup,
             "soundAlert": config.SoundAlert,
             "language": config.Language,
             "effectiveLanguage": lang,
@@ -1898,6 +2026,122 @@ final class PetController: NSObject, NSApplicationDelegate {
             "recentConversations": recentConversations,
             "availablePets": petsList
         ]
+    }
+
+    // MARK: Startup Version Check & Self-Update
+
+    func currentPluginVersion() -> String {
+        let pUrl = pluginRoot.appendingPathComponent("plugin.json")
+        if let data = try? Data(contentsOf: pUrl),
+           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let ver = obj["version"] as? String {
+            return ver
+        }
+        return "0.0.0"
+    }
+
+    func compareSemver(_ a: String, _ b: String) -> Int {
+        let pa = a.trimmingCharacters(in: CharacterSet(charactersIn: "vV ")).split(separator: ".").map { Int($0) ?? 0 }
+        let pb = b.trimmingCharacters(in: CharacterSet(charactersIn: "vV ")).split(separator: ".").map { Int($0) ?? 0 }
+        let n = max(pa.count, pb.count)
+        for i in 0..<n {
+            let va = i < pa.count ? pa[i] : 0
+            let vb = i < pb.count ? pb[i] : 0
+            if va != vb { return va < vb ? -1 : 1 }
+        }
+        return 0
+    }
+
+    func checkGitHubReleaseIfNeeded() {
+        guard config.CheckUpdatesOnStartup else { return }
+        guard let url = URL(string: "https://api.github.com/repos/Wlaeg/antigravity-pet/releases/latest") else { return }
+        var req = URLRequest(url: url, timeoutInterval: 6.0)
+        req.setValue("AntigravityPet-macOS", forHTTPHeaderField: "User-Agent")
+        URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
+            guard let self = self, let data = data,
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let tag = obj["tag_name"] as? String else { return }
+            let latest = tag.trimmingCharacters(in: CharacterSet(charactersIn: "vV "))
+            let cur = self.currentPluginVersion()
+            guard self.compareSemver(cur, latest) < 0 else { return }
+            var zipUrl = (obj["zipball_url"] as? String) ?? ""
+            if let assets = obj["assets"] as? [[String: Any]] {
+                for ast in assets {
+                    if let name = ast["name"] as? String, name.hasSuffix(".zip"),
+                       let dl = ast["browser_download_url"] as? String {
+                        zipUrl = dl
+                        break
+                    }
+                }
+            }
+            guard !zipUrl.isEmpty else { return }
+            DispatchQueue.main.async {
+                self.availableUpdateVersion = latest
+                self.availableUpdateZipUrl = zipUrl
+                self.updatePromptShownAt = Date()
+                self.canvasView.needsDisplay = true
+                self.syncWindowSizeForBubbles()
+            }
+        }.resume()
+    }
+
+    func performSelfUpdate() {
+        guard !isUpdatingSelf, let dlUrl = URL(string: availableUpdateZipUrl) else { return }
+        isUpdatingSelf = true
+        let isEn = I18n.effectiveLanguage(config: config) == "en"
+        selfUpdateStatusMsg = isEn ? "Downloading v\(availableUpdateVersion)..." : "正在下载 v\(availableUpdateVersion)..."
+        canvasView.needsDisplay = true
+        syncWindowSizeForBubbles()
+
+        var req = URLRequest(url: dlUrl, timeoutInterval: 30.0)
+        req.setValue("AntigravityPet-macOS", forHTTPHeaderField: "User-Agent")
+        URLSession.shared.downloadTask(with: req) { [weak self] tmpFile, _, err in
+            guard let self = self else { return }
+            if let err = err ?? (tmpFile == nil ? NSError(domain: "update", code: -1) : nil), tmpFile == nil {
+                DispatchQueue.main.async {
+                    self.isUpdatingSelf = false
+                    self.selfUpdateStatusMsg = ""
+                    self.canvasView.needsDisplay = true
+                    _ = err
+                }
+                return
+            }
+            guard let tmpFile = tmpFile else { return }
+            let stageDir = FileManager.default.temporaryDirectory.appendingPathComponent("agy-pet-update-\(UUID().uuidString)")
+            try? FileManager.default.createDirectory(at: stageDir, withIntermediateDirectories: true)
+            let zipDst = stageDir.appendingPathComponent("update.zip")
+            try? FileManager.default.moveItem(at: tmpFile, to: zipDst)
+
+            let script = """
+            #!/bin/bash
+            sleep 0.6
+            unzip -o -q "\(zipDst.path)" -d "\(stageDir.path)/out"
+            SRC="\(stageDir.path)/out"
+            if [ ! -f "$SRC/plugin.json" ]; then
+              SUB=$(find "$SRC" -maxdepth 2 -name "plugin.json" -print -quit)
+              if [ -n "$SUB" ]; then SRC=$(dirname "$SUB"); fi
+            fi
+            if [ -f "$SRC/plugin.json" ]; then
+              cp -R "$SRC"/* "\(self.pluginRoot.path)/"
+              if [ -f "\(self.pluginRoot.path)/build.sh" ]; then
+                bash "\(self.pluginRoot.path)/build.sh" --launch >/dev/null 2>&1 &
+              fi
+            fi
+            rm -rf "\(stageDir.path)"
+            """
+            let shPath = stageDir.appendingPathComponent("apply.sh")
+            try? script.write(to: shPath, atomically: true, encoding: .utf8)
+
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/bin/bash")
+            proc.arguments = [shPath.path]
+            try? proc.run()
+
+            DispatchQueue.main.async {
+                self.saveConfig()
+                NSApp.terminate(nil)
+            }
+        }.resume()
     }
 }
 
