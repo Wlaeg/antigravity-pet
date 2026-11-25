@@ -464,7 +464,7 @@ const TOOLS = [
       properties: {
         action: { type: 'string', description: 'Optional: start/show/hide/quit/toggle/status/resetPos/openConversation' },
         skin: { type: 'string', description: 'Pet ID: cyber-fox/astro-bot/shadow-cat/byte-ghost/shiba-dog/pixel-dragon/android-bugdroid/flutter-dash' },
-        scale: { type: 'number', description: 'Scale: 0.75/1.0/1.3/1.5' },
+        scale: { type: 'number', description: 'Scale factor: 0.33 to 3.0 (default 1.0)' },
         bubbleMode: { type: 'string', description: 'Bubble mode: always/alerts/off' },
         language: { type: 'string', description: 'Language: auto/en/zh' },
         autoWalk: { type: 'boolean', description: 'Idle roaming toggle' },

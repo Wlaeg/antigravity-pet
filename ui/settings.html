@@ -86,6 +86,28 @@
     font-variant-numeric: tabular-nums; text-align: center; outline: none;
   }
   .num-input:focus { border-color: var(--accent); }
+  .slider-wrap { display: inline-flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+  .slider-edge { font-family: var(--mono); font-size: 11px; color: var(--fg-2); font-variant-numeric: tabular-nums; user-select: none; }
+  .scale-slider {
+    -webkit-appearance: none; appearance: none;
+    width: 140px; height: 4px; border-radius: 4px;
+    background: var(--line-strong); outline: none; cursor: pointer;
+  }
+  .scale-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+    cursor: pointer; transition: transform .12s ease;
+  }
+  .scale-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+  .scale-slider:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+  .scale-val-btn {
+    min-width: 52px; padding: 4px 8px; border-radius: 4px;
+    border: 1px solid var(--line); background: var(--surface);
+    color: var(--fg); font-family: var(--mono); font-size: 12px; font-weight: 600;
+    font-variant-numeric: tabular-nums; text-align: center;
+  }
+  .scale-val-btn:hover { border-color: var(--accent); color: var(--accent-soft); }
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); overflow: hidden; }
   .stat-box { padding: 12px; border-right: 1px solid var(--line); }
   .stat-box:last-child { border-right: none; }
@@ -202,11 +224,11 @@
     </div>
     <div class="seg-row">
       <div><div class="seg-label" data-i18n="sizeLabel">Window Scale</div><div class="seg-sub" data-i18n="sizeSub">Adjust floating pet sprite dimensions</div></div>
-      <div class="seg-btns" id="scaleBtns">
-        <button data-scale="0.75" onclick="setOpt('scale', '0.75')">0.75x</button>
-        <button data-scale="1" onclick="setOpt('scale', '1')">1.0x</button>
-        <button data-scale="1.3" onclick="setOpt('scale', '1.3')">1.3x</button>
-        <button data-scale="1.5" onclick="setOpt('scale', '1.5')">1.5x</button>
+      <div class="slider-wrap">
+        <span class="slider-edge">0.33x</span>
+        <input type="range" class="scale-slider" id="scaleSlider" min="-100" max="100" step="1" value="0" onpointerdown="window._scaleDragging=true" onpointerup="window._scaleDragging=false" oninput="onScaleInput(this.value)" onchange="onScaleCommit(this.value)" />
+        <span class="slider-edge">3.0x</span>
+        <button type="button" class="scale-val-btn" id="scaleValBtn" onclick="resetScale()" title="Reset to 1.00x">1.00x</button>
       </div>
     </div>
     <div class="seg-row">
@@ -447,7 +469,12 @@
     });
 
     var sc = Number(data.scale || 1);
-    document.querySelectorAll('#scaleBtns button').forEach(function (b) { b.classList.toggle('active', Math.abs(Number(b.getAttribute('data-scale')) - sc) < 0.05); });
+    if (!window._scaleDragging) {
+      var sl = document.getElementById('scaleSlider');
+      var vb = document.getElementById('scaleValBtn');
+      if (sl) sl.value = String(scaleToSlider(sc));
+      if (vb) vb.textContent = sc.toFixed(2) + 'x';
+    }
 
     var bm = data.bubbleMode || 'always';
     document.querySelectorAll('#bubbleBtns button').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-bubble') === bm); });
@@ -516,6 +543,45 @@
       return res;
     });
   }
+
+  window._scaleDragging = false;
+  var _scalePreviewTimer = null;
+  function sliderToScale(v) {
+    var n = Number(v) || 0;
+    if (Math.abs(n) <= 2) return 1.0;
+    var s = Math.pow(3, n / 100);
+    return Math.max(0.33, Math.min(3.0, Math.round(s * 100) / 100));
+  }
+  function scaleToSlider(s) {
+    var clamped = Math.max(0.33, Math.min(3.0, Number(s) || 1.0));
+    return Math.round(Math.log(clamped) / Math.log(3) * 100);
+  }
+  window.onScaleInput = function (val) {
+    window._scaleDragging = true;
+    var sc = sliderToScale(val);
+    var vb = document.getElementById('scaleValBtn');
+    if (vb) vb.textContent = sc.toFixed(2) + 'x';
+    if (_scalePreviewTimer) clearTimeout(_scalePreviewTimer);
+    _scalePreviewTimer = setTimeout(function () {
+      callPetTool({ action: 'scale', value: String(sc) }, true).catch(function () {});
+    }, 60);
+  };
+  window.onScaleCommit = function (val) {
+    if (_scalePreviewTimer) { clearTimeout(_scalePreviewTimer); _scalePreviewTimer = null; }
+    window._scaleDragging = false;
+    var sc = sliderToScale(val);
+    var vb = document.getElementById('scaleValBtn');
+    if (vb) vb.textContent = sc.toFixed(2) + 'x';
+    window.setOpt('scale', String(sc));
+  };
+  window.resetScale = function () {
+    window._scaleDragging = false;
+    var sl = document.getElementById('scaleSlider');
+    var vb = document.getElementById('scaleValBtn');
+    if (sl) sl.value = '0';
+    if (vb) vb.textContent = '1.00x';
+    window.setOpt('scale', '1');
+  };
 
   window.act = function (action) { callPetTool({ action: action }); };
   window.setOpt = function (key, value) { callPetTool({ action: key, value: String(value) }); };

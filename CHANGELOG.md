@@ -5,6 +5,16 @@ All notable changes to **Antigravity Pet** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.1] - 2026-11-25
+
+### Fixed
+- **Windows DPI-Aware Pet Sizing (`app/AntigravityPet.cs`)**:
+  - Enabled Per-Monitor V2 DPI awareness on startup (`EnablePerMonitorDpiAwareness`) and removed the inverse `1 / dpi` layout and window dimension scaling in `ApplyScale`, `SetWindowSizeKeepingAnchor`, `OnAnimTick`, and `IsCursorInDockedZone`, so the pet scales naturally with Windows DPI settings and maintains a consistent visual size across 100%, 125%, 150%, and 200% DPI displays.
+
+### Changed
+- **3x Logarithmic Scale Slider in Settings UI (`ui/settings.html`, `scripts/pet-mcp-server.mjs`)**:
+  - Replaced discrete size preset buttons in the MCP App settings view (`ui/settings.html`) with the continuous `0.33x`–`3.00x` logarithmic slider (matching the sidecar panel, with live preview and one-click `1.00x` reset), and updated the MCP `scale` schema description accordingly.
+
 ## [4.1.0] - 2026-11-25
 
 ### Added

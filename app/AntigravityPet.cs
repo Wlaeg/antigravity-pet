@@ -53,7 +53,7 @@ namespace AntigravityPet
         public bool SnapToAgy { get; set; }
         public bool HideOnFullscreen { get; set; }
         public string Accessory { get; set; }    // auto | none | glasses | cap | coffee | crown
-        public double Scale { get; set; }       // 0.75 | 1.0 | 1.3 | 1.5
+        public double Scale { get; set; }       // 0.33 ~ 3.0 (default 1.0)
         public bool AutoWalk { get; set; }
         public bool EyeFollow { get; set; }
         public bool AutoStartOnBoot { get; set; }
@@ -158,6 +158,9 @@ namespace AntigravityPet
         [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
         [DllImport("user32.dll")] private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
         [DllImport("shell32.dll")] private static extern int SHQueryUserNotificationState(out int pquns);
+        [DllImport("user32.dll")] private static extern bool SetProcessDpiAwarenessContext(IntPtr dpiContext);
+        [DllImport("shcore.dll")] private static extern int SetProcessDpiAwareness(int value);
+        [DllImport("user32.dll")] private static extern bool SetProcessDPIAware();
 
         private const uint MONITOR_DEFAULTTONEAREST = 2;
 
@@ -626,6 +629,7 @@ namespace AntigravityPet
                 }
             }
             try { SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged; } catch { }
+            ApplyScale(_config.Scale, false);
             EnsureInsideScreenBounds(false);
             if (_config.CheckUpdatesOnStartup) CheckGitHubReleaseAsync();
         }
@@ -635,7 +639,11 @@ namespace AntigravityPet
             if (_isClosing) return;
             try
             {
-                Dispatcher.BeginInvoke(new Action(() => EnsureInsideScreenBounds(true)));
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    ApplyScale(_config.Scale, false);
+                    EnsureInsideScreenBounds(true);
+                }));
             }
             catch { }
         }
@@ -667,7 +675,11 @@ namespace AntigravityPet
             }
             else if (msg == WM_DISPLAYCHANGE || msg == WM_DPICHANGED)
             {
-                Dispatcher.BeginInvoke(new Action(() => EnsureInsideScreenBounds(true)));
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    ApplyScale(_config.Scale, false);
+                    EnsureInsideScreenBounds(true);
+                }));
             }
             return IntPtr.Zero;
         }
@@ -733,32 +745,62 @@ namespace AntigravityPet
             if (save) SaveConfig();
         }
 
+        private double GetDpiScale()
+        {
+            try
+            {
+                var src = PresentationSource.FromVisual(this);
+                if (src != null && src.CompositionTarget != null)
+                {
+                    double m11 = src.CompositionTarget.TransformToDevice.M11;
+                    if (m11 > 0.1) return m11;
+                }
+            }
+            catch { }
+            try
+            {
+                using (var g = System.Drawing.Graphics.FromHwnd(IntPtr.Zero))
+                {
+                    if (g.DpiX > 10) return g.DpiX / 96.0;
+                }
+            }
+            catch { }
+            return 1.0;
+        }
+
         private void ApplyScale(double scale, bool save)
         {
-            if (scale < 0.5 || scale > 2.0) scale = 1.0;
-            _config.Scale = scale;
-            _baseWindowHeight = Math.Round(BaseHeight * scale);
-            Width = Math.Round(BaseWidth * scale);
+            if (double.IsNaN(scale) || double.IsInfinity(scale) || scale <= 0) scale = 1.0;
+            if (scale < 0.33) scale = 0.33;
+            if (scale > 3.0) scale = 3.0;
+            _config.Scale = Math.Round(scale, 2);
+            if (_rootGrid != null)
+            {
+                _rootGrid.LayoutTransform = Transform.Identity;
+            }
+            _baseWindowHeight = Math.Round(BaseHeight * _config.Scale);
+            Width = Math.Round(BaseWidth * _config.Scale);
             if (!_bubbleExpanded)
             {
-                Height = _baseWindowHeight;
+                Height = Math.Round(_baseWindowHeight);
             }
-            _stageGrid.Width = Math.Round(BaseSpriteBox * scale);
-            _stageGrid.Height = Math.Round(BaseSpriteBox * scale);
-            _spriteImage.Width = Math.Round(BaseSpriteBox * scale);
-            _spriteImage.Height = Math.Round(BaseSpriteBox * scale);
-            _statusHalo.Width = Math.Round(116 * scale);
-            _statusHalo.Height = Math.Round(116 * scale);
-            _floorShadow.Width = Math.Round(74 * scale);
-            _floorShadow.Height = Math.Round(14 * scale);
-            _bubbleText.MaxWidth = Math.Round((BaseWidth - 28) * scale);
-            _bubbleHost.Margin = new Thickness(4, 4, 4, Math.Round(-2 * scale));
-            double badgeSize = Math.Round(22 * scale);
+            _stageGrid.Width = Math.Round(BaseSpriteBox * _config.Scale);
+            _stageGrid.Height = Math.Round(BaseSpriteBox * _config.Scale);
+            _spriteImage.Width = Math.Round(BaseSpriteBox * _config.Scale);
+            _spriteImage.Height = Math.Round(BaseSpriteBox * _config.Scale);
+            _statusHalo.Width = Math.Round(116 * _config.Scale);
+            _statusHalo.Height = Math.Round(116 * _config.Scale);
+            _floorShadow.Width = Math.Round(74 * _config.Scale);
+            _floorShadow.Height = Math.Round(14 * _config.Scale);
+            _bubbleText.MaxWidth = Math.Round((BaseWidth - 28) * _config.Scale);
+            _bubbleHost.Margin = new Thickness(4, 4, 4, Math.Round(-2 * _config.Scale));
+            double badgeSize = Math.Round(22 * _config.Scale);
             _badgeBorder.Width = badgeSize;
             _badgeBorder.Height = badgeSize;
             _badgeBorder.CornerRadius = new CornerRadius(badgeSize / 2.0);
-            _badgeBorder.Margin = new Thickness(0, Math.Round(12 * scale), Math.Round(8 * scale), 0);
-            _badgeText.FontSize = Math.Max(9.0, Math.Round(11 * scale));
+            _badgeBorder.Margin = new Thickness(0, Math.Round(12 * _config.Scale), Math.Round(8 * _config.Scale), 0);
+            _badgeText.FontSize = Math.Max(9.0, Math.Round(11 * _config.Scale));
+            if (IsLoaded) UpdateVisualState();
             ClampToWorkArea();
             if (save) SaveConfig();
         }
@@ -2562,12 +2604,14 @@ namespace AntigravityPet
             double baseW = Math.Round(BaseWidth * _config.Scale);
             if (targetWidth < baseW) targetWidth = baseW;
             if (targetHeight < _baseWindowHeight) targetHeight = _baseWindowHeight;
-            if (Math.Abs(Width - targetWidth) < 0.5 && Math.Abs(Height - targetHeight) < 0.5) return;
+            double winW = Math.Round(targetWidth);
+            double winH = Math.Round(targetHeight);
+            if (Math.Abs(Width - winW) < 0.5 && Math.Abs(Height - winH) < 0.5) return;
 
             double centerX = Left + Width * 0.5;
             double bottom = Top + Height;
-            Width = targetWidth;
-            Height = targetHeight;
+            Width = winW;
+            Height = winH;
 
             double vsLeft = SystemParameters.VirtualScreenLeft;
             double vsTop = SystemParameters.VirtualScreenTop;
@@ -4285,9 +4329,27 @@ namespace AntigravityPet
             catch { }
         }
 
+        private static void EnablePerMonitorDpiAwareness()
+        {
+            try
+            {
+                // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4 (Windows 10 1703+)
+                if (SetProcessDpiAwarenessContext(new IntPtr(-4))) return;
+            }
+            catch { }
+            try
+            {
+                // PROCESS_PER_MONITOR_DPI_AWARE = 2 (Windows 8.1+)
+                if (SetProcessDpiAwareness(2) == 0) return;
+            }
+            catch { }
+            try { SetProcessDPIAware(); } catch { }
+        }
+
         [STAThread]
         public static void Main(string[] args)
         {
+            EnablePerMonitorDpiAwareness();
             bool createdNew;
             using (var mutex = new Mutex(true, "AntigravityPetSingleInstanceMutex", out createdNew))
             {
