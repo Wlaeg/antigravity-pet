@@ -1,0 +1,87 @@
+name: Approve & Publish Community Pet
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  publish-pet:
+    if: github.event.label.name == 'approved'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Process & validate submission
+        id: process
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+        run: |
+          set -e
+          RESULT=$(node scripts/process-community-issue.mjs)
+          echo "$RESULT"
+          PET_ID=$(echo "$RESULT" | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(d.id)")
+          PET_VER=$(echo "$RESULT" | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(d.version)")
+          echo "pet_id=$PET_ID" >> $GITHUB_OUTPUT
+          echo "pet_version=$PET_VER" >> $GITHUB_OUTPUT
+
+      - name: Commit and push to main
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add community/packs/ community-pets.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "feat(community): publish ${{ steps.process.outputs.pet_id }} v${{ steps.process.outputs.pet_version }} (#${{ github.event.issue.number }})"
+            git push
+          fi
+
+      - name: Comment & close issue on success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `✅ **Approved & Published!**\n\n\`${{ steps.process.outputs.pet_id }}\` (v${{ steps.process.outputs.pet_version }}) has been validated, archived to \`community/packs/${{ steps.process.outputs.pet_id }}.zip\`, and registered in \`community-pets.json\`.\n\nUsers can now search and 1-click install it directly inside **Antigravity Pet → Characters → Community**!`
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });
+
+      - name: Report validation failure & remove approved label
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `❌ **Validation Failed**\n\nPlease check the [workflow run logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for details, fix your \`.zip\` pack according to \`CUSTOM_PET_SPEC.md\`, and re-apply the \`approved\` label.`
+            });
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'approved'
+              });
+            } catch {}

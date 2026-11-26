@@ -542,7 +542,7 @@ export async function getCommunityPets() {
   let manifest = null;
   let source = 'local';
   try {
-    const buf = await downloadHttpsBuffer(COMMUNITY_MANIFEST_URL, 1024 * 1024, 3500);
+    const buf = await downloadHttpsBuffer(COMMUNITY_MANIFEST_URL + '?t=' + Date.now(), 1024 * 1024, 3500);
     const parsed = JSON.parse(buf.toString('utf8'));
     if (parsed && Array.isArray(parsed.pets)) {
       manifest = parsed;

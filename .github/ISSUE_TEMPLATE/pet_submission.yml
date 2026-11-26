@@ -1,47 +1,75 @@
 name: Community Pet Submission / 社区宠物投稿
-description: Share a custom pixel pet pack or 1-image pet for the Community Workshop (投稿自制宠物包到社区工坊)
+description: Submit a custom pet pack (.zip) — once approved by maintainers, it is automatically published and searchable inside the plugin!
 title: "[Pet]: "
 labels: ["community-pet"]
 body:
   - type: markdown
     attributes:
       value: |
-        Before submitting, please check the [Custom Pet Specification (`CUSTOM_PET_SPEC.md`)](https://github.com/Wlaeg/antigravity-pet/blob/main/CUSTOM_PET_SPEC.md).
-        Both **1-image fallback pets** and **full 1536×2288 (8×11) sprite sheets** are welcome!
+        Submit your custom pixel pet pack! After maintainer review (`approved` label), a GitHub Action will automatically validate your `.zip`, archive it into `community/packs/`, register it in `community-pets.json`, and make it **instantly searchable & installable** inside Antigravity Pet.
+
+        Before submitting, please make sure your `.zip` follows [`CUSTOM_PET_SPEC.md`](https://github.com/Wlaeg/antigravity-pet/blob/main/CUSTOM_PET_SPEC.md).
   - type: input
-    id: pet-id
+    id: pet_id
     attributes:
       label: Pet ID / 宠物唯一标识
-      description: Lowercase letters, numbers, and hyphens only.
+      description: Lowercase letters, numbers, and hyphens only (`[a-z0-9-_]`). Must match `id` in `pet.json`.
       placeholder: e.g. cyber-shiba
     validations:
       required: true
   - type: input
-    id: pet-name
+    id: display_name
     attributes:
-      label: Display Name / 宠物名称
-      placeholder: e.g. Cyber Shiba / 赛博柴犬
+      label: Display Name (EN) / 英文名称
+      placeholder: e.g. CyberShiba
     validations:
       required: true
-  - type: dropdown
-    id: format
+  - type: input
+    id: display_name_zh
     attributes:
-      label: Asset Format / 素材格式
-      options:
-        - 1-image fallback (single PNG + pet.json)
-        - Full 1536×2288 (8×11) sprite sheet
-        - Packaged .agypet / .zip archive
+      label: Display Name (ZH) / 中文名称
+      placeholder: e.g. 赛博柴犬
     validations:
-      required: true
-  - type: textarea
+      required: false
+  - type: input
     id: description
     attributes:
-      label: Description & Theme / 简介与配色主题
-      description: Brief intro, author credit, and optional themeColor.
+      label: Description (EN) / 英文简介
+      placeholder: e.g. Pixel Shiba Inu wearing AR coding glasses
+    validations:
+      required: true
+  - type: input
+    id: description_zh
+    attributes:
+      label: Description (ZH) / 中文简介
+      placeholder: e.g. 戴着 AR 编程眼镜的像素柴犬
+    validations:
+      required: false
+  - type: input
+    id: theme_color
+    attributes:
+      label: Theme Color (Hex) / 主题色
+      placeholder: "#0EA5E9"
+    validations:
+      required: false
+  - type: input
+    id: tags
+    attributes:
+      label: Tags / 标签
+      description: Comma-separated keywords for in-plugin search (e.g. `pixel, animal, working-anim, single-image`).
+      placeholder: pixel, animal, cyber
+    validations:
+      required: false
+  - type: textarea
+    id: zip_url
+    attributes:
+      label: Pet Pack .zip File or Direct URL / 宠物包 .zip 文件或直链
+      description: Drag and drop your `.zip` file directly into this box (GitHub will upload it as a link), or paste a direct HTTPS `.zip` URL.
+      placeholder: https://github.com/user-attachments/files/.../my-pet.zip
     validations:
       required: true
   - type: checkboxes
-    id: license-check
+    id: license_check
     attributes:
       label: License Confirmation / 授权确认
       options:
