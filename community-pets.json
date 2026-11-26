@@ -7,11 +7,23 @@
       "displayNameZh": "赛博小熊猫",
       "description": "Pixel red panda wearing a glowing neon visor",
       "descriptionZh": "佩戴霓虹护目镜的赛博像素小熊猫",
-      "author": "Antigravity Community",
+      "author": "Wlaeg",
       "themeColor": "#F97316",
-      "version": "1.0.0",
+      "version": "1.0.1",
+      "tags": [
+        "pixel",
+        "cyber",
+        "panda",
+        "animal",
+        "working-anim"
+      ],
+      "hasWorkingAnim": true,
+      "updatedAt": "2026-11-26",
       "localZip": "community/packs/cyber-panda.zip",
-      "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/cyber-panda.zip"
+      "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/cyber-panda.zip",
+      "localPreview": "community/previews/cyber-panda.png",
+      "previewUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/previews/cyber-panda.png",
+      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/5"
     },
     {
       "id": "pixel-octopus",
