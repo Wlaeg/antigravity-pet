@@ -628,6 +628,11 @@
   }
   .comm-star-btn:hover { border-color: #F59E0B; color: #D97706; }
   .comm-star-btn.starred { border-color: #F59E0B; background: rgba(245, 158, 11, 0.12); color: #D97706; }
+  .comm-dl-stat {
+    height: 26px; padding: 0 7px; border-radius: 7px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--fg-3);
+    font-size: 11px; font-family: var(--mono); display: inline-flex; align-items: center; gap: 3px;
+  }
   .comm-gh-link {
     height: 26px; padding: 0 8px; border-radius: 7px;
     border: 1px solid var(--line-strong); background: var(--bg); color: var(--fg-2);
@@ -2325,6 +2330,14 @@
         '</div>';
 
       var actionsEl = card.querySelector('.comm-actions');
+      var dlCount = Number(p.downloads || 0);
+
+      // 0. 下载量展示
+      var dlStat = document.createElement('span');
+      dlStat.className = 'comm-dl-stat';
+      dlStat.title = 'Downloads';
+      dlStat.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="7 11 12 16 17 11"/><path d="M5 20h14"/></svg><span>' + dlCount + '</span>';
+      actionsEl.appendChild(dlStat);
 
       // 1. 加星按钮
       var starBtn = document.createElement('button');
@@ -2376,6 +2389,7 @@
           apiCall('/api/install-community-pet', { id: p.id, zipUrl: p.zipUrl, localZip: p.localZip }).then(function (res) {
             if (res && res.ok && res.snapshot) {
               p.installed = true;
+              p.downloads = Number(p.downloads || 0) + 1;
               render(res.snapshot);
               renderCommunityPets();
               toast();

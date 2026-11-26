@@ -21,6 +21,7 @@ const USER_PETS_DIR = path.join(os.homedir(), '.antigravity-pet', 'pets');
 const COMMUNITY_MANIFEST_PATH = path.join(PLUGIN_ROOT, 'community-pets.json');
 const COMMUNITY_MANIFEST_URL = 'https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community-pets.json';
 const COMMUNITY_STARS_PATH = path.join(os.homedir(), '.antigravity-pet', 'community-stars.json');
+const COMMUNITY_DOWNLOADS_PATH = path.join(os.homedir(), '.antigravity-pet', 'community-downloads.json');
 const PORT = 47821;
 const TASK_NAME = 'AntigravityPetLauncher';
 
@@ -672,6 +673,28 @@ export async function toggleCommunityStar(args = {}) {
   return { ok: true, id, starred };
 }
 
+function readCommunityDownloads() {
+  try {
+    if (!fs.existsSync(COMMUNITY_DOWNLOADS_PATH)) return {};
+    const obj = JSON.parse(fs.readFileSync(COMMUNITY_DOWNLOADS_PATH, 'utf8'));
+    return obj && typeof obj === 'object' ? obj : {};
+  } catch {
+    return {};
+  }
+}
+
+function incrementCommunityDownload(id) {
+  const key = String(id || '').trim().toLowerCase();
+  if (!key) return 0;
+  const map = readCommunityDownloads();
+  map[key] = Math.max(0, Number(map[key] || 0)) + 1;
+  try {
+    fs.mkdirSync(path.dirname(COMMUNITY_DOWNLOADS_PATH), { recursive: true });
+    fs.writeFileSync(COMMUNITY_DOWNLOADS_PATH, JSON.stringify(map, null, 2), 'utf8');
+  } catch {}
+  return map[key];
+}
+
 export async function getCommunityPets() {
   let manifest = null;
   let source = 'local';
@@ -690,10 +713,13 @@ export async function getCommunityPets() {
   }
   const installedIds = new Set(scanPetPacks().map((p) => String(p.id || '').toLowerCase()));
   const starredSet = readCommunityStars();
+  const downloadsMap = readCommunityDownloads();
   const pets = (manifest && Array.isArray(manifest.pets) ? manifest.pets : []).map((p) => {
     const key = String(p.id || '').toLowerCase();
     const starred = starredSet.has(key);
     const baseStars = Number(p.stars || 0);
+    const baseDownloads = Number(p.downloads || 0);
+    const localDownloads = Number(downloadsMap[key] || 0);
     const githubUrl = p.githubUrl || (p.localZip
       ? `https://github.com/Wlaeg/antigravity-pet/blob/main/${String(p.localZip).replace(/^[\\/]+/, '')}`
       : 'https://github.com/Wlaeg/antigravity-pet');
@@ -701,6 +727,7 @@ export async function getCommunityPets() {
       ...p,
       starred,
       stars: baseStars + (starred ? 1 : 0),
+      downloads: baseDownloads + localDownloads,
       githubUrl,
       installed: installedIds.has(key)
     };
@@ -816,7 +843,11 @@ export async function installCommunityPet(args = {}) {
   if (!zipUrl && !localZip) {
     return { ok: false, error: '未找到对应的社区宠物包下载地址' };
   }
-  return await importPetPack({ zipUrl, localZip });
+  const res = await importPetPack({ zipUrl, localZip });
+  if (res && res.ok) {
+    incrementCommunityDownload(id || res.id);
+  }
+  return res;
 }
 
 function startLocalDispatchBridge(app) {
