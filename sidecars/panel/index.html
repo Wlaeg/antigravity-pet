@@ -2391,16 +2391,22 @@
           btn.disabled = true;
           btn.textContent = L.commInstalling || 'Downloading...';
           apiCall('/api/install-community-pet', { id: p.id, zipUrl: p.zipUrl, localZip: p.localZip }).then(function (res) {
-            if (res && res.ok && res.snapshot) {
+            if (res && res.ok) {
               p.installed = true;
               p.downloads = Number(p.downloads || 0) + 1;
-              render(res.snapshot);
+              if (res.snapshot) {
+                render(res.snapshot);
+              } else {
+                apiCall('/api/status', {}).then(function (st) { if (st) render(st); }).catch(function () {});
+              }
+              ensurePetAvatars(true);
               renderCommunityPets();
+              switchCharTab('installed');
               toast();
             } else {
               btn.disabled = false;
               btn.textContent = L.commInstall || 'Download';
-              alert((res && res.error) || 'Install failed');
+              try { alert((res && res.error) || 'Install failed'); } catch (e) {}
             }
           }).catch(function () {
             btn.disabled = false;
