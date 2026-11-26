@@ -1,187 +1,154 @@
-<div align="center">
+# Antigravity Pet — a native pixel-art desktop companion for Antigravity
 
-<img src="assets/hero-banner.png" alt="Antigravity Pet Hero Banner" width="100%" />
-
-# 🐾 Antigravity Pet
-
-**Antigravity Pet is a free, open-source pixel desktop pet plugin for Google Antigravity.** A native Windows & macOS desktop companion that follows your AI agent's status in real time — zero extra runtime dependencies.
-
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Release](https://img.shields.io/badge/Release-v4.6.0-0EA5E9?style=flat-square)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20%7C%20macOS%2012%2B-0078D6?style=flat-square)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
-[![Characters](https://img.shields.io/badge/Pixel%20Pets-8%20Built--in%20%2B%20Community-F59E0B?style=flat-square)](#characters)
-[![i18n](https://img.shields.io/badge/i18n-11%20Locales-10B981?style=flat-square)](#english)
-[![License](https://img.shields.io/badge/License-MIT-A855F7?style=flat-square)](LICENSE)
+[![Runtime](https://img.shields.io/badge/Runtime-Zero%20External%20Dependencies-10B981?style=flat-square)](#install--download)
 
-<br/>
+![Antigravity Pet Showcase](assets/hero-showcase.gif)
 
-**[⬇️ Download Latest Release (v4.6.0)](https://github.com/Wlaeg/antigravity-pet/releases/latest)** · **[简体中文](#简体中文)** · **[English](#english)**
+An open-source native pixel-art desktop companion for **Google Antigravity** on **Windows** and **macOS** — built with zero external runtime dependencies. It reflects what your AI agent is doing in real time, tracks background tasks without stealing focus, and reacts playfully while you type.
 
-</div>
+- **Live tool status & calm `BackgroundRunning` (`🌙`):** Shows single-line live action bubbles (`Reading server.mjs`, `Editing App.tsx`, `Tests passed`) directly above your pet. When the foreground chat is idle while background tasks run, the pet switches to a calm lavender-blue resting pose with a `🌙` badge — click stacked task bubbles to expand the list and jump straight to any session.
+- **8 built-in mascots + Community Workshop:** Switch between 8 built-in pixel companions (`cyber-fox`, `astro-bot`, `shadow-cat`, `byte-ghost`, `shiba-dog`, `pixel-dragon`, `android-bugdroid`, `flutter-dash`) or install community packs (`gemini-chan`, `cyber-panda`, `pixel-octopus`, `coffee-slime`, `star-hamster`) in one click inside the Settings panel.
+- **1 static PNG comes alive:** Drop a single static PNG into the built-in **Pack Studio** (or use the `hatch-pet` skill), and the procedural animation engine brings it to life with breathing, parabolic hops, and squash-and-stretch bounces — or supply a full `1536×2288` (`8×11`) v3 multi-frame sprite sheet.
+- **Playful typing sync & tiered boredom:** Bounces with your typing cadence (frequency-only sliding window — **zero keylogging**); type faster than 5 keys/s and watch dizzy stars orbit its head. Leave it idle and it wanders with `?` / `♪` cues before curling up for a `Zzz` nap — one keystroke wakes it in 0.3s.
+- **Standalone Settings window & edge peeking:** Right-click the pet for a clean `460×800` standalone Settings window (**Characters / Behavior / Bubbles / System / Updates**), smooth `0.33x–3.00x` scaling, half-body screen-edge peeking, fullscreen auto-hide, and one-click in-app self-updates.
+- **11-locale full-stack localization:** Automatically follows your Antigravity locale (or switch anytime) across the Settings UI, live tool bubbles, background counters, approval prompts, and context menu: `English`, `简体中文`, `繁體中文 (TW)`, `Français`, `Deutsch`, `日本語`, `한국어`, `हिन्दी`, `ไทย`, `Español (ES)`, and `Español (MX)`.
 
----
+## How it works
 
-<a id="english"></a>
+```text
+Antigravity agent ──hooks.json──▶ scripts/hook-bridge.mjs ──▶ HTTP 127.0.0.1:47821
+                                                                      │
+Native Overlay (app/AntigravityPet.cs | app/AntigravityPet.swift) ◀──┘
+      └── Right-click Settings ──▶ Standalone Panel (sidecars/panel/server.mjs :47822)
+```
 
-## English
+- **Lifecycle hooks (`plugin.json` + `hooks.json`):** Triggers `node ./scripts/hook-bridge.mjs` across `SessionStart`, `PreInvocation`, `PreToolUse`, `PostToolUse`, `PostInvocation`, and `Stop`, mapping tool calls via `scripts/tool-label-mapper.mjs` and pushing compact state updates to `127.0.0.1:47821`.
+- **Native transparent overlay:** Compiled directly with built-in OS toolchains (`csc.exe` / `.NET Framework 4.x` on Windows; `swiftc` on macOS) — no Electron, no Python runtime, and no extra SDK required.
 
-**Antigravity Pet** is a free, open-source **desktop pet plugin for Google Antigravity**. It puts a pixel pet on your Windows or macOS desktop that follows your AI agent's lifecycle in real time: it shows what the agent is doing right now, celebrates when a task finishes, and quietly tracks background tasks without stealing focus. It runs as a native app — C# / WPF on Windows 10/11, Swift / AppKit on macOS 12+ — with zero third-party runtime to install, and it is free under the MIT license.
+## Install & Download
 
-Stop staring at spinning terminals. **Antigravity Pet** sits cleanly on your **Windows** or **macOS** desktop, shows what your AI agent is actually doing in real time, tracks background tasks without stealing focus, and reacts to your typing — all in one lightweight native overlay.
+**Runtime requirements:** Zero extra dependencies. Uses built-in `.NET Framework 4.x` on Windows 10/11 and built-in `swiftc` on macOS 12+.
 
-### 🔥 Why Install It?
+### For AI Agents (Quick Install)
 
-- **Live Tool Status & Calm Background Mode (`v4.5.0`)**
-  - **Real-time action bubbles**: See single-line live steps like `Reading server.mjs`, `Editing App.tsx`, or `Running tests` right above your pet instead of a generic spinner.
-  - **Independent `BackgroundRunning` (`🌙`)**: When your foreground chat is idle while background tasks run, the pet switches to a calm lavender-blue resting pose with a `🌙` badge. Click stacked task bubbles to expand the list and jump straight to any session — and get a subtle non-intrusive head alert when done without stealing focus.
-- **1 Static Image Comes Alive + Community Library (`v4.2–v4.3`)**
-  - Drop **just 1 static PNG** into the built-in **Pack Studio** (or use the `hatch-pet` skill) and the procedural animation engine brings it to life with breathing, parabolic hops, and squash-and-stretch bounces.
-  - Switch between **8 built-in mascots** or install new ones in 1 click from the **Community Pet Library** (`cyber-panda`, `pixel-octopus`, `coffee-slime`).
-- **Playful Typing Sync & Tiered Boredom (`v4.3`)**
-  - Bounces with your typing rhythm (privacy-first frequency only — **zero keylogging**); type faster than 5 keys/s and watch dizzy stars orbit its head.
-  - Leave it alone and it wanders with `?` / `♪` cues before curling up for a `Zzz` nap — one keystroke wakes it in 0.3s.
-- **Polished Everyday Controls (`v4.1–v4.4`)**
-  - Right-click **Settings** to open a standalone `460×800` window with **5 clean tabs** (**Characters / Behavior / Bubbles / System / Updates**), `0.33x–3.00x` smooth scale slider, edge half-body peeking, fullscreen auto-hide, and one-click in-app self-updates.
-- **11-Locale Full-Stack Localization (`v4.4–v4.5`)**
-  - Automatically follows your Antigravity locale (or switch manually anytime) across the **Settings UI, pet names, live tool bubbles, background counters, approval buttons, and right-click menu**: `English`, `简体中文`, `繁體中文 (TW)`, `Français`, `Deutsch`, `日本語`, `한국어`, `हिन्दी`, `ไทย`, `Español (ES)`, and `Español (MX)`.
+If you are an AI coding agent installing Antigravity Pet into a user's workspace, pick the row matching the host OS, run the build/launch script once, and inform the user of the toggle shortcut:
 
----
+| Platform | Plugin Path | Build & Launch Command | Toggle Shortcut |
+| -------- | ----------- | ---------------------- | --------------- |
+| **Windows 10/11** | `%USERPROFILE%\.gemini\config\plugins\antigravity-pet` | `.\build.ps1 -Launch` | `Win + Alt + P` |
+| **macOS 12+** | `~/.gemini/config/plugins/antigravity-pet` | `chmod +x build.sh && ./build.sh --launch` | `⌥ + ⌘ + P` |
 
-### 🚀 30-Second Quick Start
+### Option 1: Download Prebuilt Release (Recommended)
 
 #### Windows 10 / 11
+
 1. Download the [latest release `.zip`](https://github.com/Wlaeg/antigravity-pet/releases/latest) and extract it to:
    ```text
    %USERPROFILE%\.gemini\config\plugins\antigravity-pet\
    ```
-2. Run the one-click launcher (uses built-in `.NET Framework 4.x`, **no extra SDK needed**):
+2. Run the one-click launcher in PowerShell:
    ```powershell
    cd "$env:USERPROFILE\.gemini\config\plugins\antigravity-pet"
    .\build.ps1 -Launch
    ```
-3. Right-click the pet for **Settings**, or press **`Win + Alt + P`** anytime to show/hide.
+3. Right-click the pet for **Settings**, or press **`Win + Alt + P`** anytime to show or hide it.
 
 #### macOS 12+ (Apple Silicon & Intel)
-1. Download the [latest release `.zip`](https://github.com/Wlaeg/antigravity-pet/releases/latest) and extract it to:
+
+1. Download the [latest release `.zip`](https://github.com/Wlaeg/antigravity-pet/releases/latest) (or `AntigravityPet-macOS-universal.zip`) and extract it to:
    ```text
    ~/.gemini/config/plugins/antigravity-pet/
    ```
-2. Build & launch with macOS built-in `swiftc` (**no Xcode project needed**):
+2. Build and launch via built-in `swiftc`:
    ```bash
    cd ~/.gemini/config/plugins/antigravity-pet
    chmod +x build.sh && ./build.sh --launch
    ```
 3. Press **`⌥ + ⌘ + P`** (`Option + Command + P`) to toggle visibility, or open **Desktop Pet Settings** from Antigravity's `...` menu.
 
----
+### Option 2: Git Clone & Build from Source
 
-<a id="characters"></a>
+```powershell
+# Windows PowerShell
+git clone https://github.com/Wlaeg/antigravity-pet.git "$env:USERPROFILE\.gemini\config\plugins\antigravity-pet"
+cd "$env:USERPROFILE\.gemini\config\plugins\antigravity-pet"
+.\build.ps1 -Launch
+```
 
-### 🎭 Characters & Growth Accessories
+```bash
+# macOS
+git clone https://github.com/Wlaeg/antigravity-pet.git ~/.gemini/config/plugins/antigravity-pet
+cd ~/.gemini/config/plugins/antigravity-pet
+chmod +x build.sh && ./build.sh --launch
+```
 
-Includes **8 built-in pixel pets** (`cyber-fox`, `astro-bot`, `shadow-cat`, `byte-ghost`, `shiba-dog`, `pixel-dragon`, `android-bugdroid`, `flutter-dash`), **3 one-click community packs** (`cyber-panda`, `pixel-octopus`, `coffee-slime`), and unlockable frame-synced accessories (**Glasses**, **Dev Cap**, **Coffee Cup**, **Gold Crown**).
+### Updating & Uninstalling
 
----
+- **Update:** Open **Settings → Updates** for one-click in-app self-update, or run `git pull` followed by `.\build.ps1 -Launch` / `./build.sh --launch`.
+- **Uninstall:** Close the pet from its right-click menu and remove the `antigravity-pet` folder under `.gemini/config/plugins/`.
 
-### 📚 Docs & Developer Guides
+## States & Behaviors
 
-Looking to craft your own pet pack or integrate with the local bridge? Detailed specs live in separate docs:
+| State | Trigger | Visual Behavior |
+| ----- | ------- | --------------- |
+| `idle` | `SessionStart`, `Stop` (all tasks idle) | Gentle breathing & eye blink |
+| `walk` | Autonomous patrol / cursor follow | Left/right walking frames across taskbar or dock |
+| `running` | Active foreground tool / model turn | Working pose with single-line live tool bubble |
+| `background_running` | Foreground idle while background tasks run | Calm lavender-blue rest pose with `🌙` badge & clickable task stack |
+| `needs_input` | `PreToolUse` approval or `ask_question` | Attentive cue with quick inline Approve / Deny bubble |
+| `ready` | Turn completed cleanly | Celebration hop / wave with subtle non-stealing alert |
+| `blocked` | Tool failure or blocked turn | Dizzy error loop alerting you to check the session |
+| `typing_sync` | Active keyboard input | Rhythmic bounce synced to typing speed (1.5s sliding window) |
+| `dizzy` | Typing speed > 5 keys/s | 3 orbiting pixel stars above the pet's head |
+| `bored / nap` | Extended inactivity | Wanders with `?` / `♪` cues, then curls into `Zzz` nap |
+| `edge_peek` | Dragged to screen edge | Half-body peeking from left/right monitor border |
 
-- 🎨 **[Custom Pet Pack Specification (v3)](CUSTOM_PET_SPEC.md)** — Single-image fallback, `1536×2288` (`8×11`) atlas layout, `themeColor`, custom `.wav` sounds, and `.zip` packaging.
-- 🛠️ **[Architecture, Hooks & Local HTTP API](docs/DEVELOPMENT.md)** — System diagram, directory structure, `BackgroundRunning` priority state machine, and `127.0.0.1:47821` endpoints.
-- 📋 **[Release Changelog](CHANGELOG.md)** — Full version history from `v3.0.0` to `v4.6.0`.
+## Built-in Pets & Community Workshop
 
----
+- **8 Built-in Pets:** `cyber-fox`, `astro-bot`, `shadow-cat`, `byte-ghost`, `shiba-dog`, `pixel-dragon`, `android-bugdroid`, `flutter-dash`
+- **Community Workshop:** Browse, star, and 1-click install community packs directly inside **Settings → Community** (including `gemini-chan`, `cyber-panda`, `pixel-octopus`, `coffee-slime`, `star-hamster`).
+- **Unlockable Accessories:** Earn frame-synced accessories as your completed task count grows (**Glasses**, **Dev Cap**, **Coffee Cup**, **Gold Crown**).
+- **Create & Submit Your Own:** Drop a single PNG into **Pack Studio** or build a full `1536×2288` (`8×11`) v3 pack following [CUSTOM_PET_SPEC.md](CUSTOM_PET_SPEC.md), then submit via the [Community Pet Submission](https://github.com/Wlaeg/antigravity-pet/issues/new?template=pet_submission.yml) form.
 
-### ❓ Frequently Asked Questions (FAQ)
+## Security & Privacy
 
-- **Q: What is Antigravity Pet?**
-  - A: A free, open-source pixel desktop pet plugin for Google Antigravity. The pet lives on your desktop and mirrors your AI agent's status — running, waiting for input, blocked, or done — so you can tell what is happening at a glance.
-- **Q: How do I install Antigravity Pet?**
-  - A: Download the latest release `.zip`, extract it to your Antigravity plugins folder (`%USERPROFILE%\.gemini\config\plugins\antigravity-pet\` on Windows, `~/.gemini/config/plugins/antigravity-pet/` on macOS), then run the one-click launcher. Full steps are in [30-Second Quick Start](#-30-second-quick-start).
-- **Q: Does Antigravity Pet work on Windows and macOS?**
-  - A: Yes. Native Windows 10/11 (C# / WPF) and macOS 12+ (Swift / AppKit, Apple Silicon & Intel), with no extra runtime to install.
-- **Q: Is Antigravity Pet free?**
-  - A: Yes — free and open source under the MIT license, with 8 built-in pixel pets and a community pet library.
+- **Zero telemetry:** Antigravity Pet never collects analytics or phones home. Outbound HTTPS requests occur only when you explicitly browse the Community Workshop, star a pack, or check for updates on GitHub.
+- **Zero keylogging:** Typing sync measures only a 1.5-second rolling keystroke frequency count — key codes, characters, and prompt contents are never recorded or stored.
+- **Loopback-only local IPC:** The overlay (`127.0.0.1:47821`) and Settings panel (`127.0.0.1:47822`) bind strictly to localhost loopback.
+- **No hidden startup entries:** By default, the pet launches and exits with Antigravity without modifying OS startup registries.
+- See [SECURITY.md](SECURITY.md) for reporting security issues.
 
----
+## Contributing & Community
 
-<a id="简体中文"></a>
+Contributions, bug reports, new pixel mascots, and community packs are welcome:
 
-## 简体中文
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) before opening a pull request.
+- Open a [Bug Report](https://github.com/Wlaeg/antigravity-pet/issues/new?template=bug_report.yml), [Feature Request](https://github.com/Wlaeg/antigravity-pet/issues/new?template=feature_request.yml), or [Community Pet Submission](https://github.com/Wlaeg/antigravity-pet/issues/new?template=pet_submission.yml).
+- Participation is governed by our [Code of Conduct](CODE_OF_CONDUCT.md).
 
-别再盯着枯燥的终端转圈了。**Antigravity Pet** 是一款专为 **Google Antigravity** 打造的原生跨平台（**Windows & macOS**）像素桌面宠物插件——**零第三方运行时依赖**，既能实时播报 AI 正在干嘛、优雅盯住后台多任务，还会在你敲代码时陪你互动。
+## Project Layout
 
-### 🔥 为什么值得装？
+```text
+plugin.json, hooks.json         Antigravity plugin manifest & lifecycle hooks
+app/                            Native Windows (C# WinForms) & macOS (Swift AppKit) overlay
+sidecars/panel/                 Standalone Settings & Community Workshop UI (:47822)
+scripts/                        Hook bridge, tool-label mapper, MCP server & pack validator
+pets/                           8 built-in pixel-art pets
+community/                      Approved community pet packs & full-body preview images
+assets/                         Hero showcase GIF, logo & UI icons
+skills/                         Built-in `pet` and `hatch-pet` Antigravity skills
+docs/DEVELOPMENT.md             Architecture, state machine & local HTTP API reference
+CUSTOM_PET_SPEC.md              v3 sprite sheet & community submission specification
+build.ps1, build.sh             Zero-dependency Windows & macOS build/launch scripts
+CHANGELOG.md                    Full release history (v3.0.0 – v4.6.0)
+LICENSE                         MIT License
+```
 
-- **真能干活：实时动作气泡 & 后台静息态 (`v4.5.0`)**
-  - **单行实时工具播报**：气泡不再只是死板的“运行中”，而是实时显示 `正在读取 server.mjs`、`正在编辑 App.tsx`、`正在运行测试`（无省略号、自适应撑宽）。
-  - **独立 `BackgroundRunning` (`🌙`)**：前台空闲、后台有子任务在跑时，桌宠切为柔和蓝紫静息姿态并亮起 `🌙` 角标；多任务堆叠时**点击气泡展开列表直达对应对话**，跑完只飘出轻提醒，**绝不抢走你正在敲代码的焦点**。
-- **1 张静态图直接变活 + 社区宠物库 (`v4.2–v4.3`)**
-  - 内置 **制作宠物包（Pack Studio）**：随手拖入 **1 张静态图**，程序化动画引擎自动驱动平滑呼吸、抛物线小跳与 Q 弹挤压回弹；也可以直接喊内置 `hatch-pet` 技能帮你孵化新角色。
-  - 自带 **8 只内置像素宠** + **社区宠物库**（赛博小熊猫 `cyber-panda`、像素章鱼 `pixel-octopus`、咖啡史莱姆 `coffee-slime`）一键安装。
-- **好玩有灵性：敲键蹦跶、手速晕与无聊发呆 (`v4.3`)**
-  - 随打字频率同步弹跳（仅统计 1.5 秒滑窗频率，**绝不记录任何按键内容**），手速狂飙超过 5 键/秒头顶会冒 **3 颗旋转星星眩晕**！
-  - 挂机不管它会自己溜达冒 `?` / `♪`，久了会压扁打盹飘 `Zzz`；敲一下键盘 0.3 秒瞬间惊醒。
-- **打磨到位的日常体验 (`v4.1–v4.4`)**
-  - 右键点击 **「⚙️ 设置」** 秒开纯净 `460×800` 独立设置窗：**角色 / 互动 / 气泡 / 系统 / 更新** 5 大分页、**`0.33x–3.00x` 无级缩放**、左右半身贴边藏匿、全屏自动隐身，以及设置页内一键版本自更新。
-- **11 国/地区全链路多语言支持 (`v4.4–v4.5`)**
-  - 支持自动跟随 Antigravity 客户端语言或随时手动切换，完整覆盖 **设置面板、角色名称、实时工具气泡、后台计数、审批按钮与桌宠右键菜单**：`English`、`简体中文`、`繁體中文（台湾）`、`Français`、`Deutsch`、`日本語`、`한국어`、`हिन्दी`、`ไทย`、`Español (ES)`、`Español (MX)`。
+## Notes
 
----
-
-### 🚀 30 秒极速安装
-
-#### Windows 10 / 11
-1. 前往 **[Releases 页面下载最新 `.zip`](https://github.com/Wlaeg/antigravity-pet/releases/latest)**，解压到 Antigravity 插件目录：
-   ```text
-   %USERPROFILE%\.gemini\config\plugins\antigravity-pet\
-   ```
-2. 运行一键启动脚本（调用系统自带 `.NET Framework 4.x`，**无需额外安装 SDK**）：
-   ```powershell
-   cd "$env:USERPROFILE\.gemini\config\plugins\antigravity-pet"
-   .\build.ps1 -Launch
-   ```
-3. 右键桌宠即可打开独立 **设置** 窗口，随时按 **`Win + Alt + P`** 显隐。
-
-#### macOS 12+ (Apple Silicon & Intel)
-1. 下载 **[最新 Release `.zip`](https://github.com/Wlaeg/antigravity-pet/releases/latest)** 并解压到：
-   ```text
-   ~/.gemini/config/plugins/antigravity-pet/
-   ```
-2. 执行一键构建脚本（调用系统自带 `swiftc`，**零额外依赖**）：
-   ```bash
-   cd ~/.gemini/config/plugins/antigravity-pet
-   chmod +x build.sh && ./build.sh --launch
-   ```
-3. 按 **`⌥ + ⌘ + P`**（`Option + Command + P`）显隐桌宠，或在 Antigravity 右上角 `...` 菜单打开设置。
-
----
-
-### 🎭 角色与成长配饰
-
-内置 **8 款经典角色**（小蓝狐 `cyber-fox`、宇航员 `astro-bot`、小黑猫 `shadow-cat`、电子幽灵 `byte-ghost`、柴犬 `shiba-dog`、小青龙 `pixel-dragon`、安卓小绿人 `android-bugdroid`、Flutter 小蓝鸟 `flutter-dash`）与 **3 款社区宠物**，并支持随完成任务数解锁 **墨镜、鸭舌帽、咖啡杯、黄金皇冠** 帧同步配饰。
-
----
-
-### 📚 进阶与开发者文档
-
-想自己画桌宠、做宠物包，或调用本地控制接口？详细开发文档已独立拆出：
-
-- 🎨 **[自定义宠物包规范 (v3)](CUSTOM_PET_SPEC.md)** — 单图保底、`1536×2288` (`8×11`) 图集规范、`themeColor` 与自定义 `.wav` 音效打包说明。
-- 🛠️ **[系统架构、Hooks 与本地 HTTP 接口](docs/DEVELOPMENT.md)** — Mermaid 架构图、目录结构、`BackgroundRunning` 优先级状态机与 `127.0.0.1:47821` API 文档。
-- 📋 **[版本更新日志 (Changelog)](CHANGELOG.md)** — `v3.0.0` 至 `v4.6.0` 完整变更记录。
-
----
-
-### ❓ 常见问题 (FAQ)
-
-- **Q：为什么任务栏或 Dock 里看不到桌宠？**
-  - A：特意采用了不占任务栏/Dock 的纯净悬浮窗模式（Windows `WS_EX_TOOLWINDOW` / macOS `LSUIElement`），按 `Win + Alt + P`（macOS 为 `⌥ + ⌘ + P`）或右键即可随时控制。
-- **Q：会开机自启占后台吗？**
-  - A：默认 **「随 Antigravity 启动」**，打开 Antigravity 时拉起、关闭时自动退出，不写开机自启项。
-
----
-
-<div align="center">
-Released under the <a href="LICENSE">MIT License</a>.
-</div>
+- **Why is there no taskbar / Dock icon?** The overlay uses `WS_EX_TOOLWINDOW` (Windows) and `LSUIElement` (macOS) intentionally to stay out of your window switcher. Use `Win + Alt + P` (`⌥ + ⌘ + P` on macOS) or right-click the pet anytime.
+- **Does it stay running in the background after closing Antigravity?** No — by default it follows Antigravity's lifecycle and exits automatically when Antigravity closes.
+- Released under the [MIT License](LICENSE).
