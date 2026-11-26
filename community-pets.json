@@ -72,6 +72,27 @@
       "localPreview": "community/previews/coffee-slime.png",
       "previewUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/previews/coffee-slime.png",
       "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/7"
+    },
+    {
+      "id": "star-hamster",
+      "displayName": "StarHamster",
+      "description": "Golden pixel hamster wearing a bright star hairpin",
+      "author": "Wlaeg",
+      "themeColor": "#F59E0B",
+      "version": "1.0.0",
+      "tags": [
+        "pixel",
+        "hamster",
+        "cute",
+        "single-image"
+      ],
+      "hasWorkingAnim": false,
+      "updatedAt": "2026-11-26",
+      "localZip": "community/packs/star-hamster.zip",
+      "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/star-hamster.zip",
+      "localPreview": "community/previews/star-hamster.png",
+      "previewUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/previews/star-hamster.png",
+      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/8"
     }
   ]
 }
