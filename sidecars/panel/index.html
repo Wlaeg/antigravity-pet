@@ -1967,7 +1967,7 @@
       var swColor = SWATCH_MAP[p.id] || '#94A3B8';
       btn.innerHTML =
         '<div class="skin-top">' +
-          renderPetAvatarHtml(p.id, p.displayName || p.id, swColor) +
+          renderPetAvatarHtml(p.id, p.displayName || p.id, swColor, Boolean(p.isCustom)) +
           '<span class="skin-name">' + escapeHtml(p.displayName || p.id) + '</span>' +
         '</div>' +
         '<div class="skin-desc">' + escapeHtml(p.description || ('Sprite v' + (p.version || 2))) + '</div>';
@@ -2188,9 +2188,9 @@
   var _avatarsLoaded = false;
   var _avatarsLoading = false;
 
-  function renderPetAvatarHtml(id, title, accentColor) {
+  function renderPetAvatarHtml(id, title, accentColor, useFullBody) {
     var key = String(id || '').toLowerCase();
-    var src = _croppedAvatars[key];
+    var src = useFullBody ? (_croppedFullBodies[key] || _croppedAvatars[key]) : _croppedAvatars[key];
     var borderStyle = accentColor ? 'border-color:' + escapeHtml(accentColor) + '44;' : '';
     if (src) {
       return '<span class="pet-avatar" style="' + borderStyle + '"><img class="pet-avatar-img" src="' + src + '" alt="' + escapeHtml(title || id) + '" /></span>';
