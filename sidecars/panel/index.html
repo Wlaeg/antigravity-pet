@@ -573,16 +573,54 @@
 
   .comm-card {
     height: 100%;
-    padding: 10px 11px;
-    border-radius: 9px;
+    padding: 11px 12px;
+    border-radius: 10px;
     background: var(--surface);
     border: 1px solid var(--line-strong);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    gap: 8px;
+    gap: 10px;
   }
-  .comm-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 2px; }
+  #communityGrid { grid-template-columns: 1fr; }
+  .comm-main { display: flex; align-items: flex-start; gap: 11px; min-width: 0; }
+  .comm-portrait-box {
+    width: 56px;
+    height: 60px;
+    border-radius: 9px;
+    flex-shrink: 0;
+    background: var(--bg);
+    border: 1px solid var(--line-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .comm-portrait-img {
+    width: 50px;
+    height: 54px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    display: block;
+  }
+  .comm-info { flex: 1; min-width: 0; }
+  .comm-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 6px; border-top: 1px solid var(--line); }
+  .comm-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .comm-star-btn {
+    height: 26px; padding: 0 8px; border-radius: 7px;
+    border: 1px solid var(--line-strong); background: var(--bg); color: var(--fg-2);
+    font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
+  }
+  .comm-star-btn:hover { border-color: #F59E0B; color: #D97706; }
+  .comm-star-btn.starred { border-color: #F59E0B; background: rgba(245, 158, 11, 0.12); color: #D97706; }
+  .comm-gh-link {
+    height: 26px; padding: 0 8px; border-radius: 7px;
+    border: 1px solid var(--line-strong); background: var(--bg); color: var(--fg-2);
+    font-size: 11.5px; font-weight: 500; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .comm-gh-link:hover { border-color: var(--fg-3); color: var(--fg); }
   .comm-author { font-size: 11px; color: var(--fg-3); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .comm-toolbar { display: none; flex-direction: column; gap: 8px; margin-bottom: 10px; }
   .comm-search-row { display: flex; align-items: center; gap: 6px; }
@@ -1410,9 +1448,10 @@
       dropSub: 'Supports PNG / WebP / JPG — animations are driven automatically',
       btnClear: 'Clear',
       btnInstallUse: 'Save & Activate',
-      commInstall: 'Install',
+      commInstall: 'Download',
       commInstalled: 'Installed',
-      commInstalling: 'Installing...',
+      commInstalling: 'Downloading...',
+      commGithubTitle: 'GitHub',
       commEmpty: 'No community packs found',
       commSearchPlaceholder: 'Search pets by name, tag, or author...',
       commSubmit: '+ Submit Pet',
@@ -1538,9 +1577,10 @@
       dropSub: '支持 PNG / WebP / JPG 单图，呼吸/跳跃/翻转由引擎自动驱动',
       btnClear: '清空',
       btnInstallUse: '保存并立即启用',
-      commInstall: '一键安装',
+      commInstall: '下载',
       commInstalled: '已安装',
-      commInstalling: '安装中...',
+      commInstalling: '下载中...',
+      commGithubTitle: 'GitHub',
       commEmpty: '暂无社区宠物包',
       commSearchPlaceholder: '搜索宠物名称、标签或作者...',
       commSubmit: '+ 投稿宠物',
@@ -2081,6 +2121,7 @@
   var _communityQuery = '';
   var _studioImages = [];
   var _croppedAvatars = {};
+  var _croppedFullBodies = {};
   var _avatarsLoaded = false;
   var _avatarsLoading = false;
 
@@ -2096,33 +2137,50 @@
     return '<span class="pet-avatar" style="' + borderStyle + '"><span class="pet-avatar-fallback" style="' + colorStyle + '">' + ch + '</span></span>';
   }
 
-  function cropHalfBodyToDataUrl(rawSrc) {
+  function renderPetFullBodyHtml(id, title, accentColor) {
+    var key = String(id || '').toLowerCase();
+    var src = _croppedFullBodies[key] || _croppedAvatars[key];
+    var borderStyle = accentColor ? 'border-color:' + escapeHtml(accentColor) + '44;' : '';
+    if (src) {
+      return '<div class="comm-portrait-box" style="' + borderStyle + '"><img class="comm-portrait-img" src="' + src + '" alt="' + escapeHtml(title || id) + '" /></div>';
+    }
+    var ch = escapeHtml(String(title || id || '?').trim().charAt(0).toUpperCase() || '?');
+    var colorStyle = accentColor ? 'color:' + escapeHtml(accentColor) + ';' : '';
+    return '<div class="comm-portrait-box" style="' + borderStyle + '"><span class="pet-avatar-fallback" style="font-size:18px;' + colorStyle + '">' + ch + '</span></div>';
+  }
+
+  function cropPetSprites(rawSrc) {
     return new Promise(function (resolve) {
       var img = new Image();
       img.onload = function () {
         try {
-          var sx = 0, sy = 0, sw = img.width, sh = img.height;
-          if (img.width >= 1536 && img.height >= 2080) {
-            sw = 192;
-            sh = Math.round(208 * 0.72);
-            sy = 6;
-          } else {
-            sh = Math.max(1, Math.round(img.height * 0.72));
-          }
-          var cv = document.createElement('canvas');
-          cv.width = 64;
-          cv.height = 64;
-          var ctx = cv.getContext('2d');
-          ctx.imageSmoothingEnabled = false;
-          var scale = Math.min(64 / sw, 64 / sh);
-          var dw = Math.round(sw * scale);
-          var dh = Math.round(sh * scale);
-          var dx = Math.round((64 - dw) / 2);
-          var dy = Math.round((64 - dh) / 2);
-          ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
-          resolve(cv.toDataURL('image/png'));
+          var isSheet = img.width >= 1536 && img.height >= 2080;
+          var fw = isSheet ? 192 : img.width;
+          var fh = isSheet ? 208 : img.height;
+
+          // Half-body (64x64)
+          var hSh = Math.max(1, Math.round(fh * 0.72));
+          var hSy = isSheet ? 6 : 0;
+          var cv1 = document.createElement('canvas');
+          cv1.width = 64; cv1.height = 64;
+          var ctx1 = cv1.getContext('2d');
+          ctx1.imageSmoothingEnabled = false;
+          var sc1 = Math.min(64 / fw, 64 / hSh);
+          var dw1 = Math.round(fw * sc1), dh1 = Math.round(hSh * sc1);
+          ctx1.drawImage(img, 0, hSy, fw, hSh, Math.round((64 - dw1) / 2), Math.round((64 - dh1) / 2), dw1, dh1);
+
+          // Full-body (80x88)
+          var cv2 = document.createElement('canvas');
+          cv2.width = 80; cv2.height = 88;
+          var ctx2 = cv2.getContext('2d');
+          ctx2.imageSmoothingEnabled = false;
+          var sc2 = Math.min(80 / fw, 88 / fh);
+          var dw2 = Math.round(fw * sc2), dh2 = Math.round(fh * sc2);
+          ctx2.drawImage(img, 0, 0, fw, fh, Math.round((80 - dw2) / 2), Math.round((88 - dh2) / 2), dw2, dh2);
+
+          resolve({ half: cv1.toDataURL('image/png'), full: cv2.toDataURL('image/png') });
         } catch (e) {
-          resolve(rawSrc);
+          resolve({ half: rawSrc, full: rawSrc });
         }
       };
       img.onerror = function () { resolve(null); };
@@ -2139,8 +2197,11 @@
       _avatarsLoaded = true;
       var entries = Object.keys(res.avatars);
       Promise.all(entries.map(function (id) {
-        return cropHalfBodyToDataUrl(res.avatars[id]).then(function (cropped) {
-          if (cropped) _croppedAvatars[id.toLowerCase()] = cropped;
+        return cropPetSprites(res.avatars[id]).then(function (cropped) {
+          if (cropped) {
+            _croppedAvatars[id.toLowerCase()] = cropped.half;
+            _croppedFullBodies[id.toLowerCase()] = cropped.full;
+          }
         });
       })).then(function () {
         if (currentData) render(currentData);
@@ -2233,29 +2294,71 @@
           return '<span class="comm-tag">' + escapeHtml(t) + '</span>';
         }).join('') + '</div>';
       }
+      var ghUrl = p.githubUrl || 'https://github.com/Wlaeg/antigravity-pet';
+      var starCount = Number(p.stars || 0);
       card.innerHTML =
-        '<div>' +
-          '<div class="skin-top">' + renderPetAvatarHtml(p.id, title, sw) + '<span class="skin-name">' + escapeHtml(title) + '</span></div>' +
-          '<div class="skin-desc" style="margin-top:4px">' + escapeHtml(desc) + '</div>' +
-          tagsHtml +
+        '<div class="comm-main">' +
+          renderPetFullBodyHtml(p.id, title, sw) +
+          '<div class="comm-info">' +
+            '<div class="skin-name">' + escapeHtml(title) + '</div>' +
+            '<div class="skin-desc" style="margin-top:4px">' + escapeHtml(desc) + '</div>' +
+            tagsHtml +
+          '</div>' +
         '</div>' +
         '<div class="comm-foot">' +
           '<span class="comm-author">' + escapeHtml(p.author || 'Community') + (p.version ? ' · v' + escapeHtml(p.version) : '') + '</span>' +
+          '<div class="comm-actions"></div>' +
         '</div>';
+
+      var actionsEl = card.querySelector('.comm-actions');
+
+      // 1. 加星按钮
+      var starBtn = document.createElement('button');
+      starBtn.type = 'button';
+      starBtn.className = 'comm-star-btn' + (p.starred ? ' starred' : '');
+      starBtn.innerHTML = '<span>' + (p.starred ? '★' : '☆') + '</span><span>' + starCount + '</span>';
+      starBtn.onclick = function () {
+        apiCall('/api/star-community-pet', { id: p.id }).then(function (res) {
+          if (res && res.ok) {
+            var nextStarred = Boolean(res.starred);
+            if (nextStarred !== Boolean(p.starred)) {
+              p.starred = nextStarred;
+              p.stars = Math.max(0, Number(p.stars || 0) + (nextStarred ? 1 : -1));
+            }
+            renderCommunityPets();
+          }
+        }).catch(function () {});
+      };
+      actionsEl.appendChild(starBtn);
+
+      // 2. 宠物 GitHub 页
+      var ghLink = document.createElement('a');
+      ghLink.className = 'comm-gh-link';
+      ghLink.href = ghUrl;
+      ghLink.target = '_blank';
+      ghLink.rel = 'noopener noreferrer';
+      ghLink.title = L.commGithubTitle || 'GitHub';
+      ghLink.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg><span>GitHub</span>';
+      actionsEl.appendChild(ghLink);
+
+      // 3. 下载按钮
       var btn = document.createElement('button');
       if (p.installed) {
         btn.textContent = L.commInstalled || 'Installed';
         btn.className = 'secondary';
-        btn.onclick = function () { setOpt('skin', p.id); switchCharTab('installed'); };
-      } else {
-        btn.textContent = L.commInstall || 'Install';
-        btn.className = 'primary';
         btn.style.height = '26px';
         btn.style.padding = '0 8px';
         btn.style.fontSize = '11.5px';
+        btn.onclick = function () { setOpt('skin', p.id); switchCharTab('installed'); };
+      } else {
+        btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px;vertical-align:-1px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' + escapeHtml(L.commInstall || 'Download');
+        btn.className = 'primary';
+        btn.style.height = '26px';
+        btn.style.padding = '0 9px';
+        btn.style.fontSize = '11.5px';
         btn.onclick = function () {
           btn.disabled = true;
-          btn.textContent = L.commInstalling || 'Installing...';
+          btn.textContent = L.commInstalling || 'Downloading...';
           apiCall('/api/install-community-pet', { id: p.id, zipUrl: p.zipUrl, localZip: p.localZip }).then(function (res) {
             if (res && res.ok && res.snapshot) {
               p.installed = true;
@@ -2264,16 +2367,16 @@
               toast();
             } else {
               btn.disabled = false;
-              btn.textContent = L.commInstall || 'Install';
+              btn.textContent = L.commInstall || 'Download';
               alert((res && res.error) || 'Install failed');
             }
           }).catch(function () {
             btn.disabled = false;
-            btn.textContent = L.commInstall || 'Install';
+            btn.textContent = L.commInstall || 'Download';
           });
         };
       }
-      card.querySelector('.comm-foot').appendChild(btn);
+      actionsEl.appendChild(btn);
       grid.appendChild(card);
     });
   }

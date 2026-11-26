@@ -11,6 +11,7 @@ import { execFileSync } from 'child_process';
 
 const issueBody = process.env.ISSUE_BODY || '';
 const issueAuthor = process.env.ISSUE_AUTHOR || 'Community';
+const issueUrl = process.env.ISSUE_URL || '';
 const repoRoot = process.cwd();
 
 function parseIssueForm(body) {
@@ -129,7 +130,8 @@ async function main() {
       hasWorkingAnim: Boolean(validated.capabilities && validated.capabilities.hasWorkingAnim),
       updatedAt: new Date().toISOString().slice(0, 10),
       localZip: destZipRel,
-      zipUrl: `https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/${destZipRel}`
+      zipUrl: `https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/${destZipRel}`,
+      ...(issueUrl ? { githubUrl: issueUrl } : {})
     };
 
     const idx = manifest.pets.findIndex((p) => String(p.id || '').toLowerCase() === id);

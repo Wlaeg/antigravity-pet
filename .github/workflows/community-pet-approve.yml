@@ -26,6 +26,7 @@ jobs:
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
         run: |
           set -e
           RESULT=$(node scripts/process-community-issue.mjs)

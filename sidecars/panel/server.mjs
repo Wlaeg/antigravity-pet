@@ -20,6 +20,7 @@ const PETS_DIR = path.join(PLUGIN_ROOT, 'pets');
 const USER_PETS_DIR = path.join(os.homedir(), '.antigravity-pet', 'pets');
 const COMMUNITY_MANIFEST_PATH = path.join(PLUGIN_ROOT, 'community-pets.json');
 const COMMUNITY_MANIFEST_URL = 'https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community-pets.json';
+const COMMUNITY_STARS_PATH = path.join(os.homedir(), '.antigravity-pet', 'community-stars.json');
 const PORT = 47821;
 const TASK_NAME = 'AntigravityPetLauncher';
 
@@ -630,6 +631,37 @@ export async function getPetAvatars() {
   return { ok: true, avatars };
 }
 
+function readCommunityStars() {
+  try {
+    if (!fs.existsSync(COMMUNITY_STARS_PATH)) return new Set();
+    const arr = JSON.parse(fs.readFileSync(COMMUNITY_STARS_PATH, 'utf8'));
+    return new Set(Array.isArray(arr) ? arr.map((s) => String(s).toLowerCase()) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export async function toggleCommunityStar(args = {}) {
+  const id = String(args.id || '').trim().toLowerCase();
+  if (!id) return { ok: false, error: 'Missing pet id' };
+  const set = readCommunityStars();
+  let starred;
+  if (set.has(id)) {
+    set.delete(id);
+    starred = false;
+  } else {
+    set.add(id);
+    starred = true;
+  }
+  try {
+    fs.mkdirSync(path.dirname(COMMUNITY_STARS_PATH), { recursive: true });
+    fs.writeFileSync(COMMUNITY_STARS_PATH, JSON.stringify(Array.from(set), null, 2), 'utf8');
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+  return { ok: true, id, starred };
+}
+
 export async function getCommunityPets() {
   let manifest = null;
   let source = 'local';
@@ -647,10 +679,22 @@ export async function getCommunityPets() {
     } catch {}
   }
   const installedIds = new Set(scanPetPacks().map((p) => String(p.id || '').toLowerCase()));
-  const pets = (manifest && Array.isArray(manifest.pets) ? manifest.pets : []).map((p) => ({
-    ...p,
-    installed: installedIds.has(String(p.id || '').toLowerCase())
-  }));
+  const starredSet = readCommunityStars();
+  const pets = (manifest && Array.isArray(manifest.pets) ? manifest.pets : []).map((p) => {
+    const key = String(p.id || '').toLowerCase();
+    const starred = starredSet.has(key);
+    const baseStars = Number(p.stars || 0);
+    const githubUrl = p.githubUrl || (p.localZip
+      ? `https://github.com/Wlaeg/antigravity-pet/blob/main/${String(p.localZip).replace(/^[\\/]+/, '')}`
+      : 'https://github.com/Wlaeg/antigravity-pet');
+    return {
+      ...p,
+      starred,
+      stars: baseStars + (starred ? 1 : 0),
+      githubUrl,
+      installed: installedIds.has(key)
+    };
+  });
   return { ok: true, source, pets };
 }
 
@@ -910,6 +954,7 @@ if (isDirectRun) {
     app.api('/api/import-pet', async (data) => await importPetPack(data || {}), 'POST');
     app.api('/api/community-pets', async () => await getCommunityPets(), 'POST');
     app.api('/api/install-community-pet', async (data) => await installCommunityPet(data || {}), 'POST');
+    app.api('/api/star-community-pet', async (data) => await toggleCommunityStar(data || {}), 'POST');
     app.api('/api/pet-avatars', async () => await getPetAvatars(), 'POST');
     app.api('/api/github-releases', async (data) => await getGithubReleases(Boolean(data && data.force)), 'POST');
     await app.run();
@@ -939,6 +984,7 @@ if (isDirectRun) {
         url.pathname === '/api/import-pet' ||
         url.pathname === '/api/community-pets' ||
         url.pathname === '/api/install-community-pet' ||
+        url.pathname === '/api/star-community-pet' ||
         url.pathname === '/api/pet-avatars' ||
         url.pathname === '/api/github-releases'
       )) {
@@ -952,6 +998,7 @@ if (isDirectRun) {
           else if (url.pathname === '/api/import-pet') result = await importPetPack(data);
           else if (url.pathname === '/api/community-pets') result = await getCommunityPets();
           else if (url.pathname === '/api/install-community-pet') result = await installCommunityPet(data);
+          else if (url.pathname === '/api/star-community-pet') result = await toggleCommunityStar(data);
           else if (url.pathname === '/api/pet-avatars') result = await getPetAvatars();
           else if (url.pathname === '/api/github-releases') result = await getGithubReleases(Boolean(data && data.force));
           else result = await applySetting(data);
