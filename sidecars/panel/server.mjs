@@ -538,6 +538,98 @@ async function extractZipToDir(zipPath, extractDir) {
   });
 }
 
+const _avatarMemCache = new Map();
+
+function readImageAsDataUrl(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  const ext = path.extname(filePath).toLowerCase();
+  const mime = ext === '.webp' ? 'image/webp' : (ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png');
+  const buf = fs.readFileSync(filePath);
+  if (!buf || buf.length === 0) return null;
+  return `data:${mime};base64,${buf.toString('base64')}`;
+}
+
+function resolvePetPreviewDataUrl(petDir) {
+  try {
+    const manifestPath = path.join(petDir, 'pet.json');
+    if (!fs.existsSync(manifestPath)) return null;
+    const meta = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const sheetPath = path.join(petDir, meta.spritesheetPath || 'spritesheet.png');
+    if (fs.existsSync(sheetPath)) return readImageAsDataUrl(sheetPath);
+    const idleDir = path.join(petDir, 'idle');
+    if (fs.existsSync(idleDir)) {
+      const frames = fs.readdirSync(idleDir).filter((f) => /\.(png|webp|jpg|jpeg)$/i.test(f)).sort();
+      if (frames.length) return readImageAsDataUrl(path.join(idleDir, frames[0]));
+    }
+    const candidates = [meta.idleImage, meta.image, 'idle.png', 'idle.webp', 'pet.png', 'pet.webp', 'avatar.png', 'avatar.webp'].filter(Boolean);
+    for (const rel of candidates) {
+      const fp = path.join(petDir, String(rel));
+      if (fs.existsSync(fp)) return readImageAsDataUrl(fp);
+    }
+    const rootImg = fs.readdirSync(petDir).find((f) => /\.(png|webp|jpg|jpeg)$/i.test(f));
+    if (rootImg) return readImageAsDataUrl(path.join(petDir, rootImg));
+  } catch {}
+  return null;
+}
+
+export async function getPetAvatars() {
+  const avatars = {};
+  for (const root of [PETS_DIR, USER_PETS_DIR]) {
+    try {
+      if (!fs.existsSync(root)) continue;
+      for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const dir = path.join(root, entry.name);
+        const manifest = path.join(dir, 'pet.json');
+        if (!fs.existsSync(manifest)) continue;
+        try {
+          const meta = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+          const id = String(meta.id || entry.name);
+          const dataUrl = resolvePetPreviewDataUrl(dir);
+          if (dataUrl) {
+            avatars[id] = dataUrl;
+            _avatarMemCache.set(id.toLowerCase(), dataUrl);
+          }
+        } catch {}
+      }
+    } catch {}
+  }
+
+  // Fill community pack previews from local fallback zips (without re-extracting if cached)
+  if (fs.existsSync(COMMUNITY_MANIFEST_PATH)) {
+    try {
+      const manifest = JSON.parse(fs.readFileSync(COMMUNITY_MANIFEST_PATH, 'utf8'));
+      for (const p of (manifest.pets || [])) {
+        const id = String(p.id || '').trim();
+        const key = id.toLowerCase();
+        if (!id || avatars[id]) continue;
+        if (_avatarMemCache.has(key)) {
+          avatars[id] = _avatarMemCache.get(key);
+          continue;
+        }
+        const rel = String(p.localZip || '').replace(/^[\\/]+/, '');
+        const resolved = rel ? path.resolve(PLUGIN_ROOT, rel) : '';
+        const communityRoot = path.resolve(PLUGIN_ROOT, 'community');
+        if (resolved && resolved.startsWith(communityRoot) && fs.existsSync(resolved)) {
+          const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-avatar-'));
+          try {
+            await extractZipToDir(resolved, tmpDir);
+            const mDir = findPetManifestDir(tmpDir);
+            const dataUrl = mDir ? resolvePetPreviewDataUrl(mDir) : null;
+            if (dataUrl) {
+              avatars[id] = dataUrl;
+              _avatarMemCache.set(key, dataUrl);
+            }
+          } catch {} finally {
+            try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+          }
+        }
+      }
+    } catch {}
+  }
+  return { ok: true, avatars };
+}
+
 export async function getCommunityPets() {
   let manifest = null;
   let source = 'local';
@@ -818,6 +910,7 @@ if (isDirectRun) {
     app.api('/api/import-pet', async (data) => await importPetPack(data || {}), 'POST');
     app.api('/api/community-pets', async () => await getCommunityPets(), 'POST');
     app.api('/api/install-community-pet', async (data) => await installCommunityPet(data || {}), 'POST');
+    app.api('/api/pet-avatars', async () => await getPetAvatars(), 'POST');
     app.api('/api/github-releases', async (data) => await getGithubReleases(Boolean(data && data.force)), 'POST');
     await app.run();
     console.log('[antigravity-pet panel] sidecar registered and running');
@@ -846,6 +939,7 @@ if (isDirectRun) {
         url.pathname === '/api/import-pet' ||
         url.pathname === '/api/community-pets' ||
         url.pathname === '/api/install-community-pet' ||
+        url.pathname === '/api/pet-avatars' ||
         url.pathname === '/api/github-releases'
       )) {
         let raw = '';
@@ -858,6 +952,7 @@ if (isDirectRun) {
           else if (url.pathname === '/api/import-pet') result = await importPetPack(data);
           else if (url.pathname === '/api/community-pets') result = await getCommunityPets();
           else if (url.pathname === '/api/install-community-pet') result = await installCommunityPet(data);
+          else if (url.pathname === '/api/pet-avatars') result = await getPetAvatars();
           else if (url.pathname === '/api/github-releases') result = await getGithubReleases(Boolean(data && data.force));
           else result = await applySetting(data);
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });

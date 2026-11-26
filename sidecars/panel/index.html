@@ -522,8 +522,34 @@
     border-color: var(--accent);
     box-shadow: 0 0 0 1px var(--accent) inset;
   }
-  .skin-top { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+  .skin-top { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; }
   .skin-swatch { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+  .pet-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    background: var(--bg);
+    border: 1px solid var(--line-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+  .pet-avatar-img {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    display: block;
+  }
+  .pet-avatar-fallback {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--mono);
+  }
   .skin-name {
     font-weight: 600;
     font-size: 12.5px;
@@ -1860,13 +1886,14 @@
       var swColor = SWATCH_MAP[p.id] || '#94A3B8';
       btn.innerHTML =
         '<div class="skin-top">' +
-          '<span class="skin-swatch" style="background:' + swColor + '"></span>' +
+          renderPetAvatarHtml(p.id, p.displayName || p.id, swColor) +
           '<span class="skin-name">' + escapeHtml(p.displayName || p.id) + '</span>' +
         '</div>' +
         '<div class="skin-desc">' + escapeHtml(p.description || ('Sprite v' + (p.version || 2))) + '</div>';
       btn.onclick = function () { setOpt('skin', p.id); };
       grid.appendChild(btn);
     });
+    ensurePetAvatars();
 
     var sc = Number(data.scale || 1);
     if (!_scaleDragging) {
@@ -2053,6 +2080,76 @@
   var _communitySource = 'local';
   var _communityQuery = '';
   var _studioImages = [];
+  var _croppedAvatars = {};
+  var _avatarsLoaded = false;
+  var _avatarsLoading = false;
+
+  function renderPetAvatarHtml(id, title, accentColor) {
+    var key = String(id || '').toLowerCase();
+    var src = _croppedAvatars[key];
+    var borderStyle = accentColor ? 'border-color:' + escapeHtml(accentColor) + '44;' : '';
+    if (src) {
+      return '<span class="pet-avatar" style="' + borderStyle + '"><img class="pet-avatar-img" src="' + src + '" alt="' + escapeHtml(title || id) + '" /></span>';
+    }
+    var ch = escapeHtml(String(title || id || '?').trim().charAt(0).toUpperCase() || '?');
+    var colorStyle = accentColor ? 'color:' + escapeHtml(accentColor) + ';' : '';
+    return '<span class="pet-avatar" style="' + borderStyle + '"><span class="pet-avatar-fallback" style="' + colorStyle + '">' + ch + '</span></span>';
+  }
+
+  function cropHalfBodyToDataUrl(rawSrc) {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var sx = 0, sy = 0, sw = img.width, sh = img.height;
+          if (img.width >= 1536 && img.height >= 2080) {
+            sw = 192;
+            sh = Math.round(208 * 0.72);
+            sy = 6;
+          } else {
+            sh = Math.max(1, Math.round(img.height * 0.72));
+          }
+          var cv = document.createElement('canvas');
+          cv.width = 64;
+          cv.height = 64;
+          var ctx = cv.getContext('2d');
+          ctx.imageSmoothingEnabled = false;
+          var scale = Math.min(64 / sw, 64 / sh);
+          var dw = Math.round(sw * scale);
+          var dh = Math.round(sh * scale);
+          var dx = Math.round((64 - dw) / 2);
+          var dy = Math.round((64 - dh) / 2);
+          ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+          resolve(cv.toDataURL('image/png'));
+        } catch (e) {
+          resolve(rawSrc);
+        }
+      };
+      img.onerror = function () { resolve(null); };
+      img.src = rawSrc;
+    });
+  }
+
+  function ensurePetAvatars(force) {
+    if (_avatarsLoading || (_avatarsLoaded && !force)) return;
+    _avatarsLoading = true;
+    apiCall('/api/pet-avatars', {}).then(function (res) {
+      _avatarsLoading = false;
+      if (!res || !res.ok || !res.avatars) return;
+      _avatarsLoaded = true;
+      var entries = Object.keys(res.avatars);
+      Promise.all(entries.map(function (id) {
+        return cropHalfBodyToDataUrl(res.avatars[id]).then(function (cropped) {
+          if (cropped) _croppedAvatars[id.toLowerCase()] = cropped;
+        });
+      })).then(function () {
+        if (currentData) render(currentData);
+        if (_charTab === 'community') renderCommunityPets();
+      });
+    }).catch(function () {
+      _avatarsLoading = false;
+    });
+  }
 
   function switchCharTab(tab) {
     _charTab = tab === 'community' ? 'community' : 'installed';
@@ -2067,6 +2164,7 @@
   }
 
   function refreshCharView() {
+    ensurePetAvatars(true);
     if (_charTab === 'community') loadCommunityPets();
     else act('reload');
   }
@@ -2137,7 +2235,7 @@
       }
       card.innerHTML =
         '<div>' +
-          '<div class="skin-top"><span class="skin-swatch" style="background:' + escapeHtml(sw) + '"></span><span class="skin-name">' + escapeHtml(title) + '</span></div>' +
+          '<div class="skin-top">' + renderPetAvatarHtml(p.id, title, sw) + '<span class="skin-name">' + escapeHtml(title) + '</span></div>' +
           '<div class="skin-desc" style="margin-top:4px">' + escapeHtml(desc) + '</div>' +
           tagsHtml +
         '</div>' +
