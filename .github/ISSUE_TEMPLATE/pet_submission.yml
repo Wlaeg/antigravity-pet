@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Submit your custom pixel pet pack in English! After maintainer review (`approved` label), a GitHub Action will automatically validate your `.zip` and preview image, archive them, update `community-pets.json`, and make your pet **instantly searchable & installable** inside Antigravity Pet.
+        Submit your custom pixel pet pack! After maintainer review (`approved` label), a GitHub Action will automatically validate your `.zip` and preview image, archive them, update `community-pets.json`, and make your pet **instantly searchable & installable** inside Antigravity Pet.
 
         Before submitting, please make sure your `.zip` follows [`CUSTOM_PET_SPEC.md`](https://github.com/Wlaeg/antigravity-pet/blob/main/CUSTOM_PET_SPEC.md).
   - type: input

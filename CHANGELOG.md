@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **dsh-market Style Community Pet Workshop & Auto-Publish Pipeline (`.github/ISSUE_TEMPLATE/pet_submission.yml`, `.github/workflows/community-pet-approve.yml`, `.github/workflows/community-pet-pr-check.yml`, `scripts/validate-pet-pack.mjs`, `scripts/process-community-issue.mjs`)**:
-  - English-only community submission form requiring both a `.zip` pet pack and an author-provided full-body preview image (`PNG`/`WebP`/`JPG`).
+  - Community submission form requiring both a `.zip` pet pack and an author-provided full-body preview image (`PNG`/`WebP`/`JPG`).
   - Applying the `approved` label to a submission issue automatically validates the archive and preview image, archives them to `community/packs/` and `community/previews/`, registers the entry in `community-pets.json` with `githubUrl` and `tags`, and closes the issue.
 - **Global Community Stats Sync (`community-stats.json`, `scripts/sync-community-stats.mjs`, `.github/workflows/sync-community-stats.yml`)**:
   - Zero-server GitHub-backed global sync: Actions aggregates Issue reactions as global stars and Release asset `download_count` as global downloads every 30 minutes into `community-stats.json`, fetched in parallel by all clients.

@@ -16,7 +16,7 @@ Thank you for your interest in contributing to **Antigravity Pet**! Whether you 
    - Read the [Custom Pet Specification (`CUSTOM_PET_SPEC.md`)](CUSTOM_PET_SPEC.md) first.
    - Both **1-image fallback pets** (`sprite.png` + `pet.json`) and **full `1536×2288` (8×11) sprite sheets** are supported.
    - **Required assets**: You must provide **both** the pet pack `.zip` (`community/packs/<pet-id>.zip`) **and** a standalone **full-body preview image** (`community/previews/<pet-id>.png`).
-   - Use the English-only **Community Pet Submission** issue template (no manual PR needed — once approved, GitHub Actions publishes it automatically) or submit a PR registering both `localZip` and `localPreview` in `community-pets.json`.
+   - Use the **Community Pet Submission** issue template (no manual PR needed — once approved, GitHub Actions publishes it automatically) or submit a PR registering both `localZip` and `localPreview` in `community-pets.json`.
 
 3. **Improve Translations (i18n) / 完善多语言翻译**
    - Antigravity Pet supports **11 locales** (`en`, `zh`, `zh-tw`, `fr`, `de`, `ja`, `ko`, `hi`, `th`, `es`, `es-mx`).

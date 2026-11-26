@@ -78,11 +78,11 @@ my-custom-pet/
 
 ### 5. Community Submission Requirements
 
-To publish your pet to the in-plugin **Community Workshop**, submit an English-only [Community Pet Submission Issue](https://github.com/Wlaeg/antigravity-pet/issues/new?template=pet_submission.yml) with:
+To publish your pet to the in-plugin **Community Workshop**, submit a [Community Pet Submission Issue](https://github.com/Wlaeg/antigravity-pet/issues/new?template=pet_submission.yml) with:
 
 1. **Pet Pack `.zip` (Required)**: Valid v3 pack containing `pet.json` and sprite assets.
 2. **Full-Body Preview Image (Required)**: Standalone PNG / WebP / JPG full-body image provided by the author (displayed directly in the Community Workshop card before download).
-3. **English Metadata**: `id`, `displayName`, `description`, `themeColor`, and search `tags`.
+3. **Metadata**: `id`, `displayName`, `description`, `themeColor`, and search `tags`.
 
 ---
 
@@ -161,8 +161,8 @@ my-custom-pet/
 
 ### 5. 社区投稿必填规范
 
-如希望将自制宠物上架至插件内 **「社区宠物库」**，请通过 [Community Pet Submission Issue](https://github.com/Wlaeg/antigravity-pet/issues/new?template=pet_submission.yml) 提交（表单统一使用英文填写）：
+如希望将自制宠物上架至插件内 **「社区宠物库」**，请通过 [Community Pet Submission Issue](https://github.com/Wlaeg/antigravity-pet/issues/new?template=pet_submission.yml) 提交：
 
 1. **宠物包 `.zip`（必填）**：符合本规范的压缩包，内含 `pet.json` 与精灵图资源。
 2. **宠物全身预览图（必填）**：由作者单独提供的全身预览图（PNG / WebP / JPG），用于在用户下载前直接展示在社区宠物库卡片中。
-3. **英文元信息**：`id`、`displayName`、`description`、`themeColor` 与搜索 `tags`。
+3. **基础元信息**：`id`、`displayName`、`description`、`themeColor` 与搜索 `tags`。
