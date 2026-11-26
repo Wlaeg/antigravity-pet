@@ -32,11 +32,21 @@ function pick(sections, prefix) {
   return key ? sections[key].trim() : '';
 }
 
-function extractZipUrl(raw) {
-  const mdLink = raw.match(/\[[^\]]*\]\((https:\/\/[^)\s]+)\)/i);
+function extractUrlFromField(raw) {
+  const mdLink = raw.match(/!?\[[^\]]*\]\((https:\/\/[^)\s]+)\)/i);
   if (mdLink) return mdLink[1];
+  const imgTag = raw.match(/<img[^>]+src=["'](https:\/\/[^"'\s]+)["']/i);
+  if (imgTag) return imgTag[1];
   const bare = raw.match(/(https:\/\/[^\s<>")]+)/i);
   return bare ? bare[1] : '';
+}
+
+function detectImageExt(buf) {
+  if (!buf || buf.length < 12) return null;
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'png';
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg';
+  if (buf.slice(0, 4).toString('ascii') === 'RIFF' && buf.slice(8, 12).toString('ascii') === 'WEBP') return 'webp';
+  return null;
 }
 
 function downloadFile(url, maxBytes = 20 * 1024 * 1024, redirects = 5) {
@@ -74,11 +84,16 @@ async function main() {
   const descriptionZh = pick(sections, 'Description (ZH)');
   const themeColorRaw = pick(sections, 'Theme Color');
   const tagsRaw = pick(sections, 'Tags');
+  const previewField = pick(sections, 'Pet Full-Body Preview Image');
   const zipField = pick(sections, 'Pet Pack .zip');
-  const zipUrl = extractZipUrl(zipField);
+  const previewInputUrl = extractUrlFromField(previewField);
+  const zipUrl = extractUrlFromField(zipField);
 
   if (!zipUrl) {
     throw new Error('Could not find a valid HTTPS .zip URL or uploaded attachment in the issue body.');
+  }
+  if (!previewInputUrl) {
+    throw new Error('Please provide a full-body preview image (PNG/WebP/JPG) in the issue body.');
   }
 
   const tmpZip = path.join(repoRoot, '.tmp-submission.zip');
@@ -96,9 +111,19 @@ async function main() {
     }
 
     const packsDir = path.join(repoRoot, 'community', 'packs');
+    const previewsDir = path.join(repoRoot, 'community', 'previews');
     fs.mkdirSync(packsDir, { recursive: true });
+    fs.mkdirSync(previewsDir, { recursive: true });
     const destZipRel = `community/packs/${id}.zip`;
     fs.copyFileSync(tmpZip, path.join(repoRoot, destZipRel));
+
+    const prevBuf = await downloadFile(previewInputUrl, 5 * 1024 * 1024);
+    const prevExt = detectImageExt(prevBuf);
+    if (!prevExt) {
+      throw new Error('Preview image must be a valid PNG, WebP, or JPG file.');
+    }
+    const destPreviewRel = `community/previews/${id}.${prevExt}`;
+    fs.writeFileSync(path.join(repoRoot, destPreviewRel), prevBuf);
 
     const manifestPath = path.join(repoRoot, 'community-pets.json');
     const manifest = fs.existsSync(manifestPath)
@@ -131,6 +156,8 @@ async function main() {
       updatedAt: new Date().toISOString().slice(0, 10),
       localZip: destZipRel,
       zipUrl: `https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/${destZipRel}`,
+      localPreview: destPreviewRel,
+      previewUrl: `https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/${destPreviewRel}`,
       ...(issueUrl ? { githubUrl: issueUrl } : {})
     };
 

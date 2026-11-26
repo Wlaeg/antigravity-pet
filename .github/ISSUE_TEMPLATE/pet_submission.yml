@@ -61,6 +61,14 @@ body:
     validations:
       required: false
   - type: textarea
+    id: preview_url
+    attributes:
+      label: Pet Full-Body Preview Image / 宠物全身预览图
+      description: Drag and drop a PNG/WebP/JPG full-body preview image directly into this box (or paste an HTTPS image URL). Shown directly in the in-plugin Community Workshop before users download.
+      placeholder: "![preview](https://github.com/user-attachments/assets/...)"
+    validations:
+      required: true
+  - type: textarea
     id: zip_url
     attributes:
       label: Pet Pack .zip File or Direct URL / 宠物包 .zip 文件或直链

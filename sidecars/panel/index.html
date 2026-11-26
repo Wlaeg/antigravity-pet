@@ -2137,12 +2137,12 @@
     return '<span class="pet-avatar" style="' + borderStyle + '"><span class="pet-avatar-fallback" style="' + colorStyle + '">' + ch + '</span></span>';
   }
 
-  function renderPetFullBodyHtml(id, title, accentColor) {
+  function renderPetFullBodyHtml(id, title, accentColor, previewUrl) {
     var key = String(id || '').toLowerCase();
-    var src = _croppedFullBodies[key] || _croppedAvatars[key];
+    var src = _croppedFullBodies[key] || previewUrl || _croppedAvatars[key];
     var borderStyle = accentColor ? 'border-color:' + escapeHtml(accentColor) + '44;' : '';
     if (src) {
-      return '<div class="comm-portrait-box" style="' + borderStyle + '"><img class="comm-portrait-img" src="' + src + '" alt="' + escapeHtml(title || id) + '" /></div>';
+      return '<div class="comm-portrait-box" style="' + borderStyle + '"><img class="comm-portrait-img" src="' + escapeHtml(src) + '" alt="' + escapeHtml(title || id) + '" /></div>';
     }
     var ch = escapeHtml(String(title || id || '?').trim().charAt(0).toUpperCase() || '?');
     var colorStyle = accentColor ? 'color:' + escapeHtml(accentColor) + ';' : '';
@@ -2298,7 +2298,7 @@
       var starCount = Number(p.stars || 0);
       card.innerHTML =
         '<div class="comm-main">' +
-          renderPetFullBodyHtml(p.id, title, sw) +
+          renderPetFullBodyHtml(p.id, title, sw, p.previewUrl) +
           '<div class="comm-info">' +
             '<div class="skin-name">' + escapeHtml(title) + '</div>' +
             '<div class="skin-desc" style="margin-top:4px">' + escapeHtml(desc) + '</div>' +

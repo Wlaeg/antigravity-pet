@@ -608,9 +608,19 @@ export async function getPetAvatars() {
           avatars[id] = _avatarMemCache.get(key);
           continue;
         }
+        const prevRel = String(p.localPreview || `community/previews/${id}.png`).replace(/^[\\/]+/, '');
+        const prevResolved = path.resolve(PLUGIN_ROOT, prevRel);
+        const communityRoot = path.resolve(PLUGIN_ROOT, 'community');
+        if (prevResolved.startsWith(communityRoot) && fs.existsSync(prevResolved)) {
+          const prevDataUrl = readImageAsDataUrl(prevResolved);
+          if (prevDataUrl) {
+            avatars[id] = prevDataUrl;
+            _avatarMemCache.set(key, prevDataUrl);
+            continue;
+          }
+        }
         const rel = String(p.localZip || '').replace(/^[\\/]+/, '');
         const resolved = rel ? path.resolve(PLUGIN_ROOT, rel) : '';
-        const communityRoot = path.resolve(PLUGIN_ROOT, 'community');
         if (resolved && resolved.startsWith(communityRoot) && fs.existsSync(resolved)) {
           const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-avatar-'));
           try {

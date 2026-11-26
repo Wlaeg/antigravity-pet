@@ -5,7 +5,7 @@ on:
     types: [labeled]
 
 concurrency:
-  group: community-pet-publish
+  group: community-pet-publish-${{ github.event.issue.number }}
   cancel-in-progress: false
 
 permissions:
@@ -45,12 +45,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add community/packs/ community-pets.json
+          git add community/packs/ community/previews/ community-pets.json
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
             git commit -m "feat(community): publish ${{ steps.process.outputs.pet_id }} v${{ steps.process.outputs.pet_version }} (#${{ github.event.issue.number }})"
-            git push
+            for i in 1 2 3; do
+              git pull --rebase origin main && git push && break
+              sleep 2
+            done
           fi
 
       - name: Comment & close issue on success
