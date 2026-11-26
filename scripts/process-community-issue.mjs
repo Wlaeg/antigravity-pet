@@ -78,10 +78,8 @@ function downloadFile(url, maxBytes = 20 * 1024 * 1024, redirects = 5) {
 async function main() {
   const sections = parseIssueForm(issueBody);
   const rawId = pick(sections, 'Pet ID');
-  const displayName = pick(sections, 'Display Name (EN)');
-  const displayNameZh = pick(sections, 'Display Name (ZH)');
-  const description = pick(sections, 'Description (EN)');
-  const descriptionZh = pick(sections, 'Description (ZH)');
+  const displayName = pick(sections, 'Display Name');
+  const description = pick(sections, 'Description');
   const themeColorRaw = pick(sections, 'Theme Color');
   const tagsRaw = pick(sections, 'Tags');
   const previewField = pick(sections, 'Pet Full-Body Preview Image');
@@ -145,9 +143,7 @@ async function main() {
     const entry = {
       id,
       displayName: displayName || validated.displayName,
-      ...(displayNameZh || validated.displayNameZh ? { displayNameZh: displayNameZh || validated.displayNameZh } : {}),
       description: description || validated.description || '',
-      ...(descriptionZh || validated.descriptionZh ? { descriptionZh: descriptionZh || validated.descriptionZh } : {}),
       author: issueAuthor,
       themeColor,
       version: '1.0.0',

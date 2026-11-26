@@ -105,9 +105,7 @@ try {
     ok: true,
     id,
     displayName,
-    displayNameZh: meta.displayNameZh || '',
     description: meta.description || '',
-    descriptionZh: meta.descriptionZh || '',
     themeColor: meta.themeColor || '#0EA5E9',
     spriteVersionNumber: Number(meta.spriteVersionNumber || 3),
     capabilities: {
