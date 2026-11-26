@@ -38,7 +38,9 @@ Stop staring at spinning terminals. **Antigravity Pet** sits cleanly on your **W
   - Bounces with your typing rhythm (privacy-first frequency only — **zero keylogging**); type faster than 5 keys/s and watch dizzy stars orbit its head.
   - Leave it alone and it wanders with `?` / `♪` cues before curling up for a `Zzz` nap — one keystroke wakes it in 0.3s.
 - **Polished Everyday Controls (`v4.1–v4.4`)**
-  - Right-click **Settings** to open a standalone `460×800` window with **5 clean tabs** (**Characters / Behavior / Bubbles / System / Updates**), `0.33x–3.00x` smooth scale slider, **11 locales**, edge half-body peeking, fullscreen auto-hide, and one-click in-app self-updates.
+  - Right-click **Settings** to open a standalone `460×800` window with **5 clean tabs** (**Characters / Behavior / Bubbles / System / Updates**), `0.33x–3.00x` smooth scale slider, edge half-body peeking, fullscreen auto-hide, and one-click in-app self-updates.
+- **11-Locale Full-Stack Localization (`v4.4–v4.5`)**
+  - Automatically follows your Antigravity locale (or switch manually anytime) across the **Settings UI, pet names, live tool bubbles, background counters, approval buttons, and right-click menu**: `English`, `简体中文`, `繁體中文 (TW)`, `Français`, `Deutsch`, `日本語`, `한국어`, `हिन्दी`, `ไทย`, `Español (ES)`, and `Español (MX)`.
 
 ---
 
@@ -106,7 +108,9 @@ Looking to craft your own pet pack or integrate with the local bridge? Detailed 
   - 随打字频率同步弹跳（仅统计 1.5 秒滑窗频率，**绝不记录任何按键内容**），手速狂飙超过 5 键/秒头顶会冒 **3 颗旋转星星眩晕**！
   - 挂机不管它会自己溜达冒 `?` / `♪`，久了会压扁打盹飘 `Zzz`；敲一下键盘 0.3 秒瞬间惊醒。
 - **打磨到位的日常体验 (`v4.1–v4.4`)**
-  - 右键点击 **「⚙️ 设置」** 秒开纯净 `460×800` 独立设置窗：**角色 / 互动 / 气泡 / 系统 / 更新** 5 大分页、**`0.33x–3.00x` 无级缩放**、**11 国/地区语言**、左右半身贴边藏匿、全屏自动隐身，以及设置页内一键版本自更新。
+  - 右键点击 **「⚙️ 设置」** 秒开纯净 `460×800` 独立设置窗：**角色 / 互动 / 气泡 / 系统 / 更新** 5 大分页、**`0.33x–3.00x` 无级缩放**、左右半身贴边藏匿、全屏自动隐身，以及设置页内一键版本自更新。
+- **11 国/地区全链路多语言支持 (`v4.4–v4.5`)**
+  - 支持自动跟随 Antigravity 客户端语言或随时手动切换，完整覆盖 **设置面板、角色名称、实时工具气泡、后台计数、审批按钮与桌宠右键菜单**：`English`、`简体中文`、`繁體中文（台湾）`、`Français`、`Deutsch`、`日本語`、`한국어`、`हिन्दी`、`ไทย`、`Español (ES)`、`Español (MX)`。
 
 ---
 
