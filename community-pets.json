@@ -93,28 +93,6 @@
       "localPreview": "community/previews/star-hamster.png",
       "previewUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/previews/star-hamster.png",
       "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/8"
-    },
-    {
-      "id": "gemini-chan",
-      "displayName": "Gemini",
-      "description": "Pixel-art Gemini companion who tinkers with a pixelated Antigravity app icon while working",
-      "author": "Wlaeg",
-      "themeColor": "#818CF8",
-      "version": "1.0.0",
-      "tags": [
-        "pixel",
-        "anime",
-        "gemini",
-        "working-anim",
-        "agy"
-      ],
-      "hasWorkingAnim": true,
-      "updatedAt": "2026-11-26",
-      "localZip": "community/packs/gemini-chan.zip",
-      "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/gemini-chan.zip",
-      "localPreview": "community/previews/gemini-chan.png",
-      "previewUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/previews/gemini-chan.png",
-      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/9"
     }
   ]
 }
