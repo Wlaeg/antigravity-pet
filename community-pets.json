@@ -55,11 +55,23 @@
       "displayNameZh": "咖啡史莱姆",
       "description": "Mint pixel slime powered by iced Americano",
       "descriptionZh": "靠冰美式续命的薄荷绿像素史莱姆",
-      "author": "Antigravity Community",
+      "author": "Wlaeg",
       "themeColor": "#10B981",
-      "version": "1.0.0",
+      "version": "1.0.1",
+      "tags": [
+        "pixel",
+        "slime",
+        "coffee",
+        "mint",
+        "working-anim"
+      ],
+      "hasWorkingAnim": true,
+      "updatedAt": "2026-11-26",
       "localZip": "community/packs/coffee-slime.zip",
-      "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/coffee-slime.zip"
+      "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/coffee-slime.zip",
+      "localPreview": "community/previews/coffee-slime.png",
+      "previewUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/previews/coffee-slime.png",
+      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/7"
     }
   ]
 }
