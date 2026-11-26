@@ -1,0 +1,58 @@
+name: Bug Report / 问题反馈
+description: Report a bug or unexpected behavior in Antigravity Pet (报告桌面宠物运行异常或 Bug)
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill in the details below so we can reproduce and fix it quickly.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System / 操作系统
+      options:
+        - Windows 10
+        - Windows 11
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Plugin Version / 插件版本
+      description: Find this in the Updates tab of the settings window or `plugin.json`.
+      placeholder: e.g. v4.5.0
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened? / 问题描述
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce / 复现步骤
+      placeholder: |
+        1. Open settings window -> ...
+        2. Drag pet to screen edge...
+        3. See error / unexpected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior / 期望表现
+    validations:
+      required: false
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or Logs / 截图或日志
+      description: Optional screenshots, screen recordings, or console output.
+    validations:
+      required: false

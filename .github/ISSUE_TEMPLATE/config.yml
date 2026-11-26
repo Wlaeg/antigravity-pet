@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Custom Pet Specification / 自制宠物规范
+    url: https://github.com/Wlaeg/antigravity-pet/blob/main/CUSTOM_PET_SPEC.md
+    about: Learn how to make a 1-image or full sprite-sheet custom pet pack.
+  - name: Development & Architecture Guide / 开发与架构文档
+    url: https://github.com/Wlaeg/antigravity-pet/blob/main/docs/DEVELOPMENT.md
+    about: System architecture, state machine priority, and local HTTP API reference.

@@ -1,0 +1,49 @@
+name: Community Pet Submission / 社区宠物投稿
+description: Share a custom pixel pet pack or 1-image pet for the Community Workshop (投稿自制宠物包到社区工坊)
+title: "[Pet]: "
+labels: ["community-pet"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before submitting, please check the [Custom Pet Specification (`CUSTOM_PET_SPEC.md`)](https://github.com/Wlaeg/antigravity-pet/blob/main/CUSTOM_PET_SPEC.md).
+        Both **1-image fallback pets** and **full 1536×2288 (8×11) sprite sheets** are welcome!
+  - type: input
+    id: pet-id
+    attributes:
+      label: Pet ID / 宠物唯一标识
+      description: Lowercase letters, numbers, and hyphens only.
+      placeholder: e.g. cyber-shiba
+    validations:
+      required: true
+  - type: input
+    id: pet-name
+    attributes:
+      label: Display Name / 宠物名称
+      placeholder: e.g. Cyber Shiba / 赛博柴犬
+    validations:
+      required: true
+  - type: dropdown
+    id: format
+    attributes:
+      label: Asset Format / 素材格式
+      options:
+        - 1-image fallback (single PNG + pet.json)
+        - Full 1536×2288 (8×11) sprite sheet
+        - Packaged .agypet / .zip archive
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description & Theme / 简介与配色主题
+      description: Brief intro, author credit, and optional themeColor.
+    validations:
+      required: true
+  - type: checkboxes
+    id: license-check
+    attributes:
+      label: License Confirmation / 授权确认
+      options:
+        - label: I confirm I created these assets or have permission to distribute them under the repository's MIT License.
+          required: true

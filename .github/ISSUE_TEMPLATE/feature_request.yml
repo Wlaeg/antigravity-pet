@@ -1,0 +1,30 @@
+name: Feature Request / 功能建议
+description: Suggest an enhancement, new interaction, or i18n improvement (提出新功能、交互或翻译建议)
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem or use case does this address? / 使用场景与需求背景
+      description: Describe what you want to achieve and why it would be helpful.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution / 期望实现方式
+      description: Describe how you envision this feature working.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Target Platform / 目标平台
+      options:
+        - Both Windows & macOS
+        - Windows only
+        - macOS only
+        - Sidecar Panel / Plugin Tooling
+    validations:
+      required: false
