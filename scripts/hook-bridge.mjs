@@ -1,9 +1,10 @@
-import { execFile, spawn } from 'node:child_process';
+﻿import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { formatToolLabel } from './tool-label-mapper.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = path.resolve(__dirname, '..');
@@ -164,50 +165,18 @@ function launchPetInRealDesktop() {
 }
 
 function extractTitle(payload) {
-  const raw = String(payload.lastUserInput || '').replace(/\s+/g, ' ').trim();
+  const raw = String(payload.lastUserInput || payload.taskTitle || payload.title || '').replace(/\s+/g, ' ').trim();
   if (!raw) return '';
   return raw.length > 24 ? `${raw.slice(0, 24)}…` : raw;
 }
 
-function friendlyToolLabel(toolCall) {
-  const name = toolCall?.name || '';
-  const args = toolCall?.args || {};
-
-  if (name === 'call_mcp_tool') {
-    const server = String(args.ServerName || '').toLowerCase();
-    const mcpTool = String(args.ToolName || '').toLowerCase();
-    if (server.includes('windows-mcp')) {
-      if (mcpTool === 'screenshot' || mcpTool === 'snapshot') return '查看屏幕中...';
-      if (mcpTool === 'app') return '操作桌面应用中...';
-      return '操控桌面中...';
-    }
-    if (server.includes('agy-dart_fast')) {
-      if (mcpTool === 'apply_edits') return '编辑代码中...';
-      if (mcpTool === 'batch_search') return '检索代码中...';
-      if (mcpTool === 'run_checks') return '运行检查中...';
-      return '快速分析代码中...';
-    }
-    if (server.includes('agy-dart_context')) {
-      return '分析长文本中...';
-    }
-    if (server.includes('antigravity-pet')) {
-      return '更新桌宠设置...';
-    }
-    return '调用扩展工具中...';
-  }
-
-  const map = {
-    run_command: '执行命令中...',
-    read_file: '读取文件中...',
-    write_file: '编写文件中...',
-    edit_file: '修改代码中...',
-    search_web: '搜索资料中...',
-    invoke_subagent: '调度子代理中...',
-    ask_question: '等待你回答...',
-    manage_task: '管理后台任务...',
-    exit_plan_mode: '准备开始执行...'
-  };
-  return map[name] || '执行任务中...';
+function detectBackground(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+  if (payload.isBackground === true || payload.background === true) return true;
+  const mode = String(payload.mode || payload.runMode || '').toLowerCase();
+  if (mode === 'background' || mode === 'daemon') return true;
+  const src = String(payload.hookSource || payload.source || payload.trigger || '').toLowerCase();
+  return /background|daemon|cron|subagent|schedule/.test(src);
 }
 
 async function main() {
@@ -223,7 +192,10 @@ async function main() {
 
   const evt = payload.hookEventName || '';
   const conversationId = payload.conversationId || 'default';
+  const parentConversationId = payload.parentConversationId || payload.parentId || '';
   const title = extractTitle(payload);
+  const isBackground = detectBackground(payload);
+  const activeState = isBackground ? 'background_running' : 'running';
 
   if (evt === 'SessionStart') {
     const alive = await checkHealth();
@@ -231,7 +203,7 @@ async function main() {
       if (isPetEnabledInConfig()) {
         await launchPetInRealDesktop();
       }
-    } else {
+    } else if (!isBackground) {
       await postJson('/state', { conversationId, state: 'idle', message: '', title });
     }
   } else if (evt === 'PreInvocation') {
@@ -242,32 +214,74 @@ async function main() {
       alive = await checkHealth();
     }
     if (alive) {
-      await postJson('/state', { conversationId, state: 'running', message: '思考规划中...', title });
+      await postJson('/state', {
+        conversationId,
+        parentConversationId,
+        isBackground,
+        state: activeState,
+        message: '正在思考',
+        messageEn: 'Thinking',
+        toolPhase: 'thinking',
+        title
+      });
     }
   } else if (evt === 'PostToolUse') {
     if (payload.error) {
-      await postJson('/state', {
-        conversationId,
-        state: 'blocked',
-        message: '工具出错 · 点击查看',
-        title,
-        isToolCall: true
-      });
+      if (isBackground) {
+        await postJson('/state', {
+          conversationId,
+          parentConversationId,
+          isBackground: true,
+          state: 'idle',
+          backgroundDone: true,
+          backgroundSuccess: false,
+          message: '工具出错',
+          messageEn: 'Tool error',
+          toolPhase: 'error',
+          title,
+          isToolCall: true
+        });
+      } else {
+        await postJson('/state', {
+          conversationId,
+          state: 'blocked',
+          message: '工具出错 · 点击查看',
+          messageEn: 'Blocked · Click to view',
+          toolPhase: 'error',
+          title,
+          isToolCall: true
+        });
+      }
     } else {
       await postJson('/state', {
         conversationId,
-        state: 'running',
-        message: friendlyToolLabel(payload.toolCall),
-        title,
-        isToolCall: true
+        parentConversationId,
+        isBackground,
+        state: activeState,
+        message: '',
+        messageEn: '',
+        toolPhase: 'end',
+        title
       });
     }
   } else if (evt === 'PostInvocation') {
-    await postJson('/state', { conversationId, state: 'running', message: '处理结果中...', title });
+    await postJson('/state', {
+      conversationId,
+      parentConversationId,
+      isBackground,
+      state: activeState,
+      message: '整理回复中',
+      messageEn: 'Processing results',
+      toolPhase: 'finishing',
+      title
+    });
   } else if (evt === 'PreToolUse') {
-    const toolName = (payload.toolCall && payload.toolCall.name) || payload.toolName || 'run_command';
-    const cmdLine = String((payload.toolCall && payload.toolCall.args && (payload.toolCall.args.CommandLine || payload.toolCall.args.command)) || '');
-    const isHighRisk = /(\brm\s+-rf?\b|\bRemove-Item\b|\bdel\s+\/|\bformat\s+|\bgit\s+push\b|\bgit\s+reset\s+--hard\b|\bshutdown\b|\breg\s+delete\b)/i.test(cmdLine);
+    const toolCall = payload.toolCall || { name: payload.toolName || 'tool', args: {} };
+    const toolName = toolCall.name || payload.toolName || 'tool';
+    const isRunCommand = toolName === 'run_command';
+    const cmdLine = String((toolCall.args && (toolCall.args.CommandLine || toolCall.args.command)) || '');
+    const isHighRisk = isRunCommand && /(\brm\s+-rf?\b|\bRemove-Item\b|\bdel\s+\/|\bformat\s+|\bgit\s+push\b|\bgit\s+reset\s+--hard\b|\bshutdown\b|\breg\s+delete\b)/i.test(cmdLine);
+
     if (isHighRisk) {
       const alive = await checkHealth(150);
       if (alive) {
@@ -287,16 +301,47 @@ async function main() {
         }
       }
     }
-    process.stdout.write(JSON.stringify({ decision: 'ask' }));
+
+    const label = formatToolLabel(toolCall);
+    await postJson('/state', {
+      conversationId,
+      parentConversationId,
+      isBackground,
+      state: activeState,
+      message: label.zh,
+      messageEn: label.en,
+      toolPhase: 'start',
+      title,
+      isToolCall: true
+    });
+
+    if (isRunCommand) {
+      process.stdout.write(JSON.stringify({ decision: 'ask' }));
+    } else {
+      process.stdout.write(JSON.stringify({ decision: 'allow' }));
+    }
     return;
   } else if (evt === 'Stop') {
     const reason = payload.terminationReason || '';
-    if (reason === 'ERROR' || payload.error) {
-      await postJson('/state', { conversationId, state: 'blocked', message: '任务出错 · 点击查看', title });
+    const isErr = reason === 'ERROR' || Boolean(payload.error);
+    if (isBackground) {
+      await postJson('/state', {
+        conversationId,
+        parentConversationId,
+        isBackground: true,
+        state: 'idle',
+        backgroundDone: true,
+        backgroundSuccess: !isErr,
+        message: isErr ? '后台任务出错' : '后台任务已完成',
+        messageEn: isErr ? 'Bg task failed' : 'Bg task done',
+        title
+      });
+    } else if (isErr) {
+      await postJson('/state', { conversationId, state: 'blocked', message: '任务出错 · 点击查看', messageEn: 'Task error · Click to view', title });
     } else if (reason === 'USER_CANCELED') {
       await postJson('/state', { conversationId, state: 'idle', message: '', title });
     } else {
-      await postJson('/state', { conversationId, state: 'ready', message: '任务完成!', title });
+      await postJson('/state', { conversationId, state: 'ready', message: '任务完成!', messageEn: '✓ Task Ready · Click', title });
     }
   }
 

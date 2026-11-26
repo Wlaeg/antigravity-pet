@@ -28,7 +28,8 @@ namespace AntigravityPet
         Running = 1,
         Ready = 2,
         Blocked = 3,
-        NeedsInput = 4
+        NeedsInput = 4,
+        BackgroundRunning = 5
     }
 
     public enum TransientAction
@@ -140,9 +141,13 @@ namespace AntigravityPet
     public class TaskItem
     {
         public string ConversationId;
+        public string ParentConversationId;
         public string Title;
         public PetState State;
+        public bool IsBackground;
         public string Message;
+        public string MessageEn;
+        public string ToolPhase;
         public DateTime UpdatedAt;
     }
 
@@ -290,6 +295,7 @@ namespace AntigravityPet
         private DateTime _idleActivityAt = DateTime.UtcNow;
         private DateTime _nextBoredActionAt = DateTime.UtcNow.AddSeconds(24);
         private DateTime _nextSleepZzzAt = DateTime.UtcNow;
+        private DateTime _nextBgMoonAt = DateTime.UtcNow;
         private double _wakeUpLeftSec = 0.0;
         private double _lookAroundLeftSec = 0.0;
         private bool _boredLookFlipX = false;
@@ -321,6 +327,16 @@ namespace AntigravityPet
         private readonly DispatcherTimer _behaviorTimer;
         private readonly DispatcherTimer _autoIdleTimer;
         private readonly DispatcherTimer _mouseFollowTimer;
+        private readonly DispatcherTimer _toolDebounceTimer;
+        private readonly DispatcherTimer _toolIdleGapTimer;
+        private DateTime _lastToolDisplayAt = DateTime.MinValue;
+        private string _pendingToolConvId = "";
+        private string _pendingToolMsg = "";
+        private string _pendingToolMsgEn = "";
+        private string _pendingToolTitle = "";
+        private bool _pendingToolIsCall = false;
+        private const int ToolMinDisplayMs = 350;
+        private const int ToolIdleGapMs = 1200;
         private readonly JavaScriptSerializer _json = new JavaScriptSerializer();
         private readonly Random _rng = new Random();
         private readonly DateTime _sessionStart = DateTime.Now;
@@ -480,7 +496,7 @@ namespace AntigravityPet
                 FontSize = 11.5,
                 FontWeight = FontWeights.Bold,
                 TextWrapping = TextWrapping.NoWrap,
-                TextTrimming = TextTrimming.CharacterEllipsis,
+                TextTrimming = TextTrimming.None,
                 MaxWidth = 208
             };
             _bubbleWrapperPanel = new StackPanel { Orientation = Orientation.Vertical };
@@ -796,6 +812,44 @@ namespace AntigravityPet
                 {
                     ClearReminderTasks();
                 }
+            };
+
+            _toolDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ToolMinDisplayMs) };
+            _toolDebounceTimer.Tick += (s, e) =>
+            {
+                _toolDebounceTimer.Stop();
+                if (!string.IsNullOrEmpty(_pendingToolConvId))
+                {
+                    string cid = _pendingToolConvId;
+                    string pMsg = _pendingToolMsg;
+                    string pMsgEn = _pendingToolMsgEn;
+                    string pTitle = _pendingToolTitle;
+                    bool pIsCall = _pendingToolIsCall;
+                    _pendingToolConvId = "";
+                    _lastToolDisplayAt = DateTime.Now;
+                    TaskItem existingBg;
+                    bool isBg = _tasks.TryGetValue(cid, out existingBg) && existingBg.IsBackground;
+                    string pCid = existingBg != null ? existingBg.ParentConversationId : "";
+                    ApplyTaskStateCore(cid, isBg ? PetState.BackgroundRunning : PetState.Running, pMsg, pTitle, pIsCall, pMsgEn, "start", isBg, pCid);
+                }
+            };
+
+            _toolIdleGapTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ToolIdleGapMs) };
+            _toolIdleGapTimer.Tick += (s, e) =>
+            {
+                _toolIdleGapTimer.Stop();
+                bool updated = false;
+                foreach (var kv in _tasks)
+                {
+                    if ((kv.Value.State == PetState.Running || kv.Value.State == PetState.BackgroundRunning) && kv.Value.ToolPhase == "end")
+                    {
+                        kv.Value.Message = "正在思考";
+                        kv.Value.MessageEn = "Thinking";
+                        kv.Value.ToolPhase = "thinking";
+                        updated = true;
+                    }
+                }
+                if (updated) RecomputeEffectiveState();
             };
 
             StartHttpServer();
@@ -1508,8 +1562,20 @@ namespace AntigravityPet
                 }
                 if (_isUpdatingSelf) return;
 
+                if (_state == PetState.BackgroundRunning && _tasks.Values.Count(t => t.State == PetState.BackgroundRunning) >= 2)
+                {
+                    _bubbleExpanded = !_bubbleExpanded;
+                    UpdateVisualState();
+                    return;
+                }
+
                 string convId = !string.IsNullOrWhiteSpace(_activeConversationId) ? _activeConversationId : _lastConversationId;
                 string title = _activeTitle;
+                TaskItem activeTask;
+                if (!string.IsNullOrWhiteSpace(convId) && _tasks.TryGetValue(convId, out activeTask) && !string.IsNullOrWhiteSpace(activeTask.ParentConversationId))
+                {
+                    convId = activeTask.ParentConversationId;
+                }
 
                 // 若当前在结束或提醒状态，点击后消除未读高亮；若在运行中，保持进度条继续工作
                 if (_state == PetState.Ready || _state == PetState.NeedsInput || _state == PetState.Blocked)
@@ -2186,6 +2252,20 @@ namespace AntigravityPet
                             targetScaleX = 1.0 - Math.Sin(rPhase) * 0.015;
                             break;
                         }
+                        case PetState.BackgroundRunning:
+                        {
+                            double bgPhase = _animTimeSec * 1.8;
+                            double breath = Math.Sin(bgPhase);
+                            targetY = breath * (0.7 * _config.Scale);
+                            targetScaleY = 1.0 + breath * 0.016;
+                            targetScaleX = 1.0 - breath * 0.01;
+                            if (now >= _nextBgMoonAt)
+                            {
+                                _nextBgMoonAt = now.AddSeconds(2.5);
+                                ShowHeadOverlay("🌙", Color.FromArgb(215, 30, 27, 75), Color.FromRgb(199, 210, 254), 1.9, true);
+                            }
+                            break;
+                        }
                         case PetState.NeedsInput:
                         {
                             double nPhase = _animTimeSec * 4.5;
@@ -2429,6 +2509,7 @@ namespace AntigravityPet
             switch (_state)
             {
                 case PetState.Running: SetRowFrame(7); break;
+                case PetState.BackgroundRunning: SetRowFrame(0); break;
                 case PetState.NeedsInput: SetRowFrame(6); break;
                 case PetState.Blocked: SetRowFrame(5); break;
                 case PetState.Ready: SetRowFrame(8); break;
@@ -2499,10 +2580,71 @@ namespace AntigravityPet
             }
         }
 
-        public void ReportTaskState(string conversationId, PetState newState, string message, string title, bool isToolCall)
+        public void ReportTaskState(string conversationId, PetState newState, string message, string title, bool isToolCall, string messageEn = "", string toolPhase = "", bool isBackground = false, string parentConversationId = "")
         {
             if (string.IsNullOrWhiteSpace(conversationId)) conversationId = "default";
+            bool isActiveRun = newState == PetState.Running || newState == PetState.BackgroundRunning;
 
+            if (!isActiveRun)
+            {
+                _toolDebounceTimer.Stop();
+                _toolIdleGapTimer.Stop();
+                _pendingToolConvId = "";
+                ApplyTaskStateCore(conversationId, newState, message, title, isToolCall, messageEn, toolPhase, isBackground, parentConversationId);
+                return;
+            }
+
+            if (toolPhase == "start")
+            {
+                _toolIdleGapTimer.Stop();
+                TaskItem curTask;
+                bool prevWasToolStart = _tasks.TryGetValue(conversationId, out curTask) &&
+                    (curTask.State == PetState.Running || curTask.State == PetState.BackgroundRunning) &&
+                    curTask.ToolPhase == "start";
+                double elapsedMs = (DateTime.Now - _lastToolDisplayAt).TotalMilliseconds;
+
+                if (prevWasToolStart && elapsedMs < ToolMinDisplayMs)
+                {
+                    _pendingToolConvId = conversationId;
+                    _pendingToolMsg = message ?? "";
+                    _pendingToolMsgEn = messageEn ?? "";
+                    _pendingToolTitle = title ?? "";
+                    _pendingToolIsCall = isToolCall;
+                    if (!_toolDebounceTimer.IsEnabled)
+                    {
+                        _toolDebounceTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(50, ToolMinDisplayMs - elapsedMs));
+                        _toolDebounceTimer.Start();
+                    }
+                    return;
+                }
+
+                _toolDebounceTimer.Stop();
+                _pendingToolConvId = "";
+                _lastToolDisplayAt = DateTime.Now;
+                ApplyTaskStateCore(conversationId, newState, message, title, isToolCall, messageEn, "start", isBackground, parentConversationId);
+                return;
+            }
+
+            if (toolPhase == "end")
+            {
+                _toolDebounceTimer.Stop();
+                _pendingToolConvId = "";
+                // 工具结束立刻清除上一条工具文案，进入空档过渡态并启动 1.2s 回退计时
+                ApplyTaskStateCore(conversationId, newState, "⚡", title, false, "⚡", "end", isBackground, parentConversationId);
+                _toolIdleGapTimer.Stop();
+                _toolIdleGapTimer.Interval = TimeSpan.FromMilliseconds(ToolIdleGapMs);
+                _toolIdleGapTimer.Start();
+                return;
+            }
+
+            _toolDebounceTimer.Stop();
+            _toolIdleGapTimer.Stop();
+            _pendingToolConvId = "";
+            ApplyTaskStateCore(conversationId, newState, message, title, isToolCall, messageEn, toolPhase, isBackground, parentConversationId);
+        }
+
+        private void ApplyTaskStateCore(string conversationId, PetState newState, string message, string title, bool isToolCall, string messageEn, string toolPhase, bool isBackground, string parentConversationId)
+        {
             bool isPreview = conversationId.Equals("preview", StringComparison.OrdinalIgnoreCase);
             if (!isPreview)
             {
@@ -2511,7 +2653,7 @@ namespace AntigravityPet
                 UpdateRecentConversation(conversationId, title, StateToApiString(newState));
             }
 
-            if (isToolCall && newState == PetState.Running)
+            if (isToolCall && (newState == PetState.Running || newState == PetState.BackgroundRunning))
             {
                 _config.ToolCallsCount++;
             }
@@ -2524,7 +2666,9 @@ namespace AntigravityPet
             else
             {
                 string existingTitle = _tasks.ContainsKey(conversationId) ? _tasks[conversationId].Title : "";
+                string existingParent = _tasks.ContainsKey(conversationId) ? _tasks[conversationId].ParentConversationId : "";
                 string useTitle = !string.IsNullOrWhiteSpace(title) ? title : existingTitle;
+                string useParent = !string.IsNullOrWhiteSpace(parentConversationId) ? parentConversationId : existingParent;
                 if (newState == PetState.Ready && prevState != PetState.Ready && !isPreview)
                 {
                     _config.CompletedTasksCount++;
@@ -2532,9 +2676,13 @@ namespace AntigravityPet
                 _tasks[conversationId] = new TaskItem
                 {
                     ConversationId = conversationId,
+                    ParentConversationId = useParent,
                     Title = useTitle,
                     State = newState,
+                    IsBackground = isBackground || newState == PetState.BackgroundRunning,
                     Message = message ?? "",
+                    MessageEn = messageEn ?? "",
+                    ToolPhase = toolPhase ?? "",
                     UpdatedAt = DateTime.Now
                 };
                 if (_transient == TransientAction.Walk) CancelWalk();
@@ -3257,12 +3405,26 @@ namespace AntigravityPet
             RecomputeEffectiveState();
         }
 
+        private static int GetStatePriority(PetState st)
+        {
+            switch (st)
+            {
+                case PetState.NeedsInput: return 5;
+                case PetState.Blocked: return 4;
+                case PetState.Running: return 3;
+                case PetState.BackgroundRunning: return 2;
+                case PetState.Ready: return 1;
+                default: return 0;
+            }
+        }
+
         private void RecomputeEffectiveState()
         {
             if (_tasks.Count == 0)
             {
                 _state = PetState.Idle;
                 _statusMessage = "";
+                _bubbleExpanded = false;
                 _activeConversationId = _lastConversationId;
                 _autoIdleTimer.Stop();
             }
@@ -3275,7 +3437,7 @@ namespace AntigravityPet
                 }
 
                 var top = pinnedTask ?? _tasks.Values
-                    .OrderByDescending(t => (int)t.State)
+                    .OrderByDescending(t => GetStatePriority(t.State))
                     .ThenByDescending(t => t.UpdatedAt)
                     .First();
 
@@ -3289,18 +3451,30 @@ namespace AntigravityPet
                 if (_state == PetState.Ready && (string.IsNullOrWhiteSpace(baseMsg) || baseMsg == "任务完成!"))
                 {
                     if (!string.IsNullOrWhiteSpace(top.Title))
-                        baseMsg = T("✓ " + Shorten(top.Title, 10) + " · 点击打开", "✓ " + Shorten(top.Title, 14) + " · Click");
+                        baseMsg = "✓ " + Shorten(top.Title, 10) + BL("ready.click");
                     else
-                        baseMsg = T("✓ 任务完成 · 点击打开", "✓ Task Ready · Click");
+                        baseMsg = BL("ready.default");
                 }
                 else
                 {
                     baseMsg = LocalizeBubbleMessage(baseMsg);
                 }
 
-                if (sameCount > 1 && !string.IsNullOrEmpty(baseMsg))
+                if (_state == PetState.BackgroundRunning)
                 {
-                    _statusMessage = sameCount + T("个会话 · ", " tasks · ") + baseMsg;
+                    if (sameCount > 1)
+                    {
+                        _statusMessage = string.Format(BL("bg.count"), sameCount);
+                    }
+                    else
+                    {
+                        string bgTitle = !string.IsNullOrWhiteSpace(top.Title) ? Shorten(top.Title, 6) : BL("后台");
+                        _statusMessage = bgTitle + " · " + (string.IsNullOrWhiteSpace(baseMsg) ? BL("运行中") : baseMsg);
+                    }
+                }
+                else if (sameCount > 1 && !string.IsNullOrEmpty(baseMsg))
+                {
+                    _statusMessage = string.Format(BL("multi.prefix"), sameCount) + baseMsg;
                 }
                 else
                 {
@@ -3400,6 +3574,12 @@ namespace AntigravityPet
                 { "ko", "⚡ 실행 중" }, { "hi", "⚡ चल रहा है" }, { "th", "⚡ กำลังทำงาน" },
                 { "es", "⚡ En ejecución" }, { "es-mx", "⚡ En ejecución" }
             }},
+            { "state.backgroundRunning", new Dictionary<string, string> {
+                { "zh", "🌙 后台运行中" }, { "zh-tw", "🌙 背景執行中" }, { "en", "🌙 Background" },
+                { "fr", "🌙 Arrière-plan" }, { "de", "🌙 Hintergrund" }, { "ja", "🌙 バックグラウンド" },
+                { "ko", "🌙 백그라운드" }, { "hi", "🌙 पृष्ठभूमि में" }, { "th", "🌙 ทำงานเบื้องหลัง" },
+                { "es", "🌙 Segundo plano" }, { "es-mx", "🌙 Segundo plano" }
+            }},
             { "state.needsInput", new Dictionary<string, string> {
                 { "zh", "! 需要输入" }, { "zh-tw", "! 需要輸入" }, { "en", "! Needs Input" },
                 { "fr", "! Action requise" }, { "de", "! Eingabe nötig" }, { "ja", "! 入力待ち" },
@@ -3494,6 +3674,89 @@ namespace AntigravityPet
             return key;
         }
 
+        private int BubbleLangIndex()
+        {
+            switch (GetEffectiveLanguage())
+            {
+                case "zh": return 0;
+                case "zh-tw": return 1;
+                case "en": return 2;
+                case "fr": return 3;
+                case "de": return 4;
+                case "ja": return 5;
+                case "ko": return 6;
+                case "hi": return 7;
+                case "th": return 8;
+                case "es": return 9;
+                case "es-mx": return 10;
+                default: return 2;
+            }
+        }
+
+        // 顺序: zh, zh-tw, en, fr, de, ja, ko, hi, th, es, es-mx
+        private static readonly Dictionary<string, string[]> BubbleI18n = new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            { "正在思考", new[] { "正在思考", "正在思考", "Thinking", "Réflexion", "Denkt nach", "思考中", "생각 중", "सोच रहा है", "กำลังคิด", "Pensando", "Pensando" } },
+            { "整理回复中", new[] { "整理回复中", "整理回覆中", "Processing results", "Finalisation", "Wird verarbeitet", "回答を整理中", "결과 정리 중", "परिणाम तैयार", "กำลังสรุปผล", "Procesando", "Procesando" } },
+            { "工作中", new[] { "工作中", "工作中", "Working", "Au travail", "Arbeitet", "作業中", "작업 중", "काम जारी", "กำลังทำงาน", "Trabajando", "Trabajando" } },
+            { "运行中", new[] { "运行中", "執行中", "Running", "En cours", "Aktiv", "実行中", "실행 중", "चल रहा है", "กำลังทำงาน", "Ejecutando", "Ejecutando" } },
+            { "后台运行中", new[] { "后台运行中", "背景執行中", "Running in background", "En arrière-plan", "Im Hintergrund", "バックグラウンド実行", "백그라운드 실행 중", "पृष्ठभूमि में सक्रिय", "ทำงานเบื้องหลัง", "En segundo plano", "En segundo plano" } },
+            { "后台", new[] { "后台", "背景", "Bg", "Fond", "Hintergr.", "背景", "백그라운드", "पृष्ठभूमि", "เบื้องหลัง", "Fondo", "Fondo" } },
+            { "后台任务", new[] { "后台任务", "背景任務", "Bg task", "Tâche fond", "Hintergrund", "背景タスク", "백그라운드", "पृष्ठभूमि कार्य", "งานเบื้องหลัง", "Tarea fondo", "Tarea fondo" } },
+            { "bg.count", new[] { "后台 {0} 个在跑", "背景 {0} 個執行中", "{0} bg tasks", "{0} tâches fond", "{0} Hintergr.", "背景 {0}件実行中", "백그라운드 {0}개", "{0} पृष्ठभूमि कार्य", "เบื้องหลัง {0} งาน", "{0} en 2.º plano", "{0} en 2.º plano" } },
+            { "multi.prefix", new[] { "{0}任务 · ", "{0}任務 · ", "{0} tasks · ", "{0} tâches · ", "{0} Aufg. · ", "{0}件 · ", "{0}작업 · ", "{0} कार्य · ", "{0} งาน · ", "{0} tareas · ", "{0} tareas · " } },
+            { "bg.doneOk", new[] { " 已完成", " 已完成", " done", " terminé", " fertig", " 完了", " 완료", " पूर्ण", " เสร็จสิ้น", " listo", " listo" } },
+            { "bg.doneErr", new[] { " 出错", " 出錯", " failed", " échoué", " fehlgeschlagen", " エラー", " 오류", " त्रुटि", " ผิดพลาด", " error", " error" } },
+            { "ready.default", new[] { "✓ 任务完成 · 点击打开", "✓ 任務完成 · 點擊開啟", "✓ Task Ready · Click", "✓ Terminé · Cliquer", "✓ Bereit · Klicken", "✓ 完了 · クリック", "✓ 완료 · 클릭", "✓ पूर्ण · क्लिक करें", "✓ เสร็จสิ้น · คลิก", "✓ Listo · Clic", "✓ Listo · Clic" } },
+            { "ready.click", new[] { " · 点击打开", " · 點擊開啟", " · Click", " · Cliquer", " · Klicken", " · クリック", " · 클릭", " · क्लिक", " · คลิก", " · Clic", " · Clic" } },
+            { "needsInput", new[] { "需要你确认!", "需要你確認!", "Needs your input!", "Action requise !", "Eingabe nötig!", "確認が必要です!", "확인이 필요합니다!", "इनपुट आवश्यक!", "รอการยืนยัน!", "¡Requiere entrada!", "¡Requiere respuesta!" } },
+            { "blocked", new[] { "工具出错 · 点击查看", "工具出錯 · 點擊查看", "Blocked · Click to view", "Bloqué · Cliquer", "Blockiert · Klicken", "ブロック · クリック", "차단됨 · 클릭", "अवरुद्ध · क्लिक करें", "ถูกบล็อก · คลิก", "Bloqueado · Clic", "Bloqueado · Clic" } },
+            { "taskError", new[] { "任务出错 · 点击查看", "任務出錯 · 點擊查看", "Task error · Click to view", "Erreur · Cliquer", "Fehler · Klicken", "エラー · クリック", "오류 · 클릭", "त्रुटि · क्लिक करें", "ผิดพลาด · คลิก", "Error · Clic", "Error · Clic" } },
+            { "正在读文件", new[] { "正在读文件", "正在讀檔案", "Reading file", "Lecture fichier", "Liest Datei", "ファイル読込中", "파일 읽는 중", "फ़ाइल पढ़ रहा है", "กำลังอ่านไฟล์", "Leyendo archivo", "Leyendo archivo" } },
+            { "正在写文件", new[] { "正在写文件", "正在寫檔案", "Writing file", "Écriture fichier", "Schreibt Datei", "ファイル書込中", "파일 쓰는 중", "फ़ाइल लिख रहा है", "กำลังเขียนไฟล์", "Escribiendo", "Escribiendo" } },
+            { "正在改代码", new[] { "正在改代码", "正在改程式碼", "Editing code", "Édition code", "Bearbeitet Code", "コード編集中", "코드 수정 중", "कोड संपादन", "กำลังแก้ไขโค้ด", "Editando código", "Editando código" } },
+            { "正在搜代码", new[] { "正在搜代码", "正在搜程式碼", "Searching code", "Recherche code", "Sucht Code", "コード検索中", "코드 검색 중", "कोड खोज", "กำลังค้นหาโค้ด", "Buscando código", "Buscando código" } },
+            { "正在执行命令", new[] { "正在执行命令", "正在執行命令", "Running command", "Exécution cmd", "Führt Befehl aus", "コマンド実行中", "명령 실행 중", "कमांड चला रहा है", "กำลังรันคำสั่ง", "Ejecutando cmd", "Ejecutando cmd" } },
+            { "正在跑测试", new[] { "正在跑测试", "正在跑測試", "Running tests", "Exécution tests", "Führt Tests aus", "テスト実行中", "테스트 실행 중", "टेस्ट चला रहा है", "กำลังรันเทสต์", "Ejecutando tests", "Ejecutando pruebas" } },
+            { "正在构建项目", new[] { "正在构建项目", "正在建置專案", "Building project", "Construction", "Erstellt Projekt", "ビルド中", "프로젝트 빌드 중", "प्रोजेक्ट बिल्ड", "กำลังบิลด์โปรเจกต์", "Compilando", "Compilando" } },
+            { "正在跑检查", new[] { "正在跑检查", "正在跑檢查", "Running checks", "Vérification", "Prüft Projekt", "チェック実行中", "검사 실행 중", "जाँच चल रही है", "กำลังตรวจสอบ", "Verificando", "Verificando" } },
+            { "正在安装依赖", new[] { "正在安装依赖", "正在安裝相依", "Installing deps", "Installation", "Installiert", "依存導入中", "의존성 설치 중", "इंस्टॉल कर रहा है", "กำลังติดตั้ง", "Instalando", "Instalando" } },
+            { "正在执行 Git", new[] { "正在执行 Git", "正在執行 Git", "Running Git", "Exécution Git", "Führt Git aus", "Git 実行中", "Git 실행 중", "Git चला रहा है", "กำลังรัน Git", "Ejecutando Git", "Ejecutando Git" } },
+            { "正在找文件", new[] { "正在找文件", "正在找檔案", "Finding files", "Recherche fichiers", "Sucht Dateien", "ファイル検索中", "파일 찾는 중", "फ़ाइल खोज", "กำลังหาไฟล์", "Buscando archivos", "Buscando archivos" } },
+            { "正在查资料", new[] { "正在查资料", "正在查資料", "Searching web", "Recherche web", "Websuche", "Web 検索中", "웹 검색 중", "वेब खोज", "กำลังค้นเว็บ", "Buscando en web", "Buscando en web" } },
+            { "正在调度子代理", new[] { "正在调度子代理", "正在調度子代理", "Running subagent", "Sous-agent", "Subagent aktiv", "サブエージェント", "서브에이전트", "सब-एजेंट", "กำลังเรียกซับเอเจนต์", "Subagente", "Subagente" } },
+            { "等待你回答", new[] { "等待你回答", "等待你回答", "Waiting for answer", "En attente", "Wartet auf Antwort", "回答待ち", "답변 대기 중", "उत्तर की प्रतीक्षा", "รอคำตอบจากคุณ", "Esperando respuesta", "Esperando respuesta" } },
+            { "正在管理后台任务", new[] { "正在管理后台任务", "正在管理背景任務", "Managing tasks", "Gestion tâches", "Aufgabenverw.", "タスク管理中", "작업 관리 중", "कार्य प्रबंधन", "กำลังจัดการงาน", "Gestionando tareas", "Gestionando tareas" } },
+            { "准备开始执行", new[] { "准备开始执行", "準備開始執行", "Starting execution", "Démarrage", "Startet", "実行準備中", "실행 준비 중", "शुरू हो रहा है", "กำลังเริ่มทำงาน", "Iniciando", "Iniciando" } },
+            { "正在看屏幕", new[] { "正在看屏幕", "正在看螢幕", "Viewing screen", "Capture écran", "Sieht Bildschirm", "画面確認中", "화면 보는 중", "स्क्रीन देख रहा है", "กำลังดูหน้าจอ", "Viendo pantalla", "Viendo pantalla" } },
+            { "正在切换应用", new[] { "正在切换应用", "正在切換應用", "Switching app", "Changement app", "Wechselt App", "アプリ切替中", "앱 전환 중", "ऐप बदल रहा है", "กำลังสลับแอป", "Cambiando app", "Cambiando app" } },
+            { "正在操作桌面", new[] { "正在操作桌面", "正在操作桌面", "Controlling desktop", "Contrôle bureau", "Steuert Desktop", "デスクトップ操作", "데스크톱 제어 중", "डेस्कटॉप नियंत्रण", "กำลังควบคุมหน้าจอ", "Controlando PC", "Controlando PC" } },
+            { "正在看代码结构", new[] { "正在看代码结构", "正在看程式結構", "Scanning code", "Analyse structure", "Scannt Struktur", "構造スキャン中", "구조 스캔 중", "कोड स्कैन", "กำลังสแกนโค้ด", "Escaneando código", "Escaneando código" } },
+            { "正在分析代码", new[] { "正在分析代码", "正在分析程式碼", "Analyzing code", "Analyse code", "Analysiert Code", "コード解析中", "코드 분석 중", "कोड विश्लेषण", "กำลังวิเคราะห์โค้ด", "Analizando código", "Analizando código" } },
+            { "正在检索上下文", new[] { "正在检索上下文", "正在檢索上下文", "Searching context", "Recherche contexte", "Durchsucht Kontext", "文脈検索中", "컨텍스트 검색 중", "संदर्भ खोज", "กำลังค้นหาบริบท", "Buscando contexto", "Buscando contexto" } },
+            { "正在分析长文本", new[] { "正在分析长文本", "正在分析長文本", "Analyzing context", "Analyse texte", "Analysiert Text", "長文解析中", "긴 텍스트 분석 중", "पाठ विश्लेषण", "กำลังวิเคราะห์ข้อความ", "Analizando texto", "Analizando texto" } },
+            { "正在更新桌宠", new[] { "正在更新桌宠", "正在更新桌寵", "Updating pet", "Mise à jour", "Aktualisiert Pet", "ペット更新中", "펫 업데이트 중", "पेट अपडेट", "กำลังอัปเดตสัตว์เลี้ยง", "Actualizando", "Actualizando" } },
+            { "正在调用扩展工具", new[] { "正在调用扩展工具", "正在呼叫擴充工具", "Running tool", "Exécution outil", "Führt Tool aus", "ツール実行中", "도구 실행 중", "टूल चला रहा है", "กำลังใช้เครื่องมือ", "Usando herramienta", "Usando herramienta" } },
+            { "正在执行工具", new[] { "正在执行工具", "正在執行工具", "Running tool", "Exécution outil", "Führt Tool aus", "ツール実行中", "도구 실행 중", "टूल चला रहा है", "กำลังใช้เครื่องมือ", "Ejecutando tool", "Ejecutando tool" } },
+            { "prefix.read", new[] { "正在读 ", "正在讀 ", "Reading ", "Lecture ", "Liest ", "読込中 ", "읽기 ", "पढ़ रहा ", "อ่าน ", "Leyendo ", "Leyendo " } },
+            { "prefix.write", new[] { "正在写 ", "正在寫 ", "Writing ", "Écriture ", "Schreibt ", "書込中 ", "쓰기 ", "लिख रहा ", "เขียน ", "Escribiendo ", "Escribiendo " } },
+            { "prefix.edit", new[] { "正在改 ", "正在改 ", "Editing ", "Édition ", "Bearbeitet ", "編集中 ", "수정 ", "संपादन ", "แก้ไข ", "Editando ", "Editando " } },
+            { "prefix.search", new[] { "正在搜 ", "正在搜 ", "Searching ", "Recherche ", "Sucht ", "検索中 ", "검색 ", "खोज ", "ค้นหา ", "Buscando ", "Buscando " } },
+            { "prefix.run", new[] { "正在执行 ", "正在執行 ", "Running ", "Exécution ", "Startet ", "実行中 ", "실행 ", "चला रहा ", "รัน ", "Ejecutando ", "Ejecutando " } }
+        };
+
+        private string BL(string key)
+        {
+            string[] arr;
+            if (BubbleI18n.TryGetValue(key, out arr) && arr != null && arr.Length > 0)
+            {
+                int idx = BubbleLangIndex();
+                if (idx >= 0 && idx < arr.Length && !string.IsNullOrEmpty(arr[idx])) return arr[idx];
+                if (arr.Length > 2) return arr[2];
+            }
+            return key;
+        }
+
         private string GetLocalizedPackName(PetPack p)
         {
             if (p == null) return "";
@@ -3549,45 +3812,60 @@ namespace AntigravityPet
 
         private string LocalizeBubbleMessage(string msg)
         {
-            if (string.IsNullOrWhiteSpace(msg) || !IsEnglish()) return msg;
-            switch (msg.Trim())
+            if (string.IsNullOrWhiteSpace(msg)) return msg;
+            string trimmed = msg.Trim();
+            if (GetEffectiveLanguage() == "zh") return trimmed;
+
+            string[] arr;
+            if (BubbleI18n.TryGetValue(trimmed, out arr)) return BL(trimmed);
+
+            switch (trimmed)
             {
-                case "思考规划中...": return "Thinking & planning...";
-                case "执行命令中...": return "Running command...";
-                case "读取文件中...": return "Reading file...";
-                case "编写文件中...": return "Writing file...";
+                case "正在思考...":
+                case "思考规划中...": return BL("正在思考");
+                case "⚡":
+                case "⚡ ...": return "⚡";
+                case "执行命令中...": return BL("正在执行命令");
+                case "读取文件中...": return BL("正在读文件");
+                case "编写文件中...": return BL("正在写文件");
                 case "修改代码中...":
-                case "编辑代码中...": return "Editing code...";
-                case "检索代码中...": return "Searching code...";
-                case "运行检查中...": return "Running checks...";
-                case "快速分析代码中...": return "Analyzing code...";
-                case "分析长文本中...": return "Analyzing context...";
-                case "搜索资料中...": return "Searching web...";
-                case "调度子代理中...": return "Running subagent...";
-                case "等待你回答...": return "Waiting for answer...";
-                case "管理后台任务...": return "Managing tasks...";
-                case "准备开始执行...": return "Starting execution...";
-                case "查看屏幕中...": return "Viewing screen...";
+                case "编辑代码中...": return BL("正在改代码");
+                case "检索代码中...": return BL("正在搜代码");
+                case "运行检查中...": return BL("正在跑检查");
+                case "快速分析代码中...": return BL("正在分析代码");
+                case "分析长文本中...": return BL("正在分析长文本");
+                case "搜索资料中...": return BL("正在查资料");
+                case "调度子代理中...": return BL("正在调度子代理");
+                case "等待你回答...": return BL("等待你回答");
+                case "管理后台任务...": return BL("正在管理后台任务");
+                case "准备开始执行...": return BL("准备开始执行");
+                case "查看屏幕中...": return BL("正在看屏幕");
                 case "操作桌面应用中...":
-                case "操控桌面中...": return "Controlling desktop...";
-                case "更新桌宠设置...": return "Updating settings...";
+                case "操控桌面中...": return BL("正在操作桌面");
+                case "更新桌宠设置...": return BL("正在更新桌宠");
                 case "调用扩展工具中...":
-                case "执行任务中...": return "Running tool...";
+                case "执行任务中...":
+                case "正在执行工具...": return BL("正在执行工具");
                 case "处理结果中...":
-                case "整理回复中...": return "Processing results...";
+                case "整理回复中...": return BL("整理回复中");
                 case "工具出错 · 点击查看":
                 case "遇到错误 · 点击查看":
-                case "执行出错 · 点击查看": return "Blocked · Click to view";
+                case "执行出错 · 点击查看": return BL("blocked");
                 case "任务出错 · 点击查看":
-                case "任务出错中断": return "Task error · Click to view";
+                case "任务出错中断": return BL("taskError");
                 case "任务完成!":
-                case "✓ 任务完成 · 点击打开": return "✓ Task Ready · Click";
+                case "✓ 任务完成 · 点击打开": return BL("ready.default");
                 case "需要你确认!":
-                case "需要你批准操作!": return "Needs your input!";
+                case "需要你批准操作!": return BL("needsInput");
                 case "工作中...":
-                case "编写代码中...": return "Working...";
-                default: return msg;
+                case "编写代码中...": return BL("工作中");
             }
+            if (trimmed.StartsWith("正在读 ")) return BL("prefix.read") + trimmed.Substring(4);
+            if (trimmed.StartsWith("正在写 ")) return BL("prefix.write") + trimmed.Substring(4);
+            if (trimmed.StartsWith("正在改 ")) return BL("prefix.edit") + trimmed.Substring(4);
+            if (trimmed.StartsWith("正在搜 ")) return BL("prefix.search") + trimmed.Substring(4);
+            if (trimmed.StartsWith("正在执行 ")) return BL("prefix.run") + trimmed.Substring(5);
+            return msg;
         }
 
         private bool IsDetailedStyle()
@@ -3642,6 +3920,7 @@ namespace AntigravityPet
             switch (st)
             {
                 case PetState.Running: return Color.FromRgb(56, 189, 248);
+                case PetState.BackgroundRunning: return Color.FromRgb(129, 140, 248);
                 case PetState.NeedsInput: return Color.FromRgb(245, 158, 11);
                 case PetState.Ready: return Color.FromRgb(16, 185, 129);
                 case PetState.Blocked: return Color.FromRgb(239, 68, 68);
@@ -3649,9 +3928,16 @@ namespace AntigravityPet
             }
         }
 
-        private string ShortDetailedState(PetState st, string rawMsg)
+        private string ShortDetailedState(PetState st, string rawMsg, string rawMsgEn = "")
         {
             string m = (rawMsg ?? "").Trim();
+            if ((st == PetState.Running || st == PetState.BackgroundRunning) && !string.IsNullOrEmpty(m))
+            {
+                if (m.StartsWith("正在") || m.StartsWith("等待") || m.StartsWith("准备") || m == "⚡" || m == "⚡ ..." || m == "整理回复中" || m == "整理回复中...")
+                {
+                    return Shorten(LocalizeBubbleMessage(m), 24);
+                }
+            }
             if (m == "思考规划中..." || m == "思考执行中...") return T("思考中", "Thinking");
             if (m == "编辑代码中..." || m == "修改代码中..." || m == "快速分析代码中...") return T("改代码", "Editing");
             if (m == "读取文件中...") return T("读文件", "Reading");
@@ -3673,6 +3959,7 @@ namespace AntigravityPet
                 case PetState.Blocked: return T("报错", "Blocked");
                 case PetState.Ready: return T("已完成", "Ready");
                 case PetState.Running: return T("运行中", "Running");
+                case PetState.BackgroundRunning: return T("后台中", "Bg");
                 default: return T("空闲", "Idle");
             }
         }
@@ -3686,14 +3973,14 @@ namespace AntigravityPet
                     ? "Antigravity"
                     : Shorten(t.ConversationId, 8));
 
-            return taskName + " - " + ShortDetailedState(t.State, t.Message);
+            return taskName + " - " + ShortDetailedState(t.State, t.Message, t.MessageEn);
         }
 
         private List<TaskItem> GetOrderedActiveTasks()
         {
             return _tasks.Values
                 .OrderByDescending(t => string.Equals(t.ConversationId, _config.PinnedConversationId ?? "", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
-                .ThenByDescending(t => (int)t.State)
+                .ThenByDescending(t => GetStatePriority(t.State))
                 .ThenByDescending(t => t.UpdatedAt)
                 .ToList();
         }
@@ -3768,13 +4055,15 @@ namespace AntigravityPet
             card.MouseLeftButtonUp += (s, e) =>
             {
                 e.Handled = true;
+                _bubbleExpanded = false;
                 StartTransient(TransientAction.Jump, 5);
                 if (item.State == PetState.Ready || item.State == PetState.NeedsInput || item.State == PetState.Blocked)
                 {
                     _tasks.Remove(item.ConversationId);
                     RecomputeEffectiveState();
                 }
-                OpenAntigravityConversation(item.ConversationId, item.Title);
+                string jumpCid = !string.IsNullOrWhiteSpace(item.ParentConversationId) ? item.ParentConversationId : item.ConversationId;
+                OpenAntigravityConversation(jumpCid, item.Title);
             };
             return card;
         }
@@ -3964,17 +4253,79 @@ namespace AntigravityPet
                 return;
             }
 
-            // 简易模式
-            _stackBack1.Visibility = Visibility.Collapsed;
-            _stackBack2.Visibility = Visibility.Collapsed;
+            // 简易模式（含多后台任务堆叠与点击展开轻量列表）
+            var bgTasks = _state == PetState.BackgroundRunning
+                ? _tasks.Values.Where(t => t.State == PetState.BackgroundRunning).OrderByDescending(t => t.UpdatedAt).ToList()
+                : new List<TaskItem>();
+
+            if (_state == PetState.BackgroundRunning && bgTasks.Count >= 2 && _bubbleExpanded && _config.BubbleMode == "always")
+            {
+                _bubbleBorder.Visibility = Visibility.Collapsed;
+                _stackBack1.Visibility = Visibility.Collapsed;
+                _stackBack2.Visibility = Visibility.Collapsed;
+                _expandedStackPanel.Children.Clear();
+
+                double maxBgTextW = Math.Round(330 * _config.Scale);
+                double maxBgWinW = Math.Round(390 * _config.Scale);
+                int showCount = Math.Min(5, bgTasks.Count);
+                double widestText = 120;
+                for (int i = 0; i < showCount; i++)
+                {
+                    double tw = MeasureBubbleTextWidth(FormatDetailedTaskLabel(bgTasks[i]), 11.0);
+                    if (tw > widestText) widestText = tw;
+                }
+                double cappedTextW = Math.Min(maxBgTextW, widestText + 6);
+                for (int i = 0; i < showCount; i++)
+                {
+                    _expandedStackPanel.Children.Add(BuildExpandedTaskRow(bgTasks[i], cappedTextW));
+                }
+                _expandedStackPanel.Visibility = Visibility.Visible;
+                double targetW = Math.Min(maxBgWinW, Math.Max(baseW, Math.Ceiling(cappedTextW + 66)));
+                double extraH = Math.Max(0, (showCount - 1) * 31.0);
+                SetWindowSizeKeepingAnchor(targetW, _baseWindowHeight + extraH);
+                return;
+            }
+
             _expandedStackPanel.Visibility = Visibility.Collapsed;
-            _bubbleExpanded = false;
-            _bubbleText.MaxWidth = Math.Round((BaseWidth - 28) * _config.Scale);
-            SetWindowSizeKeepingAnchor(baseW, _baseWindowHeight);
+            if (_state != PetState.BackgroundRunning || bgTasks.Count < 2) _bubbleExpanded = false;
 
             string msg = string.IsNullOrWhiteSpace(_statusMessage) ? defaultMsg : LocalizeBubbleMessage(_statusMessage);
             bool shouldShowBubble = !string.IsNullOrEmpty(msg) &&
                 (_config.BubbleMode == "always" || (_config.BubbleMode == "alerts" && isAlert));
+
+            double maxSimpleTextW = Math.Round(300 * _config.Scale);
+            _bubbleText.MaxWidth = maxSimpleTextW;
+            double simpleWinW = baseW;
+            if (shouldShowBubble)
+            {
+                double measuredW = MeasureBubbleTextWidth(msg, 11.5);
+                simpleWinW = Math.Max(baseW, Math.Min(Math.Round(344 * _config.Scale), Math.Ceiling(measuredW + 46)));
+            }
+
+            if (shouldShowBubble && bgTasks.Count >= 2)
+            {
+                double cardW = Math.Max(120, Math.Ceiling(Math.Min(maxSimpleTextW, MeasureBubbleTextWidth(msg, 11.5)) + 24));
+                _stackBack1.Width = Math.Max(104, cardW - 14);
+                _stackBack1.BorderBrush = new SolidColorBrush(Color.FromRgb(129, 140, 248));
+                _stackBack1.Visibility = Visibility.Visible;
+                if (bgTasks.Count >= 3)
+                {
+                    _stackBack2.Width = Math.Max(88, cardW - 28);
+                    _stackBack2.BorderBrush = new SolidColorBrush(Color.FromRgb(129, 140, 248));
+                    _stackBack2.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    _stackBack2.Visibility = Visibility.Collapsed;
+                }
+                SetWindowSizeKeepingAnchor(simpleWinW, _baseWindowHeight + (bgTasks.Count >= 3 ? 12 : 6));
+            }
+            else
+            {
+                _stackBack1.Visibility = Visibility.Collapsed;
+                _stackBack2.Visibility = Visibility.Collapsed;
+                SetWindowSizeKeepingAnchor(simpleWinW, _baseWindowHeight);
+            }
 
             if (shouldShowBubble)
             {
@@ -3983,9 +4334,11 @@ namespace AntigravityPet
                     ? _currentPack.ThemeColor
                     : badgeBg;
                 _bubbleBorder.BorderBrush = new SolidColorBrush(borderClr);
-                _bubbleBorder.ToolTip = string.IsNullOrWhiteSpace(_activeTitle)
-                    ? T("点击打开对应 Antigravity 对话", "Click to open Antigravity conversation")
-                    : (T("点击打开对话: ", "Open conversation: ") + _activeTitle);
+                _bubbleBorder.ToolTip = bgTasks.Count >= 2
+                    ? T("点击展开后台任务列表", "Click to expand background tasks")
+                    : (string.IsNullOrWhiteSpace(_activeTitle)
+                        ? T("点击打开对应 Antigravity 对话", "Click to open Antigravity conversation")
+                        : (T("点击打开对话: ", "Open conversation: ") + _activeTitle));
                 _bubbleBorder.Visibility = Visibility.Visible;
             }
             else
@@ -4011,25 +4364,31 @@ namespace AntigravityPet
                     haloColor = Color.FromRgb(56, 189, 248);
                     badge = "⚡";
                     badgeBg = Color.FromRgb(14, 165, 233);
-                    defaultMsg = T("工作中...", "Working...");
+                    defaultMsg = BL("工作中");
+                    break;
+                case PetState.BackgroundRunning:
+                    haloColor = Color.FromRgb(129, 140, 248);
+                    badge = "🌙";
+                    badgeBg = Color.FromRgb(99, 102, 241);
+                    defaultMsg = BL("后台运行中");
                     break;
                 case PetState.NeedsInput:
                     haloColor = Color.FromRgb(251, 191, 36);
                     badge = "!";
                     badgeBg = Color.FromRgb(245, 158, 11);
-                    defaultMsg = T("需要你确认!", "Needs your input!");
+                    defaultMsg = BL("needsInput");
                     break;
                 case PetState.Ready:
                     haloColor = Color.FromRgb(52, 211, 153);
                     badge = "✓";
                     badgeBg = Color.FromRgb(16, 185, 129);
-                    defaultMsg = T("✓ 任务完成 · 点击打开", "✓ Task Ready · Click");
+                    defaultMsg = BL("ready.default");
                     break;
                 case PetState.Blocked:
                     haloColor = Color.FromRgb(248, 113, 113);
                     badge = "✕";
                     badgeBg = Color.FromRgb(239, 68, 68);
-                    defaultMsg = T("遇到错误 · 点击查看", "Blocked · Click to view");
+                    defaultMsg = BL("blocked");
                     break;
             }
 
@@ -4814,15 +5173,46 @@ namespace AntigravityPet
                 else if (path == "/state")
                 {
                     string convId = GetStr(data, "conversationId", "default");
+                    string parentConvId = GetStr(data, "parentConversationId", "");
                     string st = GetStr(data, "state", "idle");
                     string msg = GetStr(data, "message", "");
+                    string msgEn = GetStr(data, "messageEn", "");
+                    string toolPhase = GetStr(data, "toolPhase", "");
                     string title = GetStr(data, "title", "");
                     bool isTool = GetBool(data, "isToolCall", false);
+                    bool isBg = GetBool(data, "isBackground", false);
+                    bool bgDone = GetBool(data, "backgroundDone", false);
+                    bool bgOk = GetBool(data, "backgroundSuccess", true);
                     PetState parsed = ParseState(st);
+                    if (isBg && parsed == PetState.Running) parsed = PetState.BackgroundRunning;
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         if (!IsVisible && _config.Enabled) Show();
-                        ReportTaskState(convId, parsed, msg, title, isTool);
+                        if (bgDone)
+                        {
+                            TaskItem oldBg;
+                            string bgLabel = title;
+                            if (string.IsNullOrWhiteSpace(bgLabel) && _tasks.TryGetValue(convId, out oldBg))
+                            {
+                                bgLabel = oldBg.Title;
+                            }
+                            bgLabel = string.IsNullOrWhiteSpace(bgLabel) ? BL("后台任务") : Shorten(bgLabel, 10);
+                            ReportTaskState(convId, PetState.Idle, "", title, false, "", "", true, parentConvId);
+                            if (bgOk)
+                            {
+                                ShowHeadOverlay("🌙 " + bgLabel + BL("bg.doneOk"), Color.FromArgb(230, 30, 27, 75), Color.FromRgb(167, 243, 208), 2.6, true);
+                            }
+                            else
+                            {
+                                ShowHeadOverlay("⚠ " + bgLabel + BL("bg.doneErr"), Color.FromArgb(235, 69, 10, 10), Color.FromRgb(254, 202, 202), 2.8, true);
+                            }
+                            if (_state != PetState.Running && _transient == TransientAction.None)
+                            {
+                                StartTransient(TransientAction.Jump, 4);
+                            }
+                            return;
+                        }
+                        ReportTaskState(convId, parsed, msg, title, isTool, msgEn, toolPhase, isBg, parentConvId);
                     }));
                 }
                 else if (path == "/skin")
@@ -5459,6 +5849,9 @@ namespace AntigravityPet
             switch ((s ?? "").ToLowerInvariant())
             {
                 case "running": return PetState.Running;
+                case "background_running":
+                case "backgroundrunning":
+                case "background": return PetState.BackgroundRunning;
                 case "needs_input":
                 case "needsinput":
                 case "waiting": return PetState.NeedsInput;
@@ -5476,6 +5869,7 @@ namespace AntigravityPet
             switch (st)
             {
                 case PetState.Running: return "running";
+                case PetState.BackgroundRunning: return "background_running";
                 case PetState.NeedsInput: return "needs_input";
                 case PetState.Ready: return "ready";
                 case PetState.Blocked: return "blocked";
@@ -5488,6 +5882,7 @@ namespace AntigravityPet
             switch (st)
             {
                 case PetState.Running: return L("state.running");
+                case PetState.BackgroundRunning: return L("state.backgroundRunning");
                 case PetState.NeedsInput: return L("state.needsInput");
                 case PetState.Ready: return L("state.ready");
                 case PetState.Blocked: return L("state.blocked");

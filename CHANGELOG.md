@@ -5,6 +5,20 @@ All notable changes to **Antigravity Pet** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.0] - 2026-11-26
+
+### Added
+- **Live Tool-Call Bubble Status (`scripts/tool-label-mapper.mjs`, `hooks.json`, `scripts/hook-bridge.mjs`, `app/AntigravityPet.cs`)**:
+  - Added real-time single-line tool activity labels while in `Running` / `BackgroundRunning` (e.g., `Reading server.mjs`, `Editing App.tsx`, `Running tests`, `Running Git`) without altering the core state machine.
+  - Added 350ms minimum display debounce against rapid tool flickering, immediate tool-label clearing on `PostToolUse`, and a 1.2s idle-gap fallback back to `Thinking`.
+- **Independent `BackgroundRunning` State (`app/AntigravityPet.cs`, `scripts/hook-bridge.mjs`)**:
+  - Added `BackgroundRunning` with strict state priority (`NeedsInput > Blocked > Running > BackgroundRunning > Ready / Idle`).
+  - Distinguished visually with a calm resting pose, soft lavender-blue (`#818CF8`) halo/border, `🌙` badge, and floating moon overlays.
+  - Added single/multi-background task bubbles (click to jump directly or expand the task switcher list) and non-intrusive completion/failure head overlays without stealing focus.
+- **11-Locale Bubble Localization & Adaptive Width (`app/AntigravityPet.cs`)**:
+  - Localized all bubble states, live tool-call prefixes, background counters, and completion reminders across all 11 built-in locales (`zh`, `zh-tw`, `en`, `fr`, `de`, `ja`, `ko`, `hi`, `th`, `es`, `es-mx`).
+  - Removed trailing ellipses from status labels and enabled adaptive simple-mode bubble width (`[baseW, 344 * Scale]`).
+
 ## [4.4.0] - 2026-11-25
 
 ### Added

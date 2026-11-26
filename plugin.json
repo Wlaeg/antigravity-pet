@@ -1,7 +1,7 @@
 {
   "name": "antigravity-pet",
   "displayName": "桌面宠物 (Antigravity Pet)",
-  "version": "4.4.0",
+  "version": "4.5.0",
   "description": "Antigravity 原生跨平台（Windows & macOS）像素桌面伴侣插件：内置 8 款动态像素角色与专属工作抱物、双击快捷派活、气泡审批高危命令、左右贴边半身观察与状态色块、全屏避让与关键提醒弹出、成长像素配饰及 v3 自定义宠物包一键导入。",
   "logo": "assets/logo.svg",
   "homepage": "https://github.com/Wlaeg/antigravity-pet",
