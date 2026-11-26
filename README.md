@@ -4,7 +4,7 @@
 
 # 🐾 Antigravity Pet
 
-**A native pixel-art desktop companion that turns your Google Antigravity AI workflow into a living desk buddy — zero extra runtime dependencies.**
+**Antigravity Pet is a free, open-source pixel desktop pet plugin for Google Antigravity.** A native Windows & macOS desktop companion that follows your AI agent's status in real time — zero extra runtime dependencies.
 
 [![Release](https://img.shields.io/badge/Release-v4.6.0-0EA5E9?style=flat-square)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20%7C%20macOS%2012%2B-0078D6?style=flat-square)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
@@ -23,6 +23,8 @@
 <a id="english"></a>
 
 ## English
+
+**Antigravity Pet** is a free, open-source **desktop pet plugin for Google Antigravity**. It puts a pixel pet on your Windows or macOS desktop that follows your AI agent's lifecycle in real time: it shows what the agent is doing right now, celebrates when a task finishes, and quietly tracks background tasks without stealing focus. It runs as a native app — C# / WPF on Windows 10/11, Swift / AppKit on macOS 12+ — with zero third-party runtime to install, and it is free under the MIT license.
 
 Stop staring at spinning terminals. **Antigravity Pet** sits cleanly on your **Windows** or **macOS** desktop, shows what your AI agent is actually doing in real time, tracks background tasks without stealing focus, and reacts to your typing — all in one lightweight native overlay.
 
@@ -87,6 +89,19 @@ Looking to craft your own pet pack or integrate with the local bridge? Detailed 
 - 🎨 **[Custom Pet Pack Specification (v3)](CUSTOM_PET_SPEC.md)** — Single-image fallback, `1536×2288` (`8×11`) atlas layout, `themeColor`, custom `.wav` sounds, and `.zip` packaging.
 - 🛠️ **[Architecture, Hooks & Local HTTP API](docs/DEVELOPMENT.md)** — System diagram, directory structure, `BackgroundRunning` priority state machine, and `127.0.0.1:47821` endpoints.
 - 📋 **[Release Changelog](CHANGELOG.md)** — Full version history from `v3.0.0` to `v4.6.0`.
+
+---
+
+### ❓ Frequently Asked Questions (FAQ)
+
+- **Q: What is Antigravity Pet?**
+  - A: A free, open-source pixel desktop pet plugin for Google Antigravity. The pet lives on your desktop and mirrors your AI agent's status — running, waiting for input, blocked, or done — so you can tell what is happening at a glance.
+- **Q: How do I install Antigravity Pet?**
+  - A: Download the latest release `.zip`, extract it to your Antigravity plugins folder (`%USERPROFILE%\.gemini\config\plugins\antigravity-pet\` on Windows, `~/.gemini/config/plugins/antigravity-pet/` on macOS), then run the one-click launcher. Full steps are in [30-Second Quick Start](#-30-second-quick-start).
+- **Q: Does Antigravity Pet work on Windows and macOS?**
+  - A: Yes. Native Windows 10/11 (C# / WPF) and macOS 12+ (Swift / AppKit, Apple Silicon & Intel), with no extra runtime to install.
+- **Q: Is Antigravity Pet free?**
+  - A: Yes — free and open source under the MIT license, with 8 built-in pixel pets and a community pet library.
 
 ---
 
