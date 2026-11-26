@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/preview.svg" alt="Antigravity Pet Preview Banner" width="100%" />
+<img src="assets/hero-banner.png" alt="Antigravity Pet Hero Banner" width="100%" />
 
 # 🐾 Antigravity Pet
 
