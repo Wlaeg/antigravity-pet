@@ -169,7 +169,7 @@ function scanPetPacks(lang = 'zh') {
           const useTw = lang === 'zh-tw';
           map.set(id, {
             id,
-            displayName: useTw && twInfo ? twInfo.name : (!useZh && !useTw && enInfo ? enInfo.name : (meta.displayName || id)),
+            displayName: enInfo ? enInfo.name : (meta.displayName || id),
             description: useTw && twInfo ? twInfo.desc : (!useZh && !useTw && enInfo ? enInfo.desc : (meta.description || '')),
             version: meta.spriteVersionNumber || 2,
             isCustom

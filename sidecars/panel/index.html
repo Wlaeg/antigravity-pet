@@ -2348,7 +2348,7 @@
     filtered.forEach(function (p) {
       var card = document.createElement('div');
       card.className = 'comm-card';
-      var title = (isZh && p.displayNameZh) ? p.displayNameZh : (p.displayName || p.id);
+      var title = p.displayName || p.id;
       var desc = (isZh && p.descriptionZh) ? p.descriptionZh : (p.description || '');
       var sw = p.themeColor || '#0EA5E9';
       var tagsHtml = '';
