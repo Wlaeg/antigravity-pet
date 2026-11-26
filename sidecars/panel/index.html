@@ -515,8 +515,30 @@
     justify-content: flex-start;
     gap: 4px;
     white-space: normal;
+    position: relative;
   }
   .skin-card:hover { border-color: rgba(15, 23, 42, 0.22); background: var(--surface-hover); }
+  .skin-del-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 1px solid var(--line-strong);
+    color: var(--fg-3);
+    font-size: 12px;
+    line-height: 16px;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s, background .15s, color .15s, border-color .15s;
+    z-index: 2;
+  }
+  .skin-card:hover .skin-del-btn,
+  .skin-card:focus-within .skin-del-btn { opacity: 1; pointer-events: auto; }
+  .skin-del-btn:hover { background: #FEE2E2; border-color: #EF4444; color: #DC2626; }
   .skin-card.selected {
     background: var(--accent-soft);
     border-color: var(--accent);
@@ -1949,6 +1971,28 @@
           '<span class="skin-name">' + escapeHtml(p.displayName || p.id) + '</span>' +
         '</div>' +
         '<div class="skin-desc">' + escapeHtml(p.description || ('Sprite v' + (p.version || 2))) + '</div>';
+      if (p.isCustom) {
+        var delBtn = document.createElement('span');
+        delBtn.className = 'skin-del-btn';
+        delBtn.setAttribute('role', 'button');
+        delBtn.setAttribute('aria-label', 'Delete');
+        delBtn.title = (currentData && (currentData.effectiveLanguage === 'zh' || currentData.effectiveLanguage === 'zh-tw')) ? '删除此宠物' : 'Delete pet';
+        delBtn.textContent = '×';
+        delBtn.onclick = function (e) {
+          e.stopPropagation();
+          e.preventDefault();
+          apiCall('/api/delete-pet', { id: p.id }).then(function (res) {
+            if (res && res.ok) {
+              delete _croppedAvatars[String(p.id || '').toLowerCase()];
+              if (res.snapshot) render(res.snapshot);
+              ensurePetAvatars(true);
+              loadCommunityPets();
+              toast();
+            }
+          }).catch(function () {});
+        };
+        btn.appendChild(delBtn);
+      }
       btn.onclick = function () { setOpt('skin', p.id); };
       grid.appendChild(btn);
     });

@@ -153,6 +153,7 @@ const EN_PET_META = {
 function scanPetPacks(lang = 'zh') {
   const map = new Map();
   for (const root of [PETS_DIR, USER_PETS_DIR]) {
+    const isCustom = root === USER_PETS_DIR;
     try {
       if (!fs.existsSync(root)) continue;
       for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
@@ -170,7 +171,8 @@ function scanPetPacks(lang = 'zh') {
             id,
             displayName: useTw && twInfo ? twInfo.name : (!useZh && !useTw && enInfo ? enInfo.name : (meta.displayName || id)),
             description: useTw && twInfo ? twInfo.desc : (!useZh && !useTw && enInfo ? enInfo.desc : (meta.description || '')),
-            version: meta.spriteVersionNumber || 2
+            version: meta.spriteVersionNumber || 2,
+            isCustom
           });
         } catch {
           // ignore
@@ -180,7 +182,10 @@ function scanPetPacks(lang = 'zh') {
       // ignore
     }
   }
-  return Array.from(map.values()).sort((a, b) => a.displayName.localeCompare(b.displayName, lang === 'en' ? 'en' : 'zh-CN'));
+  return Array.from(map.values()).sort((a, b) => {
+    if (Boolean(a.isCustom) !== Boolean(b.isCustom)) return a.isCustom ? 1 : -1;
+    return a.displayName.localeCompare(b.displayName, lang === 'en' ? 'en' : 'zh-CN');
+  });
 }
 
 function httpRequest(method, urlPath, bodyObj = null, timeoutMs = 800) {
@@ -292,6 +297,8 @@ async function waitForHealth(maxWaitMs = 2800) {
 export async function getSnapshot() {
   const res = await httpRequest('GET', '/health', null, 600);
   if (res.ok && res.data) {
+    const effLang = res.data.effectiveLanguage || 'zh';
+    res.data.availablePets = scanPetPacks(effLang);
     return res.data;
   }
   const cfg = readOfflineConfig();
@@ -873,6 +880,35 @@ export async function installCommunityPet(args = {}) {
   return res;
 }
 
+export async function deleteCustomPet(args = {}) {
+  const rawId = String(args.id || '').trim().toLowerCase();
+  const safeId = rawId.replace(/[^a-z0-9-_]/g, '-').replace(/^-+|-+$/g, '');
+  if (!safeId) return { ok: false, error: 'Missing pet id' };
+  const targetDir = path.resolve(USER_PETS_DIR, safeId);
+  const userRoot = path.resolve(USER_PETS_DIR);
+  if (!targetDir.startsWith(userRoot + path.sep) || !fs.existsSync(targetDir)) {
+    return { ok: false, error: 'Custom pet not found' };
+  }
+  try {
+    fs.rmSync(targetDir, { recursive: true, force: true });
+    _avatarMemCache.delete(safeId);
+    const snap = await getSnapshot();
+    const health = await httpRequest('GET', '/health', null, 500);
+    if (health.ok) {
+      if (String(snap.skin || '').toLowerCase() === safeId) {
+        await httpRequest('POST', '/skin', { skin: 'cyber-fox' });
+      }
+      await httpRequest('POST', '/reload', {});
+    } else if (String(snap.skin || '').toLowerCase() === safeId) {
+      writeOfflineConfig({ Skin: 'cyber-fox' });
+    }
+    const nextSnapshot = await getSnapshot();
+    return { ok: true, id: safeId, snapshot: nextSnapshot };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
 function startLocalDispatchBridge(app) {
   const token = crypto.randomBytes(16).toString('hex');
   const bridgeFile = path.join(os.homedir(), '.antigravity-pet', 'panel-bridge.json');
@@ -1019,6 +1055,7 @@ if (isDirectRun) {
     app.api('/api/community-pets', async () => await getCommunityPets(), 'POST');
     app.api('/api/install-community-pet', async (data) => await installCommunityPet(data || {}), 'POST');
     app.api('/api/star-community-pet', async (data) => await toggleCommunityStar(data || {}), 'POST');
+    app.api('/api/delete-pet', async (data) => await deleteCustomPet(data || {}), 'POST');
     app.api('/api/pet-avatars', async () => await getPetAvatars(), 'POST');
     app.api('/api/github-releases', async (data) => await getGithubReleases(Boolean(data && data.force)), 'POST');
     await app.run();
@@ -1049,6 +1086,7 @@ if (isDirectRun) {
         url.pathname === '/api/community-pets' ||
         url.pathname === '/api/install-community-pet' ||
         url.pathname === '/api/star-community-pet' ||
+        url.pathname === '/api/delete-pet' ||
         url.pathname === '/api/pet-avatars' ||
         url.pathname === '/api/github-releases'
       )) {
@@ -1063,6 +1101,7 @@ if (isDirectRun) {
           else if (url.pathname === '/api/community-pets') result = await getCommunityPets();
           else if (url.pathname === '/api/install-community-pet') result = await installCommunityPet(data);
           else if (url.pathname === '/api/star-community-pet') result = await toggleCommunityStar(data);
+          else if (url.pathname === '/api/delete-pet') result = await deleteCustomPet(data);
           else if (url.pathname === '/api/pet-avatars') result = await getPetAvatars();
           else if (url.pathname === '/api/github-releases') result = await getGithubReleases(Boolean(data && data.force));
           else result = await applySetting(data);
