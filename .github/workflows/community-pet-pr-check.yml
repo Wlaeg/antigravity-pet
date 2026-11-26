@@ -29,6 +29,11 @@ jobs:
               seen.add(id);
               const zipPath = path.resolve(pet.localZip || ('community/packs/' + id + '.zip'));
               if (!fs.existsSync(zipPath)) throw new Error('Missing localZip for ' + id + ': ' + zipPath);
+              const previewPath = path.resolve(pet.localPreview || '');
+              if (!pet.localPreview || !fs.existsSync(previewPath) || !/\.(png|webp|jpg|jpeg)$/i.test(previewPath)) {
+                throw new Error('Missing required author-submitted full-body preview image (localPreview) for ' + id);
+              }
+              if (!pet.previewUrl) throw new Error('Missing previewUrl for ' + id);
               execFileSync('node', ['scripts/validate-pet-pack.mjs', zipPath], { stdio: 'inherit' });
             }
             console.log('Validated', manifest.pets.length, 'community pet packs.');

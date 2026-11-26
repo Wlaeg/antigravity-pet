@@ -76,6 +76,14 @@ my-custom-pet/
 1. **One-Click `.zip` Import**: Zip the folder containing `pet.json`, open **Desktop Pet Settings** (`...` menu in Antigravity), click **Import .zip**, and select your archive. It will be extracted to `~/.antigravity-pet/pets/<id>/` and activated automatically.
 2. **Manual Placement**: Copy the folder into `%USERPROFILE%\.antigravity-pet\pets\<id>\` (Windows) or `~/.antigravity-pet/pets/<id>/` (macOS), then click **Reload** in Settings (or `POST http://127.0.0.1:47821/reload`).
 
+### 5. Community Submission Requirements
+
+To publish your pet to the in-plugin **Community Workshop**, submit an English-only [Community Pet Submission Issue](https://github.com/Wlaeg/antigravity-pet/issues/new?template=pet_submission.yml) with:
+
+1. **Pet Pack `.zip` (Required)**: Valid v3 pack containing `pet.json` and sprite assets.
+2. **Full-Body Preview Image (Required)**: Standalone PNG / WebP / JPG full-body image provided by the author (displayed directly in the Community Workshop card before download).
+3. **English Metadata**: `id`, `displayName`, `description`, `themeColor`, and search `tags`.
+
 ---
 
 <a id="简体中文"></a>
@@ -150,3 +158,11 @@ my-custom-pet/
 1. **面板一键导入 `.zip`**：将包含 `pet.json` 的角色目录打包为 `.zip`，在 Antigravity 右上角 `...` 打开 **「桌面宠物设置」**，点击 **「导入宠物包」** 上传即可自动解压至 `~/.antigravity-pet/pets/<id>/` 并切换启用。
 2. **本地目录热重载**：将角色目录放入 `%USERPROFILE%\.antigravity-pet\pets\<id>\`（Windows）或 `~/.antigravity-pet/pets/<id>/`（macOS），在设置面板点击 **「刷新列表」**（或调用 `POST http://127.0.0.1:47821/reload`）即可生效。
 3. **脚本参考**：可参考仓库内 [`scripts/generate-default-pets.ps1`](scripts/generate-default-pets.ps1) 生成无锯齿 `1536×2288` 像素精灵图。
+
+### 5. 社区投稿必填规范
+
+如希望将自制宠物上架至插件内 **「社区宠物库」**，请通过 [Community Pet Submission Issue](https://github.com/Wlaeg/antigravity-pet/issues/new?template=pet_submission.yml) 提交（表单统一使用英文填写）：
+
+1. **宠物包 `.zip`（必填）**：符合本规范的压缩包，内含 `pet.json` 与精灵图资源。
+2. **宠物全身预览图（必填）**：由作者单独提供的全身预览图（PNG / WebP / JPG），用于在用户下载前直接展示在社区宠物库卡片中。
+3. **英文元信息**：`id`、`displayName`、`description`、`themeColor` 与搜索 `tags`。
