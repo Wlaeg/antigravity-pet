@@ -582,7 +582,21 @@
     justify-content: space-between;
     gap: 10px;
   }
-  #communityGrid { grid-template-columns: 1fr; }
+  #communityGrid {
+    grid-template-columns: 1fr;
+    max-height: 360px;
+    overflow-y: auto;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.35) transparent;
+  }
+  #communityGrid::-webkit-scrollbar { width: 6px; }
+  #communityGrid::-webkit-scrollbar-track { background: transparent; }
+  #communityGrid::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.32);
+    border-radius: 999px;
+  }
+  #communityGrid::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.52); }
   .comm-main { display: flex; align-items: flex-start; gap: 11px; min-width: 0; }
   .comm-portrait-box {
     width: 56px;
@@ -2226,8 +2240,8 @@
 
   function refreshCharView() {
     ensurePetAvatars(true);
-    if (_charTab === 'community') loadCommunityPets();
-    else act('reload');
+    act('reload');
+    loadCommunityPets();
   }
 
   function onCommunitySearchInput(val) {
