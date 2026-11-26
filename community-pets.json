@@ -31,11 +31,23 @@
       "displayNameZh": "像素章鱼",
       "description": "Multi-tentacle concurrent coding pixel companion",
       "descriptionZh": "多触手并发写代码的紫色像素小章鱼",
-      "author": "Antigravity Community",
+      "author": "Wlaeg",
       "themeColor": "#A855F7",
-      "version": "1.0.0",
+      "version": "1.0.1",
+      "tags": [
+        "pixel",
+        "octopus",
+        "dev",
+        "purple",
+        "working-anim"
+      ],
+      "hasWorkingAnim": true,
+      "updatedAt": "2026-11-26",
       "localZip": "community/packs/pixel-octopus.zip",
-      "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/pixel-octopus.zip"
+      "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/pixel-octopus.zip",
+      "localPreview": "community/previews/pixel-octopus.png",
+      "previewUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/previews/pixel-octopus.png",
+      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/6"
     },
     {
       "id": "coffee-slime",
