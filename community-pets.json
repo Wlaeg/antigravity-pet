@@ -36,6 +36,18 @@
       "version": "1.0.0",
       "localZip": "community/packs/coffee-slime.zip",
       "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/coffee-slime.zip"
+    },
+    {
+      "id": "pixel-penguin",
+      "displayName": "PixelPenguin",
+      "displayNameZh": "像素小企鹅",
+      "description": "Single-image pixel penguin wearing a sky-blue coding scarf",
+      "descriptionZh": "围着天蓝色围巾的单图像素小企鹅",
+      "author": "Antigravity Community",
+      "themeColor": "#38BDF8",
+      "version": "1.0.0",
+      "localZip": "community/packs/pixel-penguin.zip",
+      "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/pixel-penguin.zip"
     }
   ]
 }
