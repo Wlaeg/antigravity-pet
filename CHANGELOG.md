@@ -5,6 +5,22 @@ All notable changes to **Antigravity Pet** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.0] - 2026-11-27
+
+### Added
+- **dsh-market Style Community Pet Workshop & Auto-Publish Pipeline (`.github/ISSUE_TEMPLATE/pet_submission.yml`, `.github/workflows/community-pet-approve.yml`, `.github/workflows/community-pet-pr-check.yml`, `scripts/validate-pet-pack.mjs`, `scripts/process-community-issue.mjs`)**:
+  - English-only community submission form requiring both a `.zip` pet pack and an author-provided full-body preview image (`PNG`/`WebP`/`JPG`).
+  - Applying the `approved` label to a submission issue automatically validates the archive and preview image, archives them to `community/packs/` and `community/previews/`, registers the entry in `community-pets.json` with `githubUrl` and `tags`, and closes the issue.
+- **Global Community Stats Sync (`community-stats.json`, `scripts/sync-community-stats.mjs`, `.github/workflows/sync-community-stats.yml`)**:
+  - Zero-server GitHub-backed global sync: Actions aggregates Issue reactions as global stars and Release asset `download_count` as global downloads every 30 minutes into `community-stats.json`, fetched in parallel by all clients.
+- **Redesigned Community Cards, Search & Pet Management (`sidecars/panel/index.html`, `sidecars/panel/server.mjs`)**:
+  - Real-time search bar filtering by pet name, ID, description, tags, and author; fixed-height scrollable community container (`max-height: 360px`); `+ Submit Pet` shortcut link.
+  - Community cards now display the 6-element layout: **full-body portrait, name, description, star button (with GitHub Issue sync prompt), download count & download button, and GitHub page link**.
+  - Clicking Download automatically installs the pack, refreshes avatars/lists, and switches to the **Installed** tab.
+  - Installed tab now displays crisp **half-body portraits** for built-in pets, **full-body previews** for installed community/custom pets (always sorted at the end), a hover-reveal **Delete** button (`POST /api/delete-pet`), and pure pet names across all 11 locales.
+- **GitHub Community Standards & Hero Banner (`CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md`, `docs/DEVELOPMENT.md`, `assets/hero-banner.png`)**:
+  - Achieved **100%** GitHub Community Profile health score, split developer docs into `docs/DEVELOPMENT.md`, and upgraded the README banner to a `1280×640` pixel-art showcase.
+
 ## [4.5.0] - 2026-11-26
 
 ### Added

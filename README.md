@@ -6,7 +6,7 @@
 
 **A native pixel-art desktop companion that turns your Google Antigravity AI workflow into a living desk buddy — zero extra runtime dependencies.**
 
-[![Release](https://img.shields.io/badge/Release-v4.5.0-0EA5E9?style=flat-square)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v4.6.0-0EA5E9?style=flat-square)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20%7C%20macOS%2012%2B-0078D6?style=flat-square)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
 [![Characters](https://img.shields.io/badge/Pixel%20Pets-8%20Built--in%20%2B%20Community-F59E0B?style=flat-square)](#characters)
 [![i18n](https://img.shields.io/badge/i18n-11%20Locales-10B981?style=flat-square)](#english)
@@ -14,7 +14,7 @@
 
 <br/>
 
-**[⬇️ Download Latest Release (v4.5.0)](https://github.com/Wlaeg/antigravity-pet/releases/latest)** · **[简体中文](#简体中文)** · **[English](#english)**
+**[⬇️ Download Latest Release (v4.6.0)](https://github.com/Wlaeg/antigravity-pet/releases/latest)** · **[简体中文](#简体中文)** · **[English](#english)**
 
 </div>
 
@@ -86,7 +86,7 @@ Looking to craft your own pet pack or integrate with the local bridge? Detailed 
 
 - 🎨 **[Custom Pet Pack Specification (v3)](CUSTOM_PET_SPEC.md)** — Single-image fallback, `1536×2288` (`8×11`) atlas layout, `themeColor`, custom `.wav` sounds, and `.zip` packaging.
 - 🛠️ **[Architecture, Hooks & Local HTTP API](docs/DEVELOPMENT.md)** — System diagram, directory structure, `BackgroundRunning` priority state machine, and `127.0.0.1:47821` endpoints.
-- 📋 **[Release Changelog](CHANGELOG.md)** — Full version history from `v3.0.0` to `v4.5.0`.
+- 📋 **[Release Changelog](CHANGELOG.md)** — Full version history from `v3.0.0` to `v4.6.0`.
 
 ---
 
@@ -154,7 +154,7 @@ Looking to craft your own pet pack or integrate with the local bridge? Detailed 
 
 - 🎨 **[自定义宠物包规范 (v3)](CUSTOM_PET_SPEC.md)** — 单图保底、`1536×2288` (`8×11`) 图集规范、`themeColor` 与自定义 `.wav` 音效打包说明。
 - 🛠️ **[系统架构、Hooks 与本地 HTTP 接口](docs/DEVELOPMENT.md)** — Mermaid 架构图、目录结构、`BackgroundRunning` 优先级状态机与 `127.0.0.1:47821` API 文档。
-- 📋 **[版本更新日志 (Changelog)](CHANGELOG.md)** — `v3.0.0` 至 `v4.5.0` 完整变更记录。
+- 📋 **[版本更新日志 (Changelog)](CHANGELOG.md)** — `v3.0.0` 至 `v4.6.0` 完整变更记录。
 
 ---
 
