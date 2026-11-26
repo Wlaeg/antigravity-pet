@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "updatedAt": "2026-11-26T16:12:07.933Z",
+  "pets": {
+    "cyber-panda": {
+      "stars": 1,
+      "downloads": 0
+    },
+    "pixel-octopus": {
+      "stars": 0,
+      "downloads": 0
+    },
+    "coffee-slime": {
+      "stars": 0,
+      "downloads": 0
+    },
+    "star-hamster": {
+      "stars": 0,
+      "downloads": 0
+    }
+  }
+}

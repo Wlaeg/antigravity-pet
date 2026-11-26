@@ -2344,6 +2344,7 @@
       starBtn.type = 'button';
       starBtn.className = 'comm-star-btn' + (p.starred ? ' starred' : '');
       starBtn.innerHTML = '<span>' + (p.starred ? '★' : '☆') + '</span><span>' + starCount + '</span>';
+      starBtn.title = 'Star locally & react 👍 on GitHub Issue to sync globally';
       starBtn.onclick = function () {
         apiCall('/api/star-community-pet', { id: p.id }).then(function (res) {
           if (res && res.ok) {
@@ -2353,6 +2354,9 @@
               p.stars = Math.max(0, Number(p.stars || 0) + (nextStarred ? 1 : -1));
             }
             renderCommunityPets();
+            if (nextStarred && ghUrl && ghUrl.indexOf('/issues/') >= 0) {
+              window.open(ghUrl, '_blank', 'noopener,noreferrer');
+            }
           }
         }).catch(function () {});
       };

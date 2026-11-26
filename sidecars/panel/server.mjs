@@ -20,6 +20,8 @@ const PETS_DIR = path.join(PLUGIN_ROOT, 'pets');
 const USER_PETS_DIR = path.join(os.homedir(), '.antigravity-pet', 'pets');
 const COMMUNITY_MANIFEST_PATH = path.join(PLUGIN_ROOT, 'community-pets.json');
 const COMMUNITY_MANIFEST_URL = 'https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community-pets.json';
+const COMMUNITY_STATS_PATH = path.join(PLUGIN_ROOT, 'community-stats.json');
+const COMMUNITY_STATS_URL = 'https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community-stats.json';
 const COMMUNITY_STARS_PATH = path.join(os.homedir(), '.antigravity-pet', 'community-stars.json');
 const COMMUNITY_DOWNLOADS_PATH = path.join(os.homedir(), '.antigravity-pet', 'community-downloads.json');
 const PORT = 47821;
@@ -697,18 +699,38 @@ function incrementCommunityDownload(id) {
 
 export async function getCommunityPets() {
   let manifest = null;
+  let globalStats = {};
   let source = 'local';
-  try {
-    const buf = await downloadHttpsBuffer(COMMUNITY_MANIFEST_URL + '?t=' + Date.now(), 1024 * 1024, 3500);
-    const parsed = JSON.parse(buf.toString('utf8'));
-    if (parsed && Array.isArray(parsed.pets)) {
-      manifest = parsed;
-      source = 'remote';
-    }
-  } catch {}
+  const [manifestRes, statsRes] = await Promise.allSettled([
+    downloadHttpsBuffer(COMMUNITY_MANIFEST_URL + '?t=' + Date.now(), 1024 * 1024, 3500),
+    downloadHttpsBuffer(COMMUNITY_STATS_URL + '?t=' + Date.now(), 512 * 1024, 3000)
+  ]);
+  if (manifestRes.status === 'fulfilled') {
+    try {
+      const parsed = JSON.parse(manifestRes.value.toString('utf8'));
+      if (parsed && Array.isArray(parsed.pets)) {
+        manifest = parsed;
+        source = 'remote';
+      }
+    } catch {}
+  }
+  if (statsRes.status === 'fulfilled') {
+    try {
+      const parsedStats = JSON.parse(statsRes.value.toString('utf8'));
+      if (parsedStats && parsedStats.pets && typeof parsedStats.pets === 'object') {
+        globalStats = parsedStats.pets;
+      }
+    } catch {}
+  }
   if (!manifest && fs.existsSync(COMMUNITY_MANIFEST_PATH)) {
     try {
       manifest = JSON.parse(fs.readFileSync(COMMUNITY_MANIFEST_PATH, 'utf8'));
+    } catch {}
+  }
+  if (!Object.keys(globalStats).length && fs.existsSync(COMMUNITY_STATS_PATH)) {
+    try {
+      const parsedStats = JSON.parse(fs.readFileSync(COMMUNITY_STATS_PATH, 'utf8'));
+      if (parsedStats && parsedStats.pets) globalStats = parsedStats.pets;
     } catch {}
   }
   const installedIds = new Set(scanPetPacks().map((p) => String(p.id || '').toLowerCase()));
@@ -717,8 +739,9 @@ export async function getCommunityPets() {
   const pets = (manifest && Array.isArray(manifest.pets) ? manifest.pets : []).map((p) => {
     const key = String(p.id || '').toLowerCase();
     const starred = starredSet.has(key);
-    const baseStars = Number(p.stars || 0);
-    const baseDownloads = Number(p.downloads || 0);
+    const stat = globalStats[key] || {};
+    const baseStars = Math.max(Number(p.stars || 0), Number(stat.stars || 0));
+    const baseDownloads = Math.max(Number(p.downloads || 0), Number(stat.downloads || 0));
     const localDownloads = Number(downloadsMap[key] || 0);
     const githubUrl = p.githubUrl || (p.localZip
       ? `https://github.com/Wlaeg/antigravity-pet/blob/main/${String(p.localZip).replace(/^[\\/]+/, '')}`
