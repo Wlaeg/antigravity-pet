@@ -5,6 +5,28 @@ All notable changes to **Antigravity Pet** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.7.0] - 2026-11-27
+
+### Added
+- **200-Task Milestone — Surprise Mode (`scripts/surprise-base.json`, `scripts/surprise-agent-worker.mjs`, `app/AntigravityPet.cs`, `app/AntigravityPet.swift`, `sidecars/panel/server.mjs`)**:
+  - Built 20 conflict-free base pixel accessories across 4 dedicated slots (`head`, `face`, `hand`, `back` — 5 items per slot) with layered rendering (`back` behind the mascot body; `face`, `head`, and `hand` in front).
+  - On first entry into Surprise Mode, displays a notice and live progress bar while the local Agent hybrid worker generates 150 additional unique accessories (90 distinct geometric silhouettes + modular attachments, ensuring over 2/3 are brand-new shapes rather than simple recolors) into `~/.antigravity-pet/surprise-accessories/`.
+  - Automatically swaps a random pair of 2 non-conflicting slots every 1–5 completed tasks and adds a manual **Reroll** button in Settings.
+- **GitHub Star One-Click Unlock (`sidecars/panel/server.mjs`, `sidecars/panel/index.html`, `ui/settings.html`)**:
+  - Added a 2-click GitHub Star verification flow: clicking **Star & Unlock** opens `Wlaeg/antigravity-pet` (or unlocks immediately if authenticated via `gh` CLI) and polls real repository star status to unlock all accessory milestones automatically once starred.
+- **Developer Diagnostics Accessory Controls (`sidecars/panel/index.html`, `ui/settings.html`, `app/AntigravityPet.cs`, `app/AntigravityPet.swift`)**:
+  - Added **Cycle Accessory** (`slot1` → `slot2` → `slot3` → `slot4` → `surprise` → `none`) and **Reroll Surprise** quick-preview buttons bypassing unlock gates for fast visual inspection.
+
+### Changed
+- **Per-User Randomized Starter Accessories (`sidecars/panel/server.mjs`, `app/AntigravityPet.cs`, `app/AntigravityPet.swift`, `sidecars/panel/index.html`, `ui/settings.html`)**:
+  - Replaced the fixed 4 starter accessories (`glasses`, `cap`, `coffee`, `crown`) with per-user randomized draws: on initialization, 1 accessory is randomly assigned from each of the 4 built-in slots (`head`, `face`, `hand`, `back`) for the `20 / 50 / 100 / 150` milestones.
+  - Settings slots dynamically render live `20×20` pixel-art previews and localized names for each user's assigned starter gear.
+  - Removed the accessory `auto` equip mode (defaulting to `none`) and completed full 11-language localization for all new labels and dynamic status messages.
+
+### Fixed
+- **Sidecar Settings Panel Script Error (`sidecars/panel/index.html`)**:
+  - Replaced undefined `currentLang` references in `render()` with `data.effectiveLanguage` so all settings controls remain responsive.
+
 ## [4.6.2] - 2026-11-27
 
 ### Added
