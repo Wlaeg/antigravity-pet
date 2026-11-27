@@ -2,7 +2,7 @@ name: Sync Community Pet Stats
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
   push:
     branches: [main]

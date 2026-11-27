@@ -22,6 +22,7 @@ const COMMUNITY_MANIFEST_PATH = path.join(PLUGIN_ROOT, 'community-pets.json');
 const COMMUNITY_MANIFEST_URL = 'https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community-pets.json';
 const COMMUNITY_STATS_PATH = path.join(PLUGIN_ROOT, 'community-stats.json');
 const COMMUNITY_STATS_URL = 'https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community-stats.json';
+const COMMUNITY_RELEASE_URL = 'https://api.github.com/repos/Wlaeg/antigravity-pet/releases/tags/community-packs';
 const COMMUNITY_STARS_PATH = path.join(os.homedir(), '.antigravity-pet', 'community-stars.json');
 const COMMUNITY_DOWNLOADS_PATH = path.join(os.homedir(), '.antigravity-pet', 'community-downloads.json');
 const PORT = 47821;
@@ -707,10 +708,13 @@ function incrementCommunityDownload(id) {
 export async function getCommunityPets() {
   let manifest = null;
   let globalStats = {};
+  const liveDownloads = {};
+  let hasLiveRelease = false;
   let source = 'local';
-  const [manifestRes, statsRes] = await Promise.allSettled([
+  const [manifestRes, statsRes, releaseRes] = await Promise.allSettled([
     downloadHttpsBuffer(COMMUNITY_MANIFEST_URL + '?t=' + Date.now(), 1024 * 1024, 3500),
-    downloadHttpsBuffer(COMMUNITY_STATS_URL + '?t=' + Date.now(), 512 * 1024, 3000)
+    downloadHttpsBuffer(COMMUNITY_STATS_URL + '?t=' + Date.now(), 512 * 1024, 3000),
+    downloadHttpsBuffer(COMMUNITY_RELEASE_URL, 512 * 1024, 2500)
   ]);
   if (manifestRes.status === 'fulfilled') {
     try {
@@ -726,6 +730,21 @@ export async function getCommunityPets() {
       const parsedStats = JSON.parse(statsRes.value.toString('utf8'));
       if (parsedStats && parsedStats.pets && typeof parsedStats.pets === 'object') {
         globalStats = parsedStats.pets;
+      }
+    } catch {}
+  }
+  if (releaseRes.status === 'fulfilled') {
+    try {
+      const parsedRel = JSON.parse(releaseRes.value.toString('utf8'));
+      if (parsedRel && Array.isArray(parsedRel.assets)) {
+        hasLiveRelease = true;
+        for (const asset of parsedRel.assets) {
+          const name = String(asset && asset.name || '').toLowerCase();
+          if (name.endsWith('.zip')) {
+            const id = name.replace(/\.zip$/, '');
+            liveDownloads[id] = Number(asset.download_count || 0);
+          }
+        }
       }
     } catch {}
   }
@@ -748,8 +767,13 @@ export async function getCommunityPets() {
     const starred = starredSet.has(key);
     const stat = globalStats[key] || {};
     const baseStars = Math.max(Number(p.stars || 0), Number(stat.stars || 0));
-    const baseDownloads = Math.max(Number(p.downloads || 0), Number(stat.downloads || 0));
-    const localDownloads = Number(downloadsMap[key] || 0);
+    const hasLivePet = hasLiveRelease && Object.prototype.hasOwnProperty.call(liveDownloads, key);
+    const baseDownloads = Math.max(
+      Number(p.downloads || 0),
+      Number(stat.downloads || 0),
+      hasLivePet ? Number(liveDownloads[key] || 0) : 0
+    );
+    const localDownloads = hasLivePet ? 0 : Number(downloadsMap[key] || 0);
     const githubUrl = p.githubUrl || (p.localZip
       ? `https://github.com/Wlaeg/antigravity-pet/blob/main/${String(p.localZip).replace(/^[\\/]+/, '')}`
       : 'https://github.com/Wlaeg/antigravity-pet');
@@ -790,14 +814,15 @@ export async function importPetPack(args = {}) {
       fs.writeFileSync(zipPath, Buffer.from(cleanB64, 'base64'));
       await extractZipToDir(zipPath, extractDir);
       sourceDir = findPetManifestDir(extractDir);
-    } else if (args.zipUrl || args.localZip) {
+    } else if (args.zipUrl || args.rawZipUrl || args.localZip) {
       const zipPath = path.join(tmpRoot, 'community.zip');
       let downloaded = false;
-      if (args.zipUrl) {
+      for (const candidateUrl of [args.zipUrl, args.rawZipUrl].filter(Boolean)) {
         try {
-          const buf = await downloadHttpsBuffer(args.zipUrl);
+          const buf = await downloadHttpsBuffer(candidateUrl);
           fs.writeFileSync(zipPath, buf);
           downloaded = true;
+          break;
         } catch {}
       }
       if (!downloaded && args.localZip) {
@@ -869,11 +894,12 @@ export async function installCommunityPet(args = {}) {
     target = (listRes.pets || []).find((p) => String(p.id || '').toLowerCase() === id) || null;
   }
   const zipUrl = (target && target.zipUrl) || args.zipUrl || '';
+  const rawZipUrl = (target && target.rawZipUrl) || args.rawZipUrl || '';
   const localZip = (target && target.localZip) || args.localZip || '';
-  if (!zipUrl && !localZip) {
+  if (!zipUrl && !rawZipUrl && !localZip) {
     return { ok: false, error: '未找到对应的社区宠物包下载地址' };
   }
-  const res = await importPetPack({ zipUrl, localZip });
+  const res = await importPetPack({ zipUrl, rawZipUrl, localZip });
   if (res && res.ok) {
     incrementCommunityDownload(id || res.id);
   }
