@@ -1273,12 +1273,6 @@ final class PetController: NSObject, NSApplicationDelegate {
     func currentBubbleText() -> String? {
         let mode = config.BubbleMode
         if mode == "off" { return nil }
-        if !unlockedBannerAcc.isEmpty && config.ReadyTimeoutSec > 0 && now.timeIntervalSince(unlockedBannerShownAt) >= Double(config.ReadyTimeoutSec) {
-            unlockedBannerAcc = ""
-            canvasView.needsDisplay = true
-            syncWindowSizeForBubbles()
-        }
-
         let st = currentEffectiveState()
         if mode == "alerts" && st != "needs_input" && st != "blocked" && st != "ready" { return nil }
         guard let top = currentTopConversation() else { return nil }
@@ -1386,13 +1380,7 @@ final class PetController: NSObject, NSApplicationDelegate {
         if now < overrideUntil, let ov = overrideRow {
             row = ov
         } else {
-            if !unlockedBannerAcc.isEmpty && config.ReadyTimeoutSec > 0 && now.timeIntervalSince(unlockedBannerShownAt) >= Double(config.ReadyTimeoutSec) {
-            unlockedBannerAcc = ""
-            canvasView.needsDisplay = true
-            syncWindowSizeForBubbles()
-        }
-
-        let st = currentEffectiveState()
+            let st = currentEffectiveState()
             switch st {
             case "running": row = PetAnimRow.running.rawValue
             case "needs_input": row = PetAnimRow.needsInput.rawValue
