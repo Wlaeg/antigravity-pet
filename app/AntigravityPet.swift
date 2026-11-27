@@ -29,6 +29,9 @@ struct PetConfig: Codable {
     var CheckUpdatesOnStartup: Bool = true
     var Accessory: String = "none"
     var AccessoriesStarUnlocked: Bool = false
+    var SurpriseCurrentPair: [String] = []
+    var SurpriseCountdown: Int = 0
+    var SurprisePackGenerated: Bool = false
 
     init() {}
 
@@ -38,6 +41,7 @@ struct PetConfig: Codable {
         case AutoStartOnBoot, SoundAlert, Language, AgyDetectedLocale
         case CompletedTasksCount, ToolCallsCount, SnapToAgy, HideOnFullscreen
         case CheckUpdatesOnStartup, Accessory, AccessoriesStarUnlocked
+        case SurpriseCurrentPair, SurpriseCountdown, SurprisePackGenerated
     }
 
     init(from decoder: Decoder) throws {
@@ -66,6 +70,9 @@ struct PetConfig: Codable {
         let rawAcc = (try? c.decodeIfPresent(String.self, forKey: .Accessory)) ?? "none"
         Accessory = (rawAcc.lowercased() == "auto" || rawAcc.isEmpty) ? "none" : rawAcc
         AccessoriesStarUnlocked = (try? c.decodeIfPresent(Bool.self, forKey: .AccessoriesStarUnlocked)) ?? false
+        SurpriseCurrentPair = (try? c.decodeIfPresent([String].self, forKey: .SurpriseCurrentPair)) ?? []
+        SurpriseCountdown = (try? c.decodeIfPresent(Int.self, forKey: .SurpriseCountdown)) ?? 0
+        SurprisePackGenerated = (try? c.decodeIfPresent(Bool.self, forKey: .SurprisePackGenerated)) ?? false
     }
 }
 
@@ -282,16 +289,30 @@ final class PetCanvasView: NSView {
                 ctx.scaleBy(x: ctrl.dragScaleX, y: ctrl.dragScaleY)
                 ctx.translateBy(x: -pivotX, y: -pivotY)
 
-                ctx.saveGState()
-                ctx.translateBy(x: destRect.minX, y: destRect.maxY)
-                ctx.scaleBy(x: 1.0, y: -1.0)
-                ctx.draw(frameImg, in: CGRect(x: 0, y: 0, width: destRect.width, height: destRect.height))
-                ctx.restoreGState()
-
                 // 轻度成长像素配饰直接融入精灵动画与变换层
                 let acc = ctrl.effectiveAccessory()
-                if acc != "none" {
-                    drawPixelAccessory(ctx: ctx, accessory: acc, skinId: pack.id, row: row, frame: frame, destRect: destRect)
+                if acc == "surprise" {
+                    let items = ctrl.activeSurpriseItems()
+                    for it in items where it.slot == "back" {
+                        drawSurpriseItem(ctx: ctx, item: it, skinId: pack.id, row: row, frame: frame, destRect: destRect)
+                    }
+                    ctx.saveGState()
+                    ctx.translateBy(x: destRect.minX, y: destRect.maxY)
+                    ctx.scaleBy(x: 1.0, y: -1.0)
+                    ctx.draw(frameImg, in: CGRect(x: 0, y: 0, width: destRect.width, height: destRect.height))
+                    ctx.restoreGState()
+                    for it in items where it.slot != "back" {
+                        drawSurpriseItem(ctx: ctx, item: it, skinId: pack.id, row: row, frame: frame, destRect: destRect)
+                    }
+                } else {
+                    ctx.saveGState()
+                    ctx.translateBy(x: destRect.minX, y: destRect.maxY)
+                    ctx.scaleBy(x: 1.0, y: -1.0)
+                    ctx.draw(frameImg, in: CGRect(x: 0, y: 0, width: destRect.width, height: destRect.height))
+                    ctx.restoreGState()
+                    if acc != "none" {
+                        drawPixelAccessory(ctx: ctx, accessory: acc, skinId: pack.id, row: row, frame: frame, destRect: destRect)
+                    }
                 }
                 ctx.restoreGState()
             }
@@ -621,6 +642,12 @@ final class PetCanvasView: NSView {
         else if accessory == "cap" { drawAccessoryPixelsToGrid(accessory: accessory, cx: 9, cy: 0, ey: 0, headY: 12, frame: 0, px: px) }
         else if accessory == "crown" { drawAccessoryPixelsToGrid(accessory: accessory, cx: 10, cy: 0, ey: 0, headY: 12, frame: 0, px: px) }
         else if accessory == "coffee" { drawAccessoryPixelsToGrid(accessory: accessory, cx: -2, cy: 8, ey: 0, headY: 0, frame: 0, px: px) }
+        else if accessory == "surprise" {
+            for x in 5...14 { for y in 7...15 { px(x, y, NSColor(calibratedRed: 0.96, green: 0.25, blue: 0.37, alpha: 1)) } }
+            for x in 4...15 { for y in 5...7 { px(x, y, NSColor(calibratedRed: 0.98, green: 0.44, blue: 0.52, alpha: 1)) } }
+            for y in 5...15 { px(9, y, NSColor(calibratedRed: 0.98, green: 0.80, blue: 0.08, alpha: 1)); px(10, y, NSColor(calibratedRed: 0.98, green: 0.80, blue: 0.08, alpha: 1)) }
+            for x in 5...14 { px(x, 10, NSColor(calibratedRed: 0.98, green: 0.80, blue: 0.08, alpha: 1)) }
+        }
         let outline = NSColor(calibratedRed: 0.06, green: 0.09, blue: 0.16, alpha: 1.0)
         var finalGrid = grid
         for y in 0..<gh {
@@ -641,6 +668,47 @@ final class PetCanvasView: NSView {
                 guard let c = finalGrid[y][x] else { continue }
                 c.setFill()
                 ctx.fill(CGRect(x: rect.minX + CGFloat(x) * pw, y: rect.minY + CGFloat(y) * ph, width: pw, height: ph))
+            }
+        }
+    }
+
+    private func drawSurpriseItem(ctx: CGContext, item: SurpriseAccessoryItem, skinId: String, row: Int, frame: Int, destRect: NSRect) {
+        let gw = 36, gh = 39
+        var grid = [[NSColor?]](repeating: [NSColor?](repeating: nil, count: gw), count: gh)
+        let (bodyX, bodyY, flipX) = getFrameMotionOffset(row: row, frame: frame)
+        let cx = 18 + bodyX
+        let cy = 22 + bodyY
+        let ey = cy - 7
+        let headOffset = skinId == "flutter-dash" ? -1 : (skinId == "android-bugdroid" ? 1 : 0)
+        let headY = cy - 11 + headOffset
+        let ax = cx
+        let ay = item.slot == "head" ? headY : (item.slot == "face" ? ey : cy)
+        for p in item.pixels where p.count >= 5 {
+            let x = ax + p[0], y = ay + p[1]
+            if x >= 0 && x < gw && y >= 0 && y < gh {
+                let a = p.count >= 6 ? CGFloat(p[5]) / 255.0 : 1.0
+                grid[y][x] = NSColor(calibratedRed: CGFloat(p[2])/255.0, green: CGFloat(p[3])/255.0, blue: CGFloat(p[4])/255.0, alpha: a)
+            }
+        }
+        let outline = NSColor(calibratedRed: 0.06, green: 0.09, blue: 0.16, alpha: 1.0)
+        var finalGrid = grid
+        for y in 0..<gh {
+            for x in 0..<gw where grid[y][x] == nil {
+                for (dx, dy) in [(1,0),(-1,0),(0,1),(0,-1)] {
+                    let nx = x + dx, ny = y + dy
+                    if nx >= 0 && nx < gw && ny >= 0 && ny < gh, let nc = grid[ny][nx], nc.alphaComponent >= 0.85 {
+                        finalGrid[y][x] = outline; break
+                    }
+                }
+            }
+        }
+        let sx = destRect.width / 192.0, sy = destRect.height / 208.0
+        for y in 0..<gh {
+            for x in 0..<gw {
+                guard let c = finalGrid[y][x] else { continue }
+                let drawX = flipX ? (gw - 1 - x) : x
+                c.setFill()
+                ctx.fill(CGRect(x: destRect.minX + (6.0 + CGFloat(drawX)*5.0)*sx, y: destRect.minY + (6.0 + CGFloat(y)*5.0)*sy, width: 5.0*sx, height: 5.0*sy))
             }
         }
     }
@@ -1313,6 +1381,7 @@ final class PetController: NSObject, NSApplicationDelegate {
         case "cap": return 50
         case "coffee": return 100
         case "crown": return 150
+        case "surprise": return 200
         default: return 0
         }
     }
@@ -1326,6 +1395,7 @@ final class PetController: NSObject, NSApplicationDelegate {
     }
 
     func newlyUnlockedAccessory(prevDone: Int, newDone: Int) -> String {
+        if prevDone < 200 && newDone >= 200 { return "surprise" }
         if prevDone < 150 && newDone >= 150 { return "crown" }
         if prevDone < 100 && newDone >= 100 { return "coffee" }
         if prevDone < 50 && newDone >= 50 { return "cap" }
@@ -1340,7 +1410,59 @@ final class PetController: NSObject, NSApplicationDelegate {
         case "cap": return isEn ? "Dev Cap" : "鸭舌帽"
         case "coffee": return isEn ? "Coffee Cup" : "咖啡杯"
         case "crown": return isEn ? "Gold Crown" : "皇冠"
+        case "surprise": return isEn ? "Surprise Mode" : "惊喜模式"
         default: return acc
+        }
+    }
+
+    struct SurpriseAccessoryItem { let id: String; let slot: String; let pixels: [[Int]] }
+    private var surpriseCatalog: [String: SurpriseAccessoryItem] = [:]
+
+    func ensureSurpriseCatalogLoaded(force: Bool = false) {
+        if !surpriseCatalog.isEmpty && !force { return }
+        var map: [String: SurpriseAccessoryItem] = [:]
+        let basePath = pluginRoot + "/scripts/surprise-base.json"
+        let userPath = NSHomeDirectory() + "/.antigravity-pet/surprise-accessories/manifest.json"
+        for p in [basePath, userPath] {
+            guard let data = FileManager.default.contents(atPath: p),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let arr = obj["items"] as? [[String: Any]] else { continue }
+            for it in arr {
+                if let id = it["id"] as? String, let slot = (it["slot"] as? String)?.lowercased(), let px = it["pixels"] as? [[Int]] {
+                    map[id] = SurpriseAccessoryItem(id: id, slot: slot, pixels: px)
+                }
+            }
+        }
+        surpriseCatalog = map
+    }
+
+    func pickTwoDistinctSurprise() -> [String] {
+        ensureSurpriseCatalogLoaded()
+        var bySlot: [String: [SurpriseAccessoryItem]] = [:]
+        for it in surpriseCatalog.values { bySlot[it.slot, default: []].append(it) }
+        let slots = Array(bySlot.keys)
+        guard slots.count >= 2 else { return [] }
+        let s1 = slots.randomElement()!
+        let s2 = slots.filter { $0 != s1 }.randomElement()!
+        return [bySlot[s1]!.randomElement()!.id, bySlot[s2]!.randomElement()!.id]
+    }
+
+    func activeSurpriseItems() -> [SurpriseAccessoryItem] {
+        ensureSurpriseCatalogLoaded()
+        if config.SurpriseCurrentPair.count < 2 {
+            config.SurpriseCurrentPair = pickTwoDistinctSurprise()
+            if config.SurpriseCountdown <= 0 { config.SurpriseCountdown = Int.random(in: 1...5) }
+        }
+        return config.SurpriseCurrentPair.prefix(2).compactMap { surpriseCatalog[$0] }
+    }
+
+    func advanceSurprisePairOnTaskComplete() {
+        ensureSurpriseCatalogLoaded()
+        config.SurpriseCountdown -= 1
+        if config.SurpriseCountdown <= 0 || config.SurpriseCurrentPair.count < 2 {
+            config.SurpriseCurrentPair = pickTwoDistinctSurprise()
+            config.SurpriseCountdown = Int.random(in: 1...5)
+            saveConfig()
         }
     }
 
@@ -1351,7 +1473,7 @@ final class PetController: NSObject, NSApplicationDelegate {
     func effectiveAccessory() -> String {
         if !isAccessorySupportedForCurrentSkin() { return "none" }
         let mode = config.Accessory.lowercased()
-        if mode == "glasses" || mode == "cap" || mode == "coffee" || mode == "crown" {
+        if mode == "glasses" || mode == "cap" || mode == "coffee" || mode == "crown" || mode == "surprise" {
             return isAccessoryUnlocked(mode) ? mode : "none"
         }
         return "none"
@@ -1991,6 +2113,9 @@ final class PetController: NSObject, NSApplicationDelegate {
                     unlockedBannerAcc = newly
                     unlockedBannerShownAt = Date()
                 }
+                if config.Accessory.lowercased() == "surprise" && isAccessorySupportedForCurrentSkin() {
+                    advanceSurprisePairOnTaskComplete()
+                }
             }
 
             if !title.isEmpty && cid != "default" && cid != "preview" {
@@ -2072,7 +2197,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             case "readytimeoutsec":
                 if let sec = Int(val), sec >= 0 && sec <= 3600 { config.ReadyTimeoutSec = sec; saveConfig() }
             case "testunlock":
-                let order = ["glasses", "cap", "coffee", "crown"]
+                let order = ["glasses", "cap", "coffee", "crown", "surprise"]
                 let req = val.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 let target: String
                 if order.contains(req) {
@@ -2086,6 +2211,19 @@ final class PetController: NSObject, NSApplicationDelegate {
                 if !visible && config.Enabled { setPetVisible(true) }
                 canvasView.needsDisplay = true
                 syncWindowSizeForBubbles()
+            case "reloadsurprise":
+                ensureSurpriseCatalogLoaded(force: true)
+                canvasView.needsDisplay = true
+            case "rerollsurprise":
+                ensureSurpriseCatalogLoaded()
+                if !val.isEmpty {
+                    config.SurpriseCurrentPair = val.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }.prefix(2).map { $0 }
+                } else {
+                    config.SurpriseCurrentPair = pickTwoDistinctSurprise()
+                    config.SurpriseCountdown = Int.random(in: 1...5)
+                }
+                saveConfig()
+                canvasView.needsDisplay = true
             case "starunlock":
                 config.AccessoriesStarUnlocked = true
                 saveConfig()

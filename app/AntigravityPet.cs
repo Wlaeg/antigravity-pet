@@ -53,8 +53,11 @@ namespace AntigravityPet
         public int ReadyTimeoutSec { get; set; } // 0 = never auto-hide, default 30s
         public bool SnapToAgy { get; set; }
         public bool HideOnFullscreen { get; set; }
-        public string Accessory { get; set; }    // none | glasses | cap | coffee | crown
+        public string Accessory { get; set; }    // none | glasses | cap | coffee | crown | surprise
         public bool AccessoriesStarUnlocked { get; set; }
+        public List<string> SurpriseCurrentPair { get; set; }
+        public int SurpriseCountdown { get; set; }
+        public bool SurprisePackGenerated { get; set; }
         public double Scale { get; set; }       // 0.33 ~ 3.0 (default 1.0)
         public bool AutoWalk { get; set; }
         public bool EyeFollow { get; set; }
@@ -83,6 +86,9 @@ namespace AntigravityPet
             HideOnFullscreen = true;
             Accessory = "none";
             AccessoriesStarUnlocked = false;
+            SurpriseCurrentPair = new List<string>();
+            SurpriseCountdown = 0;
+            SurprisePackGenerated = false;
             Scale = 1.0;
             AutoWalk = true;
             EyeFollow = true;
@@ -2736,6 +2742,10 @@ namespace AntigravityPet
                         _unlockedBannerAcc = newly;
                         _unlockedBannerShownAt = DateTime.Now;
                     }
+                    if (string.Equals(_config.Accessory, "surprise", StringComparison.OrdinalIgnoreCase) && IsAccessorySupportedForCurrentSkin())
+                    {
+                        AdvanceSurprisePairOnTaskComplete();
+                    }
                 }
                 _tasks[conversationId] = new TaskItem
                 {
@@ -2797,6 +2807,7 @@ namespace AntigravityPet
 
         private static string GetNewlyUnlockedAccessory(int prevDone, int newDone)
         {
+            if (prevDone < 200 && newDone >= 200) return "surprise";
             if (prevDone < 150 && newDone >= 150) return "crown";
             if (prevDone < 100 && newDone >= 100) return "coffee";
             if (prevDone < 50 && newDone >= 50) return "cap";
@@ -2812,6 +2823,7 @@ namespace AntigravityPet
                 case "cap": return T("鸭舌帽", "Dev Cap");
                 case "coffee": return T("咖啡杯", "Coffee Cup");
                 case "crown": return T("皇冠", "Gold Crown");
+                case "surprise": return T("惊喜模式", "Surprise Mode");
                 default: return acc ?? "";
             }
         }
@@ -2877,6 +2889,16 @@ namespace AntigravityPet
                 px(cupX + 3, cupY - 2 + steamOff, 226, 232, 240, 220);
                 px(cupX + 4, cupY - 3 + steamOff, 203, 213, 225, 170);
             }
+            else if (acc == "surprise")
+            {
+                // 惊喜模式礼盒像素图标（供 20x20 解锁气泡预览）
+                for (int x = 5; x <= 14; x++) for (int y = 7; y <= 15; y++) px(x, y, 244, 63, 94, 255);
+                for (int x = 4; x <= 15; x++) for (int y = 5; y <= 7; y++) px(x, y, 251, 113, 133, 255);
+                for (int y = 5; y <= 15; y++) { px(9, y, 250, 204, 21, 255); px(10, y, 250, 204, 21, 255); }
+                for (int x = 5; x <= 14; x++) px(x, 10, 250, 204, 21, 255);
+                px(7, 3, 250, 204, 21, 255); px(8, 4, 253, 224, 71, 255);
+                px(12, 3, 250, 204, 21, 255); px(11, 4, 253, 224, 71, 255);
+            }
         }
 
         private BitmapSource CreateAccessoryIconBitmap(string acc)
@@ -2903,6 +2925,7 @@ namespace AntigravityPet
             else if (acc == "cap") DrawAccessoryPixels(acc, 9, 0, 0, 12, 0, px);
             else if (acc == "crown") DrawAccessoryPixels(acc, 10, 0, 0, 12, 0, px);
             else if (acc == "coffee") DrawAccessoryPixels(acc, -2, 8, 0, 0, 0, px);
+            else if (acc == "surprise") DrawAccessoryPixels(acc, 0, 0, 0, 0, 0, px);
 
             byte[] bgra = new byte[gw * gh * 4];
             int[] odx = new int[] { 1, -1, 0, 0 };
@@ -2939,6 +2962,101 @@ namespace AntigravityPet
             return bmp;
         }
 
+        private class SurpriseItem
+        {
+            public string Id;
+            public string Slot;
+            public List<int[]> Pixels;
+        }
+
+        private Dictionary<string, SurpriseItem> _surpriseCatalog;
+        private readonly Random _surpriseRng = new Random();
+
+        private void EnsureSurpriseCatalogLoaded(bool forceReload = false)
+        {
+            if (_surpriseCatalog != null && !forceReload) return;
+            var map = new Dictionary<string, SurpriseItem>(StringComparer.OrdinalIgnoreCase);
+            string baseFile = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "scripts", "surprise-base.json"));
+            string userFile = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".antigravity-pet", "surprise-accessories", "manifest.json");
+            var ser = new JavaScriptSerializer { MaxJsonLength = 16 * 1024 * 1024 };
+            foreach (string path in new[] { baseFile, userFile })
+            {
+                try
+                {
+                    if (!File.Exists(path)) continue;
+                    var root = ser.DeserializeObject(File.ReadAllText(path, Encoding.UTF8)) as Dictionary<string, object>;
+                    if (root == null || !root.ContainsKey("items")) continue;
+                    var arr = root["items"] as object[];
+                    if (arr == null) continue;
+                    foreach (var obj in arr)
+                    {
+                        var d = obj as Dictionary<string, object>;
+                        if (d == null) continue;
+                        string id = d.ContainsKey("id") ? Convert.ToString(d["id"]) : "";
+                        string slot = d.ContainsKey("slot") ? Convert.ToString(d["slot"]).ToLowerInvariant() : "";
+                        var pxArr = d.ContainsKey("pixels") ? d["pixels"] as object[] : null;
+                        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(slot) || pxArr == null) continue;
+                        var pxList = new List<int[]>(pxArr.Length);
+                        foreach (var pObj in pxArr)
+                        {
+                            var coords = pObj as object[];
+                            if (coords == null || coords.Length < 5) continue;
+                            int dx = Convert.ToInt32(coords[0]);
+                            int dy = Convert.ToInt32(coords[1]);
+                            int r = Convert.ToInt32(coords[2]);
+                            int g = Convert.ToInt32(coords[3]);
+                            int b = Convert.ToInt32(coords[4]);
+                            int a = coords.Length >= 6 ? Convert.ToInt32(coords[5]) : 255;
+                            pxList.Add(new[] { dx, dy, r, g, b, a });
+                        }
+                        map[id] = new SurpriseItem { Id = id, Slot = slot, Pixels = pxList };
+                    }
+                }
+                catch { }
+            }
+            _surpriseCatalog = map;
+        }
+
+        private List<string> PickTwoDistinctSurpriseAccessories()
+        {
+            EnsureSurpriseCatalogLoaded(false);
+            if (_surpriseCatalog == null || _surpriseCatalog.Count < 2) return new List<string>();
+            var bySlot = new Dictionary<string, List<SurpriseItem>>();
+            foreach (var it in _surpriseCatalog.Values)
+            {
+                if (!bySlot.ContainsKey(it.Slot)) bySlot[it.Slot] = new List<SurpriseItem>();
+                bySlot[it.Slot].Add(it);
+            }
+            var slots = bySlot.Keys.ToList();
+            if (slots.Count < 2) return new List<string>();
+            string s1 = slots[_surpriseRng.Next(slots.Count)];
+            var rest = slots.Where(s => s != s1).ToList();
+            string s2 = rest[_surpriseRng.Next(rest.Count)];
+            var l1 = bySlot[s1];
+            var l2 = bySlot[s2];
+            return new List<string> { l1[_surpriseRng.Next(l1.Count)].Id, l2[_surpriseRng.Next(l2.Count)].Id };
+        }
+
+        private void AdvanceSurprisePairOnTaskComplete()
+        {
+            EnsureSurpriseCatalogLoaded(false);
+            if (_config.SurpriseCurrentPair == null || _config.SurpriseCurrentPair.Count < 2)
+            {
+                _config.SurpriseCurrentPair = PickTwoDistinctSurpriseAccessories();
+                _config.SurpriseCountdown = _surpriseRng.Next(1, 6);
+                SaveConfig();
+                return;
+            }
+            _config.SurpriseCountdown--;
+            if (_config.SurpriseCountdown <= 0)
+            {
+                _config.SurpriseCurrentPair = PickTwoDistinctSurpriseAccessories();
+                _config.SurpriseCountdown = _surpriseRng.Next(1, 6);
+                _composedFrameCache.Clear();
+                SaveConfig();
+            }
+        }
+
         private static int GetAccessoryUnlockMilestone(string acc)
         {
             switch ((acc ?? "").Trim().ToLowerInvariant())
@@ -2947,6 +3065,7 @@ namespace AntigravityPet
                 case "cap": return 50;
                 case "coffee": return 100;
                 case "crown": return 150;
+                case "surprise": return 200;
                 default: return 0;
             }
         }
@@ -3032,7 +3151,27 @@ namespace AntigravityPet
         private BitmapSource ComposeFrameWithAccessory(BitmapSource baseFrame, string skinId, string acc, int row, int frame)
         {
             if (baseFrame == null || string.IsNullOrEmpty(acc) || acc == "none") return baseFrame;
-            string key = skinId + "|" + acc + "|" + row + "|" + frame;
+            string cacheTag = acc;
+            List<SurpriseItem> surpriseItems = null;
+            if (acc == "surprise")
+            {
+                EnsureSurpriseCatalogLoaded(false);
+                if (_config.SurpriseCurrentPair == null || _config.SurpriseCurrentPair.Count < 2)
+                {
+                    _config.SurpriseCurrentPair = PickTwoDistinctSurpriseAccessories();
+                    if (_config.SurpriseCountdown <= 0) _config.SurpriseCountdown = _surpriseRng.Next(1, 6);
+                }
+                if (_config.SurpriseCurrentPair == null || _config.SurpriseCurrentPair.Count == 0) return baseFrame;
+                surpriseItems = new List<SurpriseItem>();
+                foreach (string sid in _config.SurpriseCurrentPair.Take(2))
+                {
+                    SurpriseItem found;
+                    if (_surpriseCatalog != null && _surpriseCatalog.TryGetValue(sid, out found)) surpriseItems.Add(found);
+                }
+                if (surpriseItems.Count == 0) return baseFrame;
+                cacheTag = "surprise:" + string.Join("+", surpriseItems.Select(x => x.Id));
+            }
+            string key = skinId + "|" + cacheTag + "|" + row + "|" + frame;
             BitmapSource cached;
             if (_composedFrameCache.TryGetValue(key, out cached)) return cached;
 
@@ -3065,84 +3204,107 @@ namespace AntigravityPet
 
                 const int gw = 36;
                 const int gh = 39;
-                byte[] ovR = new byte[gw * gh];
-                byte[] ovG = new byte[gw * gh];
-                byte[] ovB = new byte[gw * gh];
-                byte[] ovA = new byte[gw * gh];
 
-                Action<int, int, byte, byte, byte, byte> px = (x, y, r, g, b, a) =>
+                Action<Action<Action<int, int, byte, byte, byte, byte>>, bool> blendLayer = (drawLayer, behindBodyOnly) =>
                 {
-                    if (x < 0 || x >= gw || y < 0 || y >= gh) return;
-                    int idx = y * gw + x;
-                    ovR[idx] = r;
-                    ovG[idx] = g;
-                    ovB[idx] = b;
-                    ovA[idx] = a;
+                    byte[] ovR = new byte[gw * gh];
+                    byte[] ovG = new byte[gw * gh];
+                    byte[] ovB = new byte[gw * gh];
+                    byte[] ovA = new byte[gw * gh];
+
+                    Action<int, int, byte, byte, byte, byte> px = (x, y, r, g, b, a) =>
+                    {
+                        if (x < 0 || x >= gw || y < 0 || y >= gh) return;
+                        int idx = y * gw + x;
+                        ovR[idx] = r;
+                        ovG[idx] = g;
+                        ovB[idx] = b;
+                        ovA[idx] = a;
+                    };
+
+                    drawLayer(px);
+
+                    byte[] outA = (byte[])ovA.Clone();
+                    int[] odx = new int[] { 1, -1, 0, 0 };
+                    int[] ody = new int[] { 0, 0, 1, -1 };
+                    for (int y = 0; y < gh; y++)
+                    {
+                        for (int x = 0; x < gw; x++)
+                        {
+                            int i = y * gw + x;
+                            if (ovA[i] > 0) continue;
+                            for (int k = 0; k < 4; k++)
+                            {
+                                int nx = x + odx[k];
+                                int ny = y + ody[k];
+                                if (nx >= 0 && nx < gw && ny >= 0 && ny < gh && ovA[ny * gw + nx] >= 220)
+                                {
+                                    ovR[i] = 15; ovG[i] = 23; ovB[i] = 42; outA[i] = 255;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    double sx = pw / 192.0;
+                    double sy = ph / 208.0;
+                    for (int y = 0; y < gh; y++)
+                    {
+                        for (int x = 0; x < gw; x++)
+                        {
+                            int i = y * gw + x;
+                            byte a = outA[i];
+                            if (a == 0) continue;
+                            int drawX = flipX ? (gw - 1 - x) : x;
+                            int px0 = (int)Math.Floor((6.0 + drawX * 5.0) * sx);
+                            int py0 = (int)Math.Floor((6.0 + y * 5.0) * sy);
+                            int px1 = (int)Math.Ceiling((6.0 + (drawX + 1) * 5.0) * sx);
+                            int py1 = (int)Math.Ceiling((6.0 + (y + 1) * 5.0) * sy);
+                            for (int pyy = Math.Max(0, py0); pyy < Math.Min(ph, py1); pyy++)
+                            {
+                                for (int pxx = Math.Max(0, px0); pxx < Math.Min(pw, px1); pxx++)
+                                {
+                                    int pIdx = pyy * stride + pxx * 4;
+                                    if (behindBodyOnly && pixels[pIdx + 3] >= 20) continue;
+                                    if (a >= 250)
+                                    {
+                                        pixels[pIdx + 0] = ovB[i];
+                                        pixels[pIdx + 1] = ovG[i];
+                                        pixels[pIdx + 2] = ovR[i];
+                                        pixels[pIdx + 3] = a;
+                                    }
+                                    else
+                                    {
+                                        double fa = a / 255.0;
+                                        double ia = 1.0 - fa;
+                                        pixels[pIdx + 0] = (byte)(ovB[i] * fa + pixels[pIdx + 0] * ia);
+                                        pixels[pIdx + 1] = (byte)(ovG[i] * fa + pixels[pIdx + 1] * ia);
+                                        pixels[pIdx + 2] = (byte)(ovR[i] * fa + pixels[pIdx + 2] * ia);
+                                        pixels[pIdx + 3] = (byte)Math.Min(255, (int)(a + pixels[pIdx + 3] * ia));
+                                    }
+                                }
+                            }
+                        }
+                    }
                 };
 
-                DrawAccessoryPixels(acc, cx, cy, ey, headY, frame, px);
-
-                // 为配饰添加 1px 深色像素外轮廓（与角色本体融合）
-                byte[] outA = (byte[])ovA.Clone();
-                int[] odx = new int[] { 1, -1, 0, 0 };
-                int[] ody = new int[] { 0, 0, 1, -1 };
-                for (int y = 0; y < gh; y++)
+                if (surpriseItems != null)
                 {
-                    for (int x = 0; x < gw; x++)
+                    Action<SurpriseItem, Action<int, int, byte, byte, byte, byte>> drawItem = (it, px) =>
                     {
-                        int i = y * gw + x;
-                        if (ovA[i] > 0) continue;
-                        for (int k = 0; k < 4; k++)
+                        int ax = cx;
+                        int ay = it.Slot == "head" ? headY : (it.Slot == "face" ? ey : cy);
+                        foreach (var pt in it.Pixels)
                         {
-                            int nx = x + odx[k];
-                            int ny = y + ody[k];
-                            if (nx >= 0 && nx < gw && ny >= 0 && ny < gh && ovA[ny * gw + nx] >= 220)
-                            {
-                                ovR[i] = 15; ovG[i] = 23; ovB[i] = 42; outA[i] = 255;
-                                break;
-                            }
+                            px(ax + pt[0], ay + pt[1], (byte)pt[2], (byte)pt[3], (byte)pt[4], (byte)pt[5]);
                         }
-                    }
+                    };
+                    foreach (var it in surpriseItems.Where(s => s.Slot == "back")) blendLayer(px => drawItem(it, px), true);
+                    foreach (var it in surpriseItems.Where(s => s.Slot != "back")) blendLayer(px => drawItem(it, px), false);
                 }
-
-                double sx = pw / 192.0;
-                double sy = ph / 208.0;
-                for (int y = 0; y < gh; y++)
+                else
                 {
-                    for (int x = 0; x < gw; x++)
-                    {
-                        int i = y * gw + x;
-                        byte a = outA[i];
-                        if (a == 0) continue;
-                        int drawX = flipX ? (gw - 1 - x) : x;
-                        int px0 = (int)Math.Floor((6.0 + drawX * 5.0) * sx);
-                        int py0 = (int)Math.Floor((6.0 + y * 5.0) * sy);
-                        int px1 = (int)Math.Ceiling((6.0 + (drawX + 1) * 5.0) * sx);
-                        int py1 = (int)Math.Ceiling((6.0 + (y + 1) * 5.0) * sy);
-                        for (int pyy = Math.Max(0, py0); pyy < Math.Min(ph, py1); pyy++)
-                        {
-                            for (int pxx = Math.Max(0, px0); pxx < Math.Min(pw, px1); pxx++)
-                            {
-                                int pIdx = pyy * stride + pxx * 4;
-                                if (a >= 250)
-                                {
-                                    pixels[pIdx + 0] = ovB[i];
-                                    pixels[pIdx + 1] = ovG[i];
-                                    pixels[pIdx + 2] = ovR[i];
-                                    pixels[pIdx + 3] = a;
-                                }
-                                else
-                                {
-                                    double fa = a / 255.0;
-                                    double ia = 1.0 - fa;
-                                    pixels[pIdx + 0] = (byte)(ovB[i] * fa + pixels[pIdx + 0] * ia);
-                                    pixels[pIdx + 1] = (byte)(ovG[i] * fa + pixels[pIdx + 1] * ia);
-                                    pixels[pIdx + 2] = (byte)(ovR[i] * fa + pixels[pIdx + 2] * ia);
-                                    pixels[pIdx + 3] = (byte)Math.Min(255, (int)(a + pixels[pIdx + 3] * ia));
-                                }
-                            }
-                        }
-                    }
+                    blendLayer(px => DrawAccessoryPixels(acc, cx, cy, ey, headY, frame, px), false);
                 }
 
                 var wb = new WriteableBitmap(pw, ph, 96, 96, PixelFormats.Bgra32, null);
@@ -5522,7 +5684,7 @@ namespace AntigravityPet
                         }
                         else if (action == "testunlock")
                         {
-                            string[] order = new string[] { "glasses", "cap", "coffee", "crown" };
+                            string[] order = new string[] { "glasses", "cap", "coffee", "crown", "surprise" };
                             string target = (val ?? "").Trim().ToLowerInvariant();
                             if (Array.IndexOf(order, target) < 0)
                             {
@@ -5534,6 +5696,26 @@ namespace AntigravityPet
                             if (!IsVisible && _config.Enabled) Show();
                             UpdateVisualState();
                             SyncFullscreenAndEdgeState();
+                        }
+                        else if (action == "reloadsurprise")
+                        {
+                            EnsureSurpriseCatalogLoaded(true);
+                            UpdateAccessoryVisual();
+                        }
+                        else if (action == "rerollsurprise")
+                        {
+                            EnsureSurpriseCatalogLoaded(false);
+                            if (!string.IsNullOrWhiteSpace(val))
+                            {
+                                _config.SurpriseCurrentPair = val.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).Take(2).ToList();
+                            }
+                            else
+                            {
+                                _config.SurpriseCurrentPair = PickTwoDistinctSurpriseAccessories();
+                                _config.SurpriseCountdown = _surpriseRng.Next(1, 6);
+                            }
+                            SaveConfig();
+                            UpdateAccessoryVisual();
                         }
                         else if (action == "starunlock")
                         {

@@ -26,6 +26,11 @@ const ABACUS_BASE_URL = 'https://abacus.jasoncameron.dev';
 const ABACUS_NS = 'wlaeg-antigravity-pet';
 const COMMUNITY_STARS_PATH = path.join(os.homedir(), '.antigravity-pet', 'community-stars.json');
 const COMMUNITY_DOWNLOADS_PATH = path.join(os.homedir(), '.antigravity-pet', 'community-downloads.json');
+const SURPRISE_BASE_PATH = path.join(PLUGIN_ROOT, 'scripts', 'surprise-base.json');
+const SURPRISE_WORKER_PATH = path.join(PLUGIN_ROOT, 'scripts', 'surprise-agent-worker.mjs');
+const SURPRISE_DIR = path.join(os.homedir(), '.antigravity-pet', 'surprise-accessories');
+const SURPRISE_MANIFEST_PATH = path.join(SURPRISE_DIR, 'manifest.json');
+const SURPRISE_PROGRESS_PATH = path.join(SURPRISE_DIR, 'progress.json');
 const PORT = 47821;
 const TASK_NAME = 'AntigravityPetLauncher';
 
@@ -66,7 +71,11 @@ function readOfflineConfig() {
     ToolCallsCount: 0,
     SnapToAgy: false,
     HideOnFullscreen: true,
-    Accessory: 'none'
+    Accessory: 'none',
+    AccessoriesStarUnlocked: false,
+    SurpriseCurrentPair: [],
+    SurpriseCountdown: 0,
+    SurprisePackGenerated: false
   };
   try {
     const p = getConfigPath();
@@ -296,7 +305,115 @@ async function waitForHealth(maxWaitMs = 2800) {
   return null;
 }
 
-const ACCESSORY_MILESTONES = { glasses: 20, cap: 50, coffee: 100, crown: 150 };
+const ACCESSORY_MILESTONES = { glasses: 20, cap: 50, coffee: 100, crown: 150, surprise: 200 };
+
+function loadSurpriseCatalog() {
+  const items = [];
+  for (const p of [SURPRISE_BASE_PATH, SURPRISE_MANIFEST_PATH]) {
+    try {
+      if (fs.existsSync(p)) {
+        const obj = JSON.parse(fs.readFileSync(p, 'utf8'));
+        if (Array.isArray(obj.items)) items.push(...obj.items);
+      }
+    } catch {}
+  }
+  return items;
+}
+
+function pickTwoDistinctSlotAccessories() {
+  const items = loadSurpriseCatalog();
+  if (items.length < 2) return [];
+  const bySlot = new Map();
+  for (const it of items) {
+    if (!it || !it.id || !it.slot) continue;
+    if (!bySlot.has(it.slot)) bySlot.set(it.slot, []);
+    bySlot.get(it.slot).push(it);
+  }
+  const slots = Array.from(bySlot.keys());
+  if (slots.length < 2) return [];
+  const s1 = slots[Math.floor(Math.random() * slots.length)];
+  const rest = slots.filter((s) => s !== s1);
+  const s2 = rest[Math.floor(Math.random() * rest.length)];
+  const list1 = bySlot.get(s1);
+  const list2 = bySlot.get(s2);
+  const a1 = list1[Math.floor(Math.random() * list1.length)];
+  const a2 = list2[Math.floor(Math.random() * list2.length)];
+  return [a1.id, a2.id];
+}
+
+let surpriseWorkerRunning = false;
+
+function readSurpriseProgress() {
+  try {
+    if (fs.existsSync(SURPRISE_PROGRESS_PATH)) {
+      const p = JSON.parse(fs.readFileSync(SURPRISE_PROGRESS_PATH, 'utf8'));
+      return {
+        status: p.status || 'idle',
+        current: Number(p.current || 0),
+        total: Number(p.total || 150),
+        labelZh: p.labelZh || '',
+        labelEn: p.labelEn || ''
+      };
+    }
+  } catch {}
+  if (fs.existsSync(SURPRISE_MANIFEST_PATH)) {
+    return { status: 'done', current: 150, total: 150, labelZh: '', labelEn: '' };
+  }
+  return { status: surpriseWorkerRunning ? 'generating' : 'idle', current: 0, total: 150, labelZh: '', labelEn: '' };
+}
+
+function ensureSurpriseGenerationStarted() {
+  if (fs.existsSync(SURPRISE_MANIFEST_PATH) || surpriseWorkerRunning) return;
+  if (!fs.existsSync(SURPRISE_WORKER_PATH)) return;
+  surpriseWorkerRunning = true;
+  try {
+    fs.mkdirSync(SURPRISE_DIR, { recursive: true });
+    fs.writeFileSync(SURPRISE_PROGRESS_PATH, JSON.stringify({
+      status: 'generating',
+      current: 0,
+      total: 150,
+      labelZh: '正在启动本地 Agent 生成配饰库…',
+      labelEn: 'Starting local Agent to generate accessories...',
+      updatedAt: new Date().toISOString()
+    }), 'utf8');
+  } catch {}
+  const child = spawn(process.execPath, [SURPRISE_WORKER_PATH], {
+    cwd: PLUGIN_ROOT,
+    stdio: 'ignore',
+    windowsHide: true
+  });
+  child.on('exit', async () => {
+    surpriseWorkerRunning = false;
+    try {
+      const cfg = readOfflineConfig();
+      const patch = { SurprisePackGenerated: fs.existsSync(SURPRISE_MANIFEST_PATH) };
+      if (!Array.isArray(cfg.SurpriseCurrentPair) || cfg.SurpriseCurrentPair.length < 2) {
+        patch.SurpriseCurrentPair = pickTwoDistinctSlotAccessories();
+        patch.SurpriseCountdown = 1 + Math.floor(Math.random() * 5);
+      }
+      writeOfflineConfig(patch);
+      const health = await httpRequest('GET', '/health', null, 600);
+      if (health.ok && health.data && health.data.running) {
+        await httpRequest('POST', '/control', { action: 'reloadsurprise', value: 'true' });
+      }
+    } catch {}
+  });
+}
+
+function attachSurpriseMeta(status, cfg) {
+  const catalog = loadSurpriseCatalog();
+  const byId = new Map(catalog.map((x) => [x.id, x]));
+  const pairIds = Array.isArray(cfg.SurpriseCurrentPair) ? cfg.SurpriseCurrentPair : [];
+  status.surprisePair = pairIds.map((id) => {
+    const it = byId.get(id);
+    return it ? { id: it.id, slot: it.slot, nameZh: it.nameZh, nameEn: it.nameEn } : { id, slot: '', nameZh: id, nameEn: id };
+  });
+  status.surpriseCountdown = Number(cfg.SurpriseCountdown || 0);
+  status.surprisePackGenerated = fs.existsSync(SURPRISE_MANIFEST_PATH) || !!cfg.SurprisePackGenerated;
+  status.surpriseTotalCount = catalog.length;
+  status.surpriseProgress = readSurpriseProgress();
+  return status;
+}
 
 function isAccessoryUnlocked(acc, done, starUnlocked = false) {
   const norm = String(acc || 'none').toLowerCase();
@@ -515,9 +632,10 @@ export async function getSnapshot() {
       res.data.accessorySupported = !(activePet && activePet.isCustom);
     }
     res.data.accessoryMilestones = ACCESSORY_MILESTONES;
-    return attachStarVerifyMeta(res.data);
+    return attachSurpriseMeta(attachStarVerifyMeta(res.data), readOfflineConfig());
   }
-  return attachStarVerifyMeta(buildOfflineStatus(readOfflineConfig()));
+  const cfg = readOfflineConfig();
+  return attachSurpriseMeta(attachStarVerifyMeta(buildOfflineStatus(cfg)), cfg);
 }
 
 function parseBool(v, fallback = true) {
@@ -659,8 +777,26 @@ export async function applySetting(args = {}) {
         status: isRunning ? (await httpRequest('GET', '/status', null, 600)).data || buildOfflineStatus(cfg) : buildOfflineStatus(cfg)
       };
     }
-    writeOfflineConfig({ Accessory: acc });
-    if (isRunning) await httpRequest('POST', '/control', { action: 'accessory', value: acc });
+    const patch = { Accessory: acc };
+    if (acc === 'surprise') {
+      if (!Array.isArray(cfg.SurpriseCurrentPair) || cfg.SurpriseCurrentPair.length < 2) {
+        patch.SurpriseCurrentPair = pickTwoDistinctSlotAccessories();
+        patch.SurpriseCountdown = 1 + Math.floor(Math.random() * 5);
+      }
+      ensureSurpriseGenerationStarted();
+    }
+    writeOfflineConfig(patch);
+    if (isRunning) {
+      if (patch.SurpriseCurrentPair) {
+        await httpRequest('POST', '/control', { action: 'rerollsurprise', value: patch.SurpriseCurrentPair.join(',') });
+      }
+      await httpRequest('POST', '/control', { action: 'accessory', value: acc });
+    }
+  } else if (action === 'rerollSurprise') {
+    const pair = pickTwoDistinctSlotAccessories();
+    const countdown = 1 + Math.floor(Math.random() * 5);
+    writeOfflineConfig({ SurpriseCurrentPair: pair, SurpriseCountdown: countdown });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'rerollsurprise', value: pair.join(',') });
   } else if (action === 'startStarVerify') {
     await startStarVerify();
   } else if (action === 'checkStarVerify') {
