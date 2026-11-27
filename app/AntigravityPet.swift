@@ -1417,6 +1417,7 @@ final class PetController: NSObject, NSApplicationDelegate {
 
     struct SurpriseAccessoryItem { let id: String; let slot: String; let pixels: [[Int]] }
     private var surpriseCatalog: [String: SurpriseAccessoryItem] = [:]
+    private var debugAccessoryOverride: String = ""
 
     func ensureSurpriseCatalogLoaded(force: Bool = false) {
         if !surpriseCatalog.isEmpty && !force { return }
@@ -1472,6 +1473,7 @@ final class PetController: NSObject, NSApplicationDelegate {
 
     func effectiveAccessory() -> String {
         if !isAccessorySupportedForCurrentSkin() { return "none" }
+        if !debugAccessoryOverride.isEmpty { return debugAccessoryOverride }
         let mode = config.Accessory.lowercased()
         if mode == "glasses" || mode == "cap" || mode == "coffee" || mode == "crown" || mode == "surprise" {
             return isAccessoryUnlocked(mode) ? mode : "none"
@@ -2211,6 +2213,25 @@ final class PetController: NSObject, NSApplicationDelegate {
                 if !visible && config.Enabled { setPetVisible(true) }
                 canvasView.needsDisplay = true
                 syncWindowSizeForBubbles()
+            case "testaccessory":
+                let order = ["glasses", "cap", "coffee", "crown", "surprise", "none"]
+                let req = val.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                let target: String
+                if order.contains(req) {
+                    target = req
+                } else {
+                    let cur = debugAccessoryOverride.isEmpty ? effectiveAccessory() : debugAccessoryOverride
+                    let curIdx = order.firstIndex(of: cur) ?? -1
+                    target = order[(curIdx + 1) % order.count]
+                }
+                if target == "surprise" {
+                    ensureSurpriseCatalogLoaded()
+                    config.SurpriseCurrentPair = pickTwoDistinctSurprise()
+                }
+                debugAccessoryOverride = (target == "none") ? "" : target
+                if !visible && config.Enabled { setPetVisible(true) }
+                canvasView.needsDisplay = true
+                syncWindowSizeForBubbles()
             case "reloadsurprise":
                 ensureSurpriseCatalogLoaded(force: true)
                 canvasView.needsDisplay = true
@@ -2258,7 +2279,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             case "accessory":
                 var reqAcc = val.isEmpty ? "none" : val.lowercased()
                 if reqAcc == "auto" { reqAcc = "none" }
-                if isAccessorySupportedForCurrentSkin() && isAccessoryUnlocked(reqAcc) { config.Accessory = reqAcc; saveConfig() }
+                if isAccessorySupportedForCurrentSkin() && isAccessoryUnlocked(reqAcc) { debugAccessoryOverride = ""; config.Accessory = reqAcc; saveConfig() }
             case "checkupdatesonstartup":
                 config.CheckUpdatesOnStartup = (val.lowercased() == "true" || val == "1"); saveConfig()
             case "dockleft":

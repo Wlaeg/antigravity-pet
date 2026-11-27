@@ -834,6 +834,15 @@ export async function applySetting(args = {}) {
       action: 'testunlock',
       value: String(value || args.accessory || '')
     });
+  } else if (action === 'testAccessory') {
+    if (!isRunning) {
+      await launchPetOnRealDesktop();
+      await waitForHealth(3000);
+    }
+    await httpRequest('POST', '/control', {
+      action: 'testaccessory',
+      value: String(value || args.accessory || '')
+    });
   }
 
   return await getSnapshot();

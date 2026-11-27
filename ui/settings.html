@@ -1479,6 +1479,8 @@
         <button onclick="previewState('ready', 'Task ready')" data-i18n="pvReady">Ready</button>
         <button onclick="previewState('blocked', 'Blocked')" data-i18n="pvErr">Blocked</button>
         <button onclick="previewUnlock()" data-i18n="pvUnlock">Unlock Bubble</button>
+        <button onclick="previewAccessory()" data-i18n="pvAcc">Cycle Accessory</button>
+        <button onclick="previewAccessory('surprise')" data-i18n="pvSur">Reroll Surprise</button>
         <button onclick="previewState('idle', '')" data-i18n="pvIdle">Idle</button>
         <button onclick="act('wave')" data-i18n="pvWave">Wave</button>
         <button onclick="act('jump')" data-i18n="pvJump">Jump</button>
@@ -1577,7 +1579,7 @@
       tUpdates: 'Check for Updates on Startup', tUpdatesSub: 'Check GitHub Releases on launch and prompt when a newer version is available',
       recentSec: 'Recent Conversations', noRecent: 'No recent chats recorded', pinBtn: 'Pin', pinnedBtn: 'Pinned', openBtn: 'Open',
       debugSec: 'Developer Diagnostics',
-      pvRun: 'Running', pvBg: 'Background 🌙', pvUnlock: 'Unlock Bubble', pvWait: 'Needs Input', pvReady: 'Ready', pvErr: 'Blocked', pvIdle: 'Idle', pvWave: 'Wave', pvJump: 'Jump', pvWalk: 'Walk',
+      pvRun: 'Running', pvBg: 'Background 🌙', pvUnlock: 'Unlock Bubble', pvAcc: 'Cycle Accessory', pvSur: 'Reroll Surprise', pvWait: 'Needs Input', pvReady: 'Ready', pvErr: 'Blocked', pvIdle: 'Idle', pvWave: 'Wave', pvJump: 'Jump', pvWalk: 'Walk',
       stOff: 'Stopped', stHidden: 'Online (Hidden)', stPrefix: 'Online · ',
       states: { idle: 'Idle', running: 'Running', needs_input: 'Needs Input', ready: 'Ready', blocked: 'Blocked' },
       upUnit: 'm', toastOk: 'Saved', importErr: 'Import failed',
@@ -1625,7 +1627,7 @@
       tUpdates: '启动时检查版本更新', tUpdatesSub: '启动时自动检测 GitHub 新发版并在气泡提示一键更新',
       recentSec: '最近关联对话', noRecent: '暂无会话记录', pinBtn: '固定', pinnedBtn: '已固定', openBtn: '打开',
       debugSec: '开发者调试',
-      pvRun: '运行中', pvBg: '后台 🌙', pvUnlock: '解锁气泡', pvWait: '待确认', pvReady: '已完成', pvErr: '报错', pvIdle: '待机', pvWave: '挥手', pvJump: '跳跃', pvWalk: '散步',
+      pvRun: '运行中', pvBg: '后台 🌙', pvUnlock: '解锁气泡', pvAcc: '切换配件', pvSur: '随机惊喜', pvWait: '待确认', pvReady: '已完成', pvErr: '报错', pvIdle: '待机', pvWave: '挥手', pvJump: '跳跃', pvWalk: '散步',
       stOff: '未运行', stHidden: '在线 (已隐藏)', stPrefix: '在线 · ',
       states: { idle: '待机', running: '运行中', needs_input: '待确认', ready: '已完成', blocked: '报错' },
       upUnit: ' 分', toastOk: '已保存', importErr: '导入宠物包失败',
@@ -2135,6 +2137,7 @@
   window.toggleOpt = function (key) { callPetTool({ action: key, value: String(!(currentData ? currentData[key] : true)) }); };
   window.previewState = function (st, msg, isBg) { callPetTool({ action: 'testState', state: st, message: msg, isBackground: !!isBg }); };
   window.previewUnlock = function () { callPetTool({ action: 'testUnlock', value: '' }); };
+  window.previewAccessory = function (val) { callPetTool({ action: 'testAccessory', value: val || '' }); };
   window.starUnlockAll = function () {
     try {
       window.open('https://github.com/Wlaeg/antigravity-pet', '_blank', 'noopener,noreferrer');

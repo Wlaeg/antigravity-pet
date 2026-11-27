@@ -1620,6 +1620,8 @@
         <button onclick="testState('ready', 'Task ready')" data-i18n="pvReady">Ready</button>
         <button onclick="testState('blocked', 'Blocked')" data-i18n="pvErr">Blocked</button>
         <button onclick="testUnlock()" data-i18n="pvUnlock">Unlock Bubble</button>
+        <button onclick="testAccessory()" data-i18n="pvAcc">Cycle Accessory</button>
+        <button onclick="testAccessory('surprise')" data-i18n="pvSur">Reroll Surprise</button>
         <button onclick="testState('idle', '')" data-i18n="pvIdle">Idle</button>
         <button onclick="act('wave')" data-i18n="pvWave">Wave</button>
         <button onclick="act('jump')" data-i18n="pvJump">Jump</button>
@@ -1782,7 +1784,7 @@
       pinnedBtn: 'Pinned',
       openBtn: 'Open',
       debugSec: 'Developer Diagnostics',
-      pvRun: 'Running', pvBg: 'Background 🌙', pvUnlock: 'Unlock Bubble',
+      pvRun: 'Running', pvBg: 'Background 🌙', pvUnlock: 'Unlock Bubble', pvAcc: 'Cycle Accessory', pvSur: 'Reroll Surprise',
       pvWait: 'Needs Input',
       pvReady: 'Ready',
       pvErr: 'Blocked',
@@ -1912,7 +1914,7 @@
       pinnedBtn: '已固定',
       openBtn: '打开',
       debugSec: '开发者调试',
-      pvRun: '运行中', pvBg: '后台 🌙', pvUnlock: '解锁气泡',
+      pvRun: '运行中', pvBg: '后台 🌙', pvUnlock: '解锁气泡', pvAcc: '切换配件', pvSur: '随机惊喜',
       pvWait: '待确认',
       pvReady: '已完成',
       pvErr: '报错',
@@ -2523,6 +2525,13 @@
   function testUnlock() {
     apiCall('/api/apply', { action: 'testUnlock', value: '' }).then(function (res) {
       render(res);
+    });
+  }
+
+  function testAccessory(val) {
+    apiCall('/api/apply', { action: 'testAccessory', value: val || '' }).then(function (res) {
+      render(res);
+      toast();
     });
   }
 

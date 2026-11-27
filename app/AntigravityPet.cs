@@ -2971,6 +2971,7 @@ namespace AntigravityPet
 
         private Dictionary<string, SurpriseItem> _surpriseCatalog;
         private readonly Random _surpriseRng = new Random();
+        private string _debugAccessoryOverride = null;
 
         private void EnsureSurpriseCatalogLoaded(bool forceReload = false)
         {
@@ -3087,6 +3088,7 @@ namespace AntigravityPet
         private string GetEffectiveAccessoryId()
         {
             if (!IsAccessorySupportedForCurrentSkin()) return "none";
+            if (!string.IsNullOrEmpty(_debugAccessoryOverride)) return _debugAccessoryOverride;
             string pref = (_config.Accessory ?? "none").Trim().ToLowerInvariant();
             if (pref == "none" || pref == "auto" || string.IsNullOrEmpty(pref)) return "none";
             return IsAccessoryUnlocked(pref, _config.CompletedTasksCount, _config.AccessoriesStarUnlocked) ? pref : "none";
@@ -5697,6 +5699,32 @@ namespace AntigravityPet
                             UpdateVisualState();
                             SyncFullscreenAndEdgeState();
                         }
+                        else if (action == "testaccessory")
+                        {
+                            string[] order = new string[] { "glasses", "cap", "coffee", "crown", "surprise", "none" };
+                            string req = (val ?? "").Trim().ToLowerInvariant();
+                            string target;
+                            if (Array.IndexOf(order, req) >= 0)
+                            {
+                                target = req;
+                            }
+                            else
+                            {
+                                string cur = string.IsNullOrEmpty(_debugAccessoryOverride) ? GetEffectiveAccessoryId() : _debugAccessoryOverride;
+                                int curIdx = Array.IndexOf(order, cur);
+                                target = order[(curIdx + 1) % order.Length];
+                            }
+                            if (target == "surprise")
+                            {
+                                EnsureSurpriseCatalogLoaded(false);
+                                _config.SurpriseCurrentPair = PickTwoDistinctSurpriseAccessories();
+                            }
+                            _debugAccessoryOverride = target == "none" ? null : target;
+                            if (!IsVisible && _config.Enabled) Show();
+                            UpdateAccessoryVisual();
+                            UpdateVisualState();
+                            SyncFullscreenAndEdgeState();
+                        }
                         else if (action == "reloadsurprise")
                         {
                             EnsureSurpriseCatalogLoaded(true);
@@ -5803,6 +5831,7 @@ namespace AntigravityPet
                             if (reqAcc == "auto") reqAcc = "none";
                             if (IsAccessorySupportedForCurrentSkin() && IsAccessoryUnlocked(reqAcc, _config.CompletedTasksCount, _config.AccessoriesStarUnlocked))
                             {
+                                _debugAccessoryOverride = null;
                                 _config.Accessory = reqAcc;
                                 UpdateAccessoryVisual();
                                 SaveConfig();
