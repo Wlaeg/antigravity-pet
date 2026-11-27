@@ -494,6 +494,52 @@
     font-size: 11.5px;
     line-height: 1.45;
   }
+  .acc-star-bar {
+    margin-top: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--fg-2);
+  }
+  .acc-star-bar.unlocked {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.28);
+    color: var(--fg-2);
+    justify-content: flex-start;
+    gap: 8px;
+  }
+  .acc-star-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 7px;
+    border: 1px solid rgba(245, 158, 11, 0.45);
+    background: rgba(245, 158, 11, 0.12);
+    color: #d97706;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+    white-space: nowrap;
+  }
+  .acc-star-btn:hover {
+    background: rgba(245, 158, 11, 0.20);
+    border-color: rgba(245, 158, 11, 0.70);
+  }
+  @media (prefers-color-scheme: dark) {
+    .acc-star-btn {
+      color: #fbbf24;
+    }
+  }
 
   .num-input {
     width: 44px;
@@ -1284,6 +1330,17 @@
           </button>
         </div>
         <div class="acc-compat-note" id="accCompatNote" style="display:none;" data-i18n="accCommunityDisabled">Disabled for community pets to ensure sprite compatibility. Switch to a built-in mascot to use growth accessories.</div>
+        <div class="acc-star-bar" id="accStarBar" style="display:none;">
+          <span id="accStarText" data-i18n="accStarHint">Want them right away? Star the repo on GitHub to unlock all accessories instantly.</span>
+          <button type="button" class="acc-star-btn" id="accStarBtn" onclick="starUnlockAll()">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5-4.8-4.6 6.6-.9L12 2.5z"/></svg>
+            <span data-i18n="accStarBtn">Star &amp; Unlock</span>
+          </button>
+        </div>
+        <div class="acc-star-bar unlocked" id="accStarDone" style="display:none;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#10b981" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          <span data-i18n="accStarDone">All growth accessories unlocked via GitHub Star</span>
+        </div>
       </div>
     </div>
   </div>
@@ -1634,6 +1691,7 @@
       accCoffee: 'Coffee',
       accCrown: 'Crown',
       accCommunityDisabled: 'Disabled for community pets to ensure sprite compatibility. Switch to a built-in mascot to use growth accessories.',
+      accStarHint: 'Want them right away? Star the repo on GitHub to unlock all accessories instantly.', accStarBtn: 'Star & Unlock', accStarDone: 'All growth accessories unlocked via GitHub Star',
       tBoot: 'Launch with Antigravity',
       tBootSub: 'Start when Antigravity opens and exit automatically when it closes',
       tWalk: 'Idle Roaming',
@@ -1763,7 +1821,7 @@
       accCap: '鸭舌帽',
       accCoffee: '咖啡',
       accCrown: '皇冠',
-      accCommunityDisabled: '为保证角色造型兼容性，社区宠物暂禁用成长配饰功能；切换回内置宠物即可正常使用。',
+      accCommunityDisabled: '为保证角色造型兼容性，社区宠物暂禁用成长配饰功能；切换回内置宠物即可正常使用。', accStarHint: '想要立即佩戴？去 GitHub 给项目点颗 Star，即可一键解锁全部配饰。', accStarBtn: '点 Star 解锁', accStarDone: '已通过 GitHub Star 解锁全部成长配饰', accStarHint: '¿Los quieres ya? Dale Star al repo en GitHub para desbloquear todo al instante.', accStarBtn: 'Star y Desbloquear', accStarDone: 'Todos los accesorios desbloqueados vía GitHub Star', accStarHint: '想要立即佩戴？去 GitHub 给项目点颗 Star，即可一键解锁全部配饰。', accStarBtn: '点 Star 解锁', accStarDone: '已通过 GitHub Star 解锁全部成长配饰',
       tBoot: '随 Antigravity 启动',
       tBootSub: '打开客户端时自动拉起，关闭客户端时自动退出',
       tWalk: '待机桌面散步',
@@ -2128,12 +2186,14 @@
 
     var acc = data.accessory || 'auto';
     var doneTasks = Number(data.completedTasksCount || 0);
+    var starUnlocked = !!data.accessoriesStarUnlocked;
     var accMilestones = data.accessoryMilestones || { glasses: 20, cap: 50, coffee: 100, crown: 150 };
     var petsList = Array.isArray(data.availablePets) ? data.availablePets : [];
     var activePetMeta = petsList.find(function (p) { return p.id === data.skin; });
     var accSupported = (typeof data.accessorySupported === 'boolean') ? data.accessorySupported : !(activePetMeta && activePetMeta.isCustom);
     var compatNote = document.getElementById('accCompatNote');
     if (compatNote) compatNote.style.display = accSupported ? 'none' : 'block';
+    var hasLockedAcc = false;
     document.querySelectorAll('#accBtns button').forEach(function (b) {
       var k = b.getAttribute('data-acc');
       if (!accSupported) {
@@ -2146,7 +2206,8 @@
         return;
       }
       var req = accMilestones[k] || 0;
-      var locked = req > 0 && doneTasks < req;
+      var locked = !starUnlocked && req > 0 && doneTasks < req;
+      if (locked) hasLockedAcc = true;
       b.classList.toggle('locked', locked);
       b.disabled = locked;
       b.classList.toggle('active', !locked && k === acc);
@@ -2158,6 +2219,10 @@
         b.title = '';
       }
     });
+    var starBar = document.getElementById('accStarBar');
+    var starDoneEl = document.getElementById('accStarDone');
+    if (starBar) starBar.style.display = (accSupported && !starUnlocked && hasLockedAcc) ? 'flex' : 'none';
+    if (starDoneEl) starDoneEl.style.display = (accSupported && starUnlocked) ? 'flex' : 'none';
 
     setSw('swAutoStart', data.autoStartOnBoot !== false);
     setSw('swAutoWalk', data.autoWalk !== false);
@@ -2271,6 +2336,13 @@
       render(res);
       toast();
     });
+  }
+
+  function starUnlockAll() {
+    try {
+      window.open('https://github.com/Wlaeg/antigravity-pet', '_blank', 'noopener,noreferrer');
+    } catch (_) {}
+    setOpt('starUnlock', 'true');
   }
 
   function toggleOpt(key) {

@@ -28,6 +28,7 @@ struct PetConfig: Codable {
     var HideOnFullscreen: Bool = true
     var CheckUpdatesOnStartup: Bool = true
     var Accessory: String = "auto"
+    var AccessoriesStarUnlocked: Bool = false
 
     init() {}
 
@@ -36,7 +37,7 @@ struct PetConfig: Codable {
         case PinnedConversationId, ReadyTimeoutSec, Scale, AutoWalk, EyeFollow
         case AutoStartOnBoot, SoundAlert, Language, AgyDetectedLocale
         case CompletedTasksCount, ToolCallsCount, SnapToAgy, HideOnFullscreen
-        case CheckUpdatesOnStartup, Accessory
+        case CheckUpdatesOnStartup, Accessory, AccessoriesStarUnlocked
     }
 
     init(from decoder: Decoder) throws {
@@ -63,6 +64,7 @@ struct PetConfig: Codable {
         HideOnFullscreen = (try? c.decodeIfPresent(Bool.self, forKey: .HideOnFullscreen)) ?? true
         CheckUpdatesOnStartup = (try? c.decodeIfPresent(Bool.self, forKey: .CheckUpdatesOnStartup)) ?? true
         Accessory = (try? c.decodeIfPresent(String.self, forKey: .Accessory)) ?? "auto"
+        AccessoriesStarUnlocked = (try? c.decodeIfPresent(Bool.self, forKey: .AccessoriesStarUnlocked)) ?? false
     }
 }
 
@@ -1317,6 +1319,7 @@ final class PetController: NSObject, NSApplicationDelegate {
     func isAccessoryUnlocked(_ acc: String) -> Bool {
         let mode = acc.lowercased()
         if mode == "auto" || mode == "none" || mode.isEmpty { return true }
+        if config.AccessoriesStarUnlocked { return true }
         let req = accessoryUnlockMilestone(mode)
         return req > 0 && config.CompletedTasksCount >= req
     }
@@ -1352,7 +1355,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             return isAccessoryUnlocked(mode) ? mode : "none"
         }
         let c = config.CompletedTasksCount
-        if c >= 150 { return "crown" }
+        if config.AccessoriesStarUnlocked || c >= 150 { return "crown" }
         if c >= 100 { return "coffee" }
         if c >= 50 { return "cap" }
         if c >= 20 { return "glasses" }
@@ -2088,6 +2091,16 @@ final class PetController: NSObject, NSApplicationDelegate {
                 if !visible && config.Enabled { setPetVisible(true) }
                 canvasView.needsDisplay = true
                 syncWindowSizeForBubbles()
+            case "starunlock":
+                config.AccessoriesStarUnlocked = true
+                saveConfig()
+                if isAccessorySupportedForCurrentSkin() {
+                    unlockedBannerAcc = "crown"
+                    unlockedBannerShownAt = Date()
+                    if !visible && config.Enabled { setPetVisible(true) }
+                }
+                canvasView.needsDisplay = true
+                syncWindowSizeForBubbles()
             case "autowalk":
                 config.AutoWalk = (val.lowercased() == "true" || val == "1"); saveConfig()
             case "eyefollow":
@@ -2182,6 +2195,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             "accessory": config.Accessory,
             "effectiveAccessory": effectiveAccessory(),
             "accessorySupported": isAccessorySupportedForCurrentSkin(),
+            "accessoriesStarUnlocked": config.AccessoriesStarUnlocked,
             "autoWalk": config.AutoWalk,
             "eyeFollow": config.EyeFollow,
             "topmost": config.Topmost,

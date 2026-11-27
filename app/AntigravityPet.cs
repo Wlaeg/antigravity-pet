@@ -54,6 +54,7 @@ namespace AntigravityPet
         public bool SnapToAgy { get; set; }
         public bool HideOnFullscreen { get; set; }
         public string Accessory { get; set; }    // auto | none | glasses | cap | coffee | crown
+        public bool AccessoriesStarUnlocked { get; set; }
         public double Scale { get; set; }       // 0.33 ~ 3.0 (default 1.0)
         public bool AutoWalk { get; set; }
         public bool EyeFollow { get; set; }
@@ -81,6 +82,7 @@ namespace AntigravityPet
             SnapToAgy = false;
             HideOnFullscreen = true;
             Accessory = "auto";
+            AccessoriesStarUnlocked = false;
             Scale = 1.0;
             AutoWalk = true;
             EyeFollow = true;
@@ -2949,10 +2951,11 @@ namespace AntigravityPet
             }
         }
 
-        private static bool IsAccessoryUnlocked(string acc, int done)
+        private static bool IsAccessoryUnlocked(string acc, int done, bool starUnlocked = false)
         {
             string norm = (acc ?? "").Trim().ToLowerInvariant();
             if (norm == "auto" || norm == "none" || string.IsNullOrEmpty(norm)) return true;
+            if (starUnlocked) return true;
             int req = GetAccessoryUnlockMilestone(norm);
             return req > 0 && done >= req;
         }
@@ -2968,15 +2971,16 @@ namespace AntigravityPet
             string pref = (_config.Accessory ?? "auto").Trim().ToLowerInvariant();
             if (pref == "none") return "none";
             int done = _config.CompletedTasksCount;
+            bool star = _config.AccessoriesStarUnlocked;
             if (pref == "auto")
             {
-                if (done >= 150) return "crown";
+                if (star || done >= 150) return "crown";
                 if (done >= 100) return "coffee";
                 if (done >= 50) return "cap";
                 if (done >= 20) return "glasses";
                 return "none";
             }
-            return IsAccessoryUnlocked(pref, done) ? pref : "none";
+            return IsAccessoryUnlocked(pref, done, star) ? pref : "none";
         }
 
         private void UpdateAccessoryVisual()
@@ -5315,6 +5319,7 @@ namespace AntigravityPet
                             accessory = _config.Accessory ?? "auto",
                             effectiveAccessory = GetEffectiveAccessoryId(),
                             accessorySupported = IsAccessorySupportedForCurrentSkin(),
+                            accessoriesStarUnlocked = _config.AccessoriesStarUnlocked,
                             autoWalk = _config.AutoWalk,
                             eyeFollow = _config.EyeFollow,
                             boredomIdle = _config.BoredomIdle,
@@ -5540,6 +5545,21 @@ namespace AntigravityPet
                             UpdateVisualState();
                             SyncFullscreenAndEdgeState();
                         }
+                        else if (action == "starunlock")
+                        {
+                            _config.AccessoriesStarUnlocked = true;
+                            SaveConfig();
+                            if (IsAccessorySupportedForCurrentSkin())
+                            {
+                                UpdateAccessoryVisual();
+                                _unlockedBannerAcc = "crown";
+                                _unlockedBannerShownAt = DateTime.Now;
+                                if (!IsVisible && _config.Enabled) Show();
+                            }
+                            UpdateVisualState();
+                            SyncFullscreenAndEdgeState();
+                            RebuildContextMenu();
+                        }
                         else if (action == "autowalk")
                         {
                             _config.AutoWalk = ParseBoolStr(val, !_config.AutoWalk);
@@ -5608,7 +5628,7 @@ namespace AntigravityPet
                         else if (action == "accessory")
                         {
                             string reqAcc = string.IsNullOrWhiteSpace(val) ? "auto" : val.Trim().ToLowerInvariant();
-                            if (IsAccessorySupportedForCurrentSkin() && IsAccessoryUnlocked(reqAcc, _config.CompletedTasksCount))
+                            if (IsAccessorySupportedForCurrentSkin() && IsAccessoryUnlocked(reqAcc, _config.CompletedTasksCount, _config.AccessoriesStarUnlocked))
                             {
                                 _config.Accessory = reqAcc;
                                 UpdateAccessoryVisual();
@@ -5727,10 +5747,11 @@ namespace AntigravityPet
             if (data.ContainsKey("soundAlert")) _config.SoundAlert = GetBool(data, "soundAlert", _config.SoundAlert);
             if (data.ContainsKey("snapToAgy")) _config.SnapToAgy = GetBool(data, "snapToAgy", _config.SnapToAgy);
             if (data.ContainsKey("hideOnFullscreen")) _config.HideOnFullscreen = GetBool(data, "hideOnFullscreen", _config.HideOnFullscreen);
+            if (data.ContainsKey("accessoriesStarUnlocked")) { _config.AccessoriesStarUnlocked = GetBool(data, "accessoriesStarUnlocked", _config.AccessoriesStarUnlocked); UpdateAccessoryVisual(); }
             if (data.ContainsKey("accessory") && data["accessory"] != null)
             {
                 string reqAcc = data["accessory"].ToString().Trim().ToLowerInvariant();
-                if (IsAccessorySupportedForCurrentSkin() && IsAccessoryUnlocked(reqAcc, _config.CompletedTasksCount)) { _config.Accessory = reqAcc; UpdateAccessoryVisual(); }
+                if (IsAccessorySupportedForCurrentSkin() && IsAccessoryUnlocked(reqAcc, _config.CompletedTasksCount, _config.AccessoriesStarUnlocked)) { _config.Accessory = reqAcc; UpdateAccessoryVisual(); }
             }
 
             UpdateVisualState();

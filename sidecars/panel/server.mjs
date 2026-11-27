@@ -298,19 +298,20 @@ async function waitForHealth(maxWaitMs = 2800) {
 
 const ACCESSORY_MILESTONES = { glasses: 20, cap: 50, coffee: 100, crown: 150 };
 
-function isAccessoryUnlocked(acc, done) {
+function isAccessoryUnlocked(acc, done, starUnlocked = false) {
   const norm = String(acc || 'auto').toLowerCase();
   if (norm === 'auto' || norm === 'none') return true;
+  if (starUnlocked) return true;
   const req = ACCESSORY_MILESTONES[norm];
   return typeof req === 'number' && Number(done || 0) >= req;
 }
 
-function resolveEffectiveAccessory(pref, done) {
+function resolveEffectiveAccessory(pref, done, starUnlocked = false) {
   const norm = String(pref || 'auto').toLowerCase();
   const c = Number(done || 0);
   if (norm === 'none') return 'none';
-  if (norm !== 'auto') return isAccessoryUnlocked(norm, c) ? norm : 'none';
-  if (c >= 150) return 'crown';
+  if (norm !== 'auto') return isAccessoryUnlocked(norm, c, starUnlocked) ? norm : 'none';
+  if (starUnlocked || c >= 150) return 'crown';
   if (c >= 100) return 'coffee';
   if (c >= 50) return 'cap';
   if (c >= 20) return 'glasses';
@@ -339,8 +340,9 @@ function buildOfflineStatus(cfg) {
     snapToAgy: !!cfg.SnapToAgy,
     hideOnFullscreen: cfg.HideOnFullscreen !== false,
     accessory: cfg.Accessory || 'auto',
-    effectiveAccessory: accessorySupported ? resolveEffectiveAccessory(cfg.Accessory, cfg.CompletedTasksCount) : 'none',
+    effectiveAccessory: accessorySupported ? resolveEffectiveAccessory(cfg.Accessory, cfg.CompletedTasksCount, !!cfg.AccessoriesStarUnlocked) : 'none',
     accessorySupported,
+    accessoriesStarUnlocked: !!cfg.AccessoriesStarUnlocked,
     accessoryMilestones: ACCESSORY_MILESTONES,
     autoWalk: cfg.AutoWalk !== false,
     eyeFollow: cfg.EyeFollow !== false,
@@ -505,7 +507,8 @@ export async function applySetting(args = {}) {
       };
     }
     const done = Number(cfg.CompletedTasksCount || 0);
-    if (!isAccessoryUnlocked(acc, done)) {
+    const starUnlocked = !!cfg.AccessoriesStarUnlocked;
+    if (!isAccessoryUnlocked(acc, done, starUnlocked)) {
       return {
         ok: false,
         locked: true,
@@ -517,6 +520,9 @@ export async function applySetting(args = {}) {
     }
     writeOfflineConfig({ Accessory: acc });
     if (isRunning) await httpRequest('POST', '/control', { action: 'accessory', value: acc });
+  } else if (action === 'starUnlock') {
+    writeOfflineConfig({ AccessoriesStarUnlocked: true });
+    if (isRunning) await httpRequest('POST', '/control', { action: 'starunlock', value: 'true' });
   } else if (action === 'quickDispatch') {
     if (isRunning) await httpRequest('POST', '/control', { action: 'quickDispatch' });
   } else if (action === 'resetPos') {
