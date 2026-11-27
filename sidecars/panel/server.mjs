@@ -75,7 +75,8 @@ function readOfflineConfig() {
     AccessoriesStarUnlocked: false,
     SurpriseCurrentPair: [],
     SurpriseCountdown: 0,
-    SurprisePackGenerated: false
+    SurprisePackGenerated: false,
+    UserStarterAccessories: []
   };
   try {
     const p = getConfigPath();
@@ -305,7 +306,46 @@ async function waitForHealth(maxWaitMs = 2800) {
   return null;
 }
 
-const ACCESSORY_MILESTONES = { glasses: 20, cap: 50, coffee: 100, crown: 150, surprise: 200 };
+const ACCESSORY_MILESTONES = { slot1: 20, slot2: 50, slot3: 100, slot4: 150, surprise: 200 };
+
+function loadBaseAccessories() {
+  try {
+    if (fs.existsSync(SURPRISE_BASE_PATH)) {
+      const obj = JSON.parse(fs.readFileSync(SURPRISE_BASE_PATH, 'utf8'));
+      if (Array.isArray(obj.items)) return obj.items;
+    }
+  } catch {}
+  return [];
+}
+
+function ensureUserStarterAccessories(cfg) {
+  const base = loadBaseAccessories();
+  const byId = new Map(base.map((x) => [x.id, x]));
+  const cur = Array.isArray(cfg.UserStarterAccessories) ? cfg.UserStarterAccessories : [];
+  if (cur.length === 4 && cur.every((id) => byId.has(id))) {
+    return cur;
+  }
+  const bySlot = new Map();
+  for (const it of base) {
+    if (!it || !it.id || !it.slot) continue;
+    if (!bySlot.has(it.slot)) bySlot.set(it.slot, []);
+    bySlot.get(it.slot).push(it);
+  }
+  const slots = Array.from(bySlot.keys());
+  for (let i = slots.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [slots[i], slots[j]] = [slots[j], slots[i]];
+  }
+  const picked = slots.slice(0, 4).map((s) => {
+    const list = bySlot.get(s);
+    return list[Math.floor(Math.random() * list.length)].id;
+  });
+  if (picked.length === 4) {
+    cfg.UserStarterAccessories = picked;
+    writeOfflineConfig({ UserStarterAccessories: picked });
+  }
+  return picked;
+}
 
 function loadSurpriseCatalog() {
   const items = [];
@@ -403,6 +443,19 @@ function ensureSurpriseGenerationStarted() {
 function attachSurpriseMeta(status, cfg) {
   const catalog = loadSurpriseCatalog();
   const byId = new Map(catalog.map((x) => [x.id, x]));
+  const starterIds = ensureUserStarterAccessories(cfg);
+  status.starterAccessories = starterIds.map((id, idx) => {
+    const it = byId.get(id);
+    return {
+      slotKey: `slot${idx + 1}`,
+      milestone: [20, 50, 100, 150][idx],
+      id,
+      slot: it ? it.slot : '',
+      nameZh: it ? it.nameZh : id,
+      nameEn: it ? it.nameEn : id,
+      pixels: it ? it.pixels : []
+    };
+  });
   const pairIds = Array.isArray(cfg.SurpriseCurrentPair) ? cfg.SurpriseCurrentPair : [];
   status.surprisePair = pairIds.map((id) => {
     const it = byId.get(id);
@@ -427,6 +480,7 @@ function resolveEffectiveAccessory(pref, done, starUnlocked = false) {
   const norm = String(pref || 'none').toLowerCase();
   const c = Number(done || 0);
   if (norm === 'none' || norm === 'auto' || !norm) return 'none';
+  if (!ACCESSORY_MILESTONES[norm]) return 'none';
   return isAccessoryUnlocked(norm, c, starUnlocked) ? norm : 'none';
 }
 
@@ -451,7 +505,7 @@ function buildOfflineStatus(cfg) {
     readyTimeoutSec: typeof cfg.ReadyTimeoutSec === 'number' ? cfg.ReadyTimeoutSec : 30,
     snapToAgy: !!cfg.SnapToAgy,
     hideOnFullscreen: cfg.HideOnFullscreen !== false,
-    accessory: (cfg.Accessory && String(cfg.Accessory).toLowerCase() !== 'auto') ? cfg.Accessory : 'none',
+    accessory: (cfg.Accessory && ACCESSORY_MILESTONES[String(cfg.Accessory).toLowerCase()]) ? String(cfg.Accessory).toLowerCase() : 'none',
     effectiveAccessory: accessorySupported ? resolveEffectiveAccessory(cfg.Accessory, cfg.CompletedTasksCount, !!cfg.AccessoriesStarUnlocked) : 'none',
     accessorySupported,
     accessoriesStarUnlocked: !!cfg.AccessoriesStarUnlocked,
@@ -752,7 +806,7 @@ export async function applySetting(args = {}) {
     if (isRunning) await httpRequest('POST', '/control', { action: 'hideOnFullscreen', value: String(b) });
   } else if (action === 'accessory') {
     let acc = String(value || args.accessory || 'none').toLowerCase();
-    if (acc === 'auto' || !acc) acc = 'none';
+    if (acc === 'auto' || !acc || (acc !== 'none' && !ACCESSORY_MILESTONES[acc])) acc = 'none';
     const cfg = readOfflineConfig();
     const effLang = detectEffectiveLang(cfg);
     const pets = scanPetPacks(effLang);

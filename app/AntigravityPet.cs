@@ -53,11 +53,12 @@ namespace AntigravityPet
         public int ReadyTimeoutSec { get; set; } // 0 = never auto-hide, default 30s
         public bool SnapToAgy { get; set; }
         public bool HideOnFullscreen { get; set; }
-        public string Accessory { get; set; }    // none | glasses | cap | coffee | crown | surprise
+        public string Accessory { get; set; }    // none | slot1 | slot2 | slot3 | slot4 | surprise
         public bool AccessoriesStarUnlocked { get; set; }
         public List<string> SurpriseCurrentPair { get; set; }
         public int SurpriseCountdown { get; set; }
         public bool SurprisePackGenerated { get; set; }
+        public List<string> UserStarterAccessories { get; set; }
         public double Scale { get; set; }       // 0.33 ~ 3.0 (default 1.0)
         public bool AutoWalk { get; set; }
         public bool EyeFollow { get; set; }
@@ -89,6 +90,7 @@ namespace AntigravityPet
             SurpriseCurrentPair = new List<string>();
             SurpriseCountdown = 0;
             SurprisePackGenerated = false;
+            UserStarterAccessories = new List<string>();
             Scale = 1.0;
             AutoWalk = true;
             EyeFollow = true;
@@ -2808,22 +2810,25 @@ namespace AntigravityPet
         private static string GetNewlyUnlockedAccessory(int prevDone, int newDone)
         {
             if (prevDone < 200 && newDone >= 200) return "surprise";
-            if (prevDone < 150 && newDone >= 150) return "crown";
-            if (prevDone < 100 && newDone >= 100) return "coffee";
-            if (prevDone < 50 && newDone >= 50) return "cap";
-            if (prevDone < 20 && newDone >= 20) return "glasses";
+            if (prevDone < 150 && newDone >= 150) return "slot4";
+            if (prevDone < 100 && newDone >= 100) return "slot3";
+            if (prevDone < 50 && newDone >= 50) return "slot2";
+            if (prevDone < 20 && newDone >= 20) return "slot1";
             return "";
         }
 
         private string GetAccessoryDisplayName(string acc)
         {
-            switch ((acc ?? "").ToLowerInvariant())
+            string norm = (acc ?? "").ToLowerInvariant();
+            if (norm == "surprise") return T("惊喜模式", "Surprise Mode");
+            SurpriseItem starter = GetStarterAccessoryItem(norm);
+            if (starter != null) return T(starter.NameZh, starter.NameEn);
+            switch (norm)
             {
-                case "glasses": return T("墨镜", "Glasses");
-                case "cap": return T("鸭舌帽", "Dev Cap");
-                case "coffee": return T("咖啡杯", "Coffee Cup");
-                case "crown": return T("皇冠", "Gold Crown");
-                case "surprise": return T("惊喜模式", "Surprise Mode");
+                case "slot1": return T("神秘配饰 1", "Starter #1");
+                case "slot2": return T("神秘配饰 2", "Starter #2");
+                case "slot3": return T("神秘配饰 3", "Starter #3");
+                case "slot4": return T("神秘配饰 4", "Starter #4");
                 default: return acc ?? "";
             }
         }
@@ -2921,11 +2926,29 @@ namespace AntigravityPet
                 ovR[idx] = r; ovG[idx] = g; ovB[idx] = b; ovA[idx] = a;
             };
 
-            if (acc == "glasses") DrawAccessoryPixels(acc, 10, 0, 7, 0, 0, px);
+            SurpriseItem starter = GetStarterAccessoryItem(acc);
+            if (starter != null && starter.Pixels != null && starter.Pixels.Count > 0)
+            {
+                int minX = int.MaxValue, maxX = int.MinValue, minY = int.MaxValue, maxY = int.MinValue;
+                foreach (var pt in starter.Pixels)
+                {
+                    if (pt[0] < minX) minX = pt[0];
+                    if (pt[0] > maxX) maxX = pt[0];
+                    if (pt[1] < minY) minY = pt[1];
+                    if (pt[1] > maxY) maxY = pt[1];
+                }
+                int ox = 10 - (minX + maxX) / 2;
+                int oy = 10 - (minY + maxY) / 2;
+                foreach (var pt in starter.Pixels)
+                {
+                    px(ox + pt[0], oy + pt[1], (byte)pt[2], (byte)pt[3], (byte)pt[4], (byte)pt[5]);
+                }
+            }
+            else if (acc == "surprise") DrawAccessoryPixels(acc, 0, 0, 0, 0, 0, px);
+            else if (acc == "glasses") DrawAccessoryPixels(acc, 10, 0, 7, 0, 0, px);
             else if (acc == "cap") DrawAccessoryPixels(acc, 9, 0, 0, 12, 0, px);
             else if (acc == "crown") DrawAccessoryPixels(acc, 10, 0, 0, 12, 0, px);
             else if (acc == "coffee") DrawAccessoryPixels(acc, -2, 8, 0, 0, 0, px);
-            else if (acc == "surprise") DrawAccessoryPixels(acc, 0, 0, 0, 0, 0, px);
 
             byte[] bgra = new byte[gw * gh * 4];
             int[] odx = new int[] { 1, -1, 0, 0 };
@@ -2966,6 +2989,8 @@ namespace AntigravityPet
         {
             public string Id;
             public string Slot;
+            public string NameZh;
+            public string NameEn;
             public List<int[]> Pixels;
         }
 
@@ -2995,6 +3020,8 @@ namespace AntigravityPet
                         if (d == null) continue;
                         string id = d.ContainsKey("id") ? Convert.ToString(d["id"]) : "";
                         string slot = d.ContainsKey("slot") ? Convert.ToString(d["slot"]).ToLowerInvariant() : "";
+                        string nameZh = d.ContainsKey("nameZh") ? Convert.ToString(d["nameZh"]) : id;
+                        string nameEn = d.ContainsKey("nameEn") ? Convert.ToString(d["nameEn"]) : id;
                         var pxArr = d.ContainsKey("pixels") ? d["pixels"] as object[] : null;
                         if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(slot) || pxArr == null) continue;
                         var pxList = new List<int[]>(pxArr.Length);
@@ -3010,7 +3037,7 @@ namespace AntigravityPet
                             int a = coords.Length >= 6 ? Convert.ToInt32(coords[5]) : 255;
                             pxList.Add(new[] { dx, dy, r, g, b, a });
                         }
-                        map[id] = new SurpriseItem { Id = id, Slot = slot, Pixels = pxList };
+                        map[id] = new SurpriseItem { Id = id, Slot = slot, NameZh = nameZh, NameEn = nameEn, Pixels = pxList };
                     }
                 }
                 catch { }
@@ -3058,14 +3085,52 @@ namespace AntigravityPet
             }
         }
 
+        private void EnsureUserStarterAccessoriesLoaded()
+        {
+            EnsureSurpriseCatalogLoaded(false);
+            if (_surpriseCatalog == null || _surpriseCatalog.Count == 0) return;
+            bool valid = _config.UserStarterAccessories != null && _config.UserStarterAccessories.Count == 4 &&
+                         _config.UserStarterAccessories.All(id => !string.IsNullOrEmpty(id) && _surpriseCatalog.ContainsKey(id));
+            if (valid) return;
+            var bySlot = new Dictionary<string, List<SurpriseItem>>();
+            foreach (var it in _surpriseCatalog.Values)
+            {
+                if (it.Id != null && it.Id.StartsWith("base_", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!bySlot.ContainsKey(it.Slot)) bySlot[it.Slot] = new List<SurpriseItem>();
+                    bySlot[it.Slot].Add(it);
+                }
+            }
+            var slots = bySlot.Keys.OrderBy(_ => _surpriseRng.Next()).Take(4).ToList();
+            if (slots.Count == 4)
+            {
+                _config.UserStarterAccessories = slots.Select(s => bySlot[s][_surpriseRng.Next(bySlot[s].Count)].Id).ToList();
+                SaveConfig();
+            }
+        }
+
+        private SurpriseItem GetStarterAccessoryItem(string acc)
+        {
+            EnsureUserStarterAccessoriesLoaded();
+            if (_config.UserStarterAccessories == null || _config.UserStarterAccessories.Count < 4) return null;
+            int idx = -1;
+            if (acc == "slot1") idx = 0;
+            else if (acc == "slot2") idx = 1;
+            else if (acc == "slot3") idx = 2;
+            else if (acc == "slot4") idx = 3;
+            if (idx < 0) return null;
+            SurpriseItem found;
+            return _surpriseCatalog != null && _surpriseCatalog.TryGetValue(_config.UserStarterAccessories[idx], out found) ? found : null;
+        }
+
         private static int GetAccessoryUnlockMilestone(string acc)
         {
             switch ((acc ?? "").Trim().ToLowerInvariant())
             {
-                case "glasses": return 20;
-                case "cap": return 50;
-                case "coffee": return 100;
-                case "crown": return 150;
+                case "slot1": return 20;
+                case "slot2": return 50;
+                case "slot3": return 100;
+                case "slot4": return 150;
                 case "surprise": return 200;
                 default: return 0;
             }
@@ -3091,6 +3156,7 @@ namespace AntigravityPet
             if (!string.IsNullOrEmpty(_debugAccessoryOverride)) return _debugAccessoryOverride;
             string pref = (_config.Accessory ?? "none").Trim().ToLowerInvariant();
             if (pref == "none" || pref == "auto" || string.IsNullOrEmpty(pref)) return "none";
+            if (GetAccessoryUnlockMilestone(pref) <= 0) return "none";
             return IsAccessoryUnlocked(pref, _config.CompletedTasksCount, _config.AccessoriesStarUnlocked) ? pref : "none";
         }
 
@@ -3155,7 +3221,14 @@ namespace AntigravityPet
             if (baseFrame == null || string.IsNullOrEmpty(acc) || acc == "none") return baseFrame;
             string cacheTag = acc;
             List<SurpriseItem> surpriseItems = null;
-            if (acc == "surprise")
+            if (acc == "slot1" || acc == "slot2" || acc == "slot3" || acc == "slot4")
+            {
+                SurpriseItem starter = GetStarterAccessoryItem(acc);
+                if (starter == null) return baseFrame;
+                surpriseItems = new List<SurpriseItem> { starter };
+                cacheTag = acc + ":" + starter.Id;
+            }
+            else if (acc == "surprise")
             {
                 EnsureSurpriseCatalogLoaded(false);
                 if (_config.SurpriseCurrentPair == null || _config.SurpriseCurrentPair.Count < 2)
@@ -5686,7 +5759,7 @@ namespace AntigravityPet
                         }
                         else if (action == "testunlock")
                         {
-                            string[] order = new string[] { "glasses", "cap", "coffee", "crown", "surprise" };
+                            string[] order = new string[] { "slot1", "slot2", "slot3", "slot4", "surprise" };
                             string target = (val ?? "").Trim().ToLowerInvariant();
                             if (Array.IndexOf(order, target) < 0)
                             {
@@ -5701,7 +5774,7 @@ namespace AntigravityPet
                         }
                         else if (action == "testaccessory")
                         {
-                            string[] order = new string[] { "glasses", "cap", "coffee", "crown", "surprise", "none" };
+                            string[] order = new string[] { "slot1", "slot2", "slot3", "slot4", "surprise", "none" };
                             string req = (val ?? "").Trim().ToLowerInvariant();
                             string target;
                             if (Array.IndexOf(order, req) >= 0)
@@ -5828,7 +5901,7 @@ namespace AntigravityPet
                         else if (action == "accessory")
                         {
                             string reqAcc = string.IsNullOrWhiteSpace(val) ? "none" : val.Trim().ToLowerInvariant();
-                            if (reqAcc == "auto") reqAcc = "none";
+                            if (reqAcc == "auto" || (reqAcc != "none" && GetAccessoryUnlockMilestone(reqAcc) <= 0)) reqAcc = "none";
                             if (IsAccessorySupportedForCurrentSkin() && IsAccessoryUnlocked(reqAcc, _config.CompletedTasksCount, _config.AccessoriesStarUnlocked))
                             {
                                 _debugAccessoryOverride = null;

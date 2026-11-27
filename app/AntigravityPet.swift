@@ -32,6 +32,7 @@ struct PetConfig: Codable {
     var SurpriseCurrentPair: [String] = []
     var SurpriseCountdown: Int = 0
     var SurprisePackGenerated: Bool = false
+    var UserStarterAccessories: [String] = []
 
     init() {}
 
@@ -41,7 +42,7 @@ struct PetConfig: Codable {
         case AutoStartOnBoot, SoundAlert, Language, AgyDetectedLocale
         case CompletedTasksCount, ToolCallsCount, SnapToAgy, HideOnFullscreen
         case CheckUpdatesOnStartup, Accessory, AccessoriesStarUnlocked
-        case SurpriseCurrentPair, SurpriseCountdown, SurprisePackGenerated
+        case SurpriseCurrentPair, SurpriseCountdown, SurprisePackGenerated, UserStarterAccessories
     }
 
     init(from decoder: Decoder) throws {
@@ -73,6 +74,7 @@ struct PetConfig: Codable {
         SurpriseCurrentPair = (try? c.decodeIfPresent([String].self, forKey: .SurpriseCurrentPair)) ?? []
         SurpriseCountdown = (try? c.decodeIfPresent(Int.self, forKey: .SurpriseCountdown)) ?? 0
         SurprisePackGenerated = (try? c.decodeIfPresent(Bool.self, forKey: .SurprisePackGenerated)) ?? false
+        UserStarterAccessories = (try? c.decodeIfPresent([String].self, forKey: .UserStarterAccessories)) ?? []
     }
 }
 
@@ -291,8 +293,15 @@ final class PetCanvasView: NSView {
 
                 // 轻度成长像素配饰直接融入精灵动画与变换层
                 let acc = ctrl.effectiveAccessory()
-                if acc == "surprise" {
-                    let items = ctrl.activeSurpriseItems()
+                if acc == "surprise" || acc == "slot1" || acc == "slot2" || acc == "slot3" || acc == "slot4" {
+                    let items: [PetController.SurpriseAccessoryItem]
+                    if acc == "surprise" {
+                        items = ctrl.activeSurpriseItems()
+                    } else if let single = ctrl.starterAccessoryItem(acc) {
+                        items = [single]
+                    } else {
+                        items = []
+                    }
                     for it in items where it.slot == "back" {
                         drawSurpriseItem(ctx: ctx, item: it, skinId: pack.id, row: row, frame: frame, destRect: destRect)
                     }
@@ -638,10 +647,15 @@ final class PetCanvasView: NSView {
             guard x >= 0, x < gw, y >= 0, y < gh else { return }
             grid[y][x] = c
         }
-        if accessory == "glasses" { drawAccessoryPixelsToGrid(accessory: accessory, cx: 10, cy: 0, ey: 7, headY: 0, frame: 0, px: px) }
-        else if accessory == "cap" { drawAccessoryPixelsToGrid(accessory: accessory, cx: 9, cy: 0, ey: 0, headY: 12, frame: 0, px: px) }
-        else if accessory == "crown" { drawAccessoryPixelsToGrid(accessory: accessory, cx: 10, cy: 0, ey: 0, headY: 12, frame: 0, px: px) }
-        else if accessory == "coffee" { drawAccessoryPixelsToGrid(accessory: accessory, cx: -2, cy: 8, ey: 0, headY: 0, frame: 0, px: px) }
+        if let starter = ctrl.starterAccessoryItem(accessory), !starter.pixels.isEmpty {
+            let xs = starter.pixels.map { $0[0] }, ys = starter.pixels.map { $0[1] }
+            let ox = 10 - ((xs.min()! + xs.max()!) / 2)
+            let oy = 10 - ((ys.min()! + ys.max()!) / 2)
+            for p in starter.pixels where p.count >= 5 {
+                let a = p.count >= 6 ? CGFloat(p[5]) / 255.0 : 1.0
+                px(ox + p[0], oy + p[1], NSColor(calibratedRed: CGFloat(p[2])/255.0, green: CGFloat(p[3])/255.0, blue: CGFloat(p[4])/255.0, alpha: a))
+            }
+        }
         else if accessory == "surprise" {
             for x in 5...14 { for y in 7...15 { px(x, y, NSColor(calibratedRed: 0.96, green: 0.25, blue: 0.37, alpha: 1)) } }
             for x in 4...15 { for y in 5...7 { px(x, y, NSColor(calibratedRed: 0.98, green: 0.44, blue: 0.52, alpha: 1)) } }
@@ -1377,10 +1391,10 @@ final class PetController: NSObject, NSApplicationDelegate {
 
     func accessoryUnlockMilestone(_ acc: String) -> Int {
         switch acc.lowercased() {
-        case "glasses": return 20
-        case "cap": return 50
-        case "coffee": return 100
-        case "crown": return 150
+        case "slot1": return 20
+        case "slot2": return 50
+        case "slot3": return 100
+        case "slot4": return 150
         case "surprise": return 200
         default: return 0
         }
@@ -1396,26 +1410,28 @@ final class PetController: NSObject, NSApplicationDelegate {
 
     func newlyUnlockedAccessory(prevDone: Int, newDone: Int) -> String {
         if prevDone < 200 && newDone >= 200 { return "surprise" }
-        if prevDone < 150 && newDone >= 150 { return "crown" }
-        if prevDone < 100 && newDone >= 100 { return "coffee" }
-        if prevDone < 50 && newDone >= 50 { return "cap" }
-        if prevDone < 20 && newDone >= 20 { return "glasses" }
+        if prevDone < 150 && newDone >= 150 { return "slot4" }
+        if prevDone < 100 && newDone >= 100 { return "slot3" }
+        if prevDone < 50 && newDone >= 50 { return "slot2" }
+        if prevDone < 20 && newDone >= 20 { return "slot1" }
         return ""
     }
 
     func accessoryDisplayName(_ acc: String) -> String {
         let isEn = I18n.effectiveLanguage(config: config) == "en"
-        switch acc.lowercased() {
-        case "glasses": return isEn ? "Glasses" : "墨镜"
-        case "cap": return isEn ? "Dev Cap" : "鸭舌帽"
-        case "coffee": return isEn ? "Coffee Cup" : "咖啡杯"
-        case "crown": return isEn ? "Gold Crown" : "皇冠"
-        case "surprise": return isEn ? "Surprise Mode" : "惊喜模式"
+        let norm = acc.lowercased()
+        if norm == "surprise" { return isEn ? "Surprise Mode" : "惊喜模式" }
+        if let st = starterAccessoryItem(norm) { return isEn ? st.nameEn : st.nameZh }
+        switch norm {
+        case "slot1": return isEn ? "Starter #1" : "神秘配饰 1"
+        case "slot2": return isEn ? "Starter #2" : "神秘配饰 2"
+        case "slot3": return isEn ? "Starter #3" : "神秘配饰 3"
+        case "slot4": return isEn ? "Starter #4" : "神秘配饰 4"
         default: return acc
         }
     }
 
-    struct SurpriseAccessoryItem { let id: String; let slot: String; let pixels: [[Int]] }
+    struct SurpriseAccessoryItem { let id: String; let slot: String; let nameZh: String; let nameEn: String; let pixels: [[Int]] }
     private var surpriseCatalog: [String: SurpriseAccessoryItem] = [:]
     private var debugAccessoryOverride: String = ""
 
@@ -1430,11 +1446,41 @@ final class PetController: NSObject, NSApplicationDelegate {
                   let arr = obj["items"] as? [[String: Any]] else { continue }
             for it in arr {
                 if let id = it["id"] as? String, let slot = (it["slot"] as? String)?.lowercased(), let px = it["pixels"] as? [[Int]] {
-                    map[id] = SurpriseAccessoryItem(id: id, slot: slot, pixels: px)
+                    let nz = (it["nameZh"] as? String) ?? id
+                    let ne = (it["nameEn"] as? String) ?? id
+                    map[id] = SurpriseAccessoryItem(id: id, slot: slot, nameZh: nz, nameEn: ne, pixels: px)
                 }
             }
         }
         surpriseCatalog = map
+    }
+
+    func ensureUserStarterAccessoriesLoaded() {
+        ensureSurpriseCatalogLoaded()
+        if config.UserStarterAccessories.count == 4 && config.UserStarterAccessories.allSatisfy({ surpriseCatalog[$0] != nil }) { return }
+        var bySlot: [String: [SurpriseAccessoryItem]] = [:]
+        for it in surpriseCatalog.values where it.id.hasPrefix("base_") {
+            bySlot[it.slot, default: []].append(it)
+        }
+        let slots = Array(bySlot.keys).shuffled()
+        if slots.count >= 4 {
+            config.UserStarterAccessories = slots.prefix(4).map { bySlot[$0]!.randomElement()!.id }
+            saveConfig()
+        }
+    }
+
+    func starterAccessoryItem(_ acc: String) -> SurpriseAccessoryItem? {
+        ensureUserStarterAccessoriesLoaded()
+        let idx: Int
+        switch acc.lowercased() {
+        case "slot1": idx = 0
+        case "slot2": idx = 1
+        case "slot3": idx = 2
+        case "slot4": idx = 3
+        default: return nil
+        }
+        guard idx < config.UserStarterAccessories.count else { return nil }
+        return surpriseCatalog[config.UserStarterAccessories[idx]]
     }
 
     func pickTwoDistinctSurprise() -> [String] {
@@ -1475,7 +1521,7 @@ final class PetController: NSObject, NSApplicationDelegate {
         if !isAccessorySupportedForCurrentSkin() { return "none" }
         if !debugAccessoryOverride.isEmpty { return debugAccessoryOverride }
         let mode = config.Accessory.lowercased()
-        if mode == "glasses" || mode == "cap" || mode == "coffee" || mode == "crown" || mode == "surprise" {
+        if mode == "slot1" || mode == "slot2" || mode == "slot3" || mode == "slot4" || mode == "surprise" {
             return isAccessoryUnlocked(mode) ? mode : "none"
         }
         return "none"
@@ -2199,7 +2245,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             case "readytimeoutsec":
                 if let sec = Int(val), sec >= 0 && sec <= 3600 { config.ReadyTimeoutSec = sec; saveConfig() }
             case "testunlock":
-                let order = ["glasses", "cap", "coffee", "crown", "surprise"]
+                let order = ["slot1", "slot2", "slot3", "slot4", "surprise"]
                 let req = val.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 let target: String
                 if order.contains(req) {
@@ -2214,7 +2260,7 @@ final class PetController: NSObject, NSApplicationDelegate {
                 canvasView.needsDisplay = true
                 syncWindowSizeForBubbles()
             case "testaccessory":
-                let order = ["glasses", "cap", "coffee", "crown", "surprise", "none"]
+                let order = ["slot1", "slot2", "slot3", "slot4", "surprise", "none"]
                 let req = val.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 let target: String
                 if order.contains(req) {
@@ -2278,7 +2324,7 @@ final class PetController: NSObject, NSApplicationDelegate {
                 config.HideOnFullscreen = (val.lowercased() == "true" || val == "1"); saveConfig()
             case "accessory":
                 var reqAcc = val.isEmpty ? "none" : val.lowercased()
-                if reqAcc == "auto" { reqAcc = "none" }
+                if reqAcc == "auto" || (reqAcc != "none" && accessoryUnlockMilestone(reqAcc) <= 0) { reqAcc = "none" }
                 if isAccessorySupportedForCurrentSkin() && isAccessoryUnlocked(reqAcc) { debugAccessoryOverride = ""; config.Accessory = reqAcc; saveConfig() }
             case "checkupdatesonstartup":
                 config.CheckUpdatesOnStartup = (val.lowercased() == "true" || val == "1"); saveConfig()
