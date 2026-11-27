@@ -267,7 +267,7 @@ namespace AntigravityPet
         private readonly TextBlock _bubbleText;
         private readonly Dictionary<string, BitmapSource> _accIconCache = new Dictionary<string, BitmapSource>();
         private string _unlockedBannerAcc = "";
-        private DateTime _unlockedBannerUntil = DateTime.MinValue;
+        private DateTime _unlockedBannerShownAt = DateTime.MinValue;
         private readonly StackPanel _expandedStackPanel;
         private readonly DispatcherTimer _bubbleCollapseTimer;
         private bool _bubbleExpanded = false;
@@ -1587,6 +1587,13 @@ namespace AntigravityPet
             _bubbleBorder.MouseLeftButtonUp += (s, e) =>
             {
                 e.Handled = true;
+                if (!string.IsNullOrEmpty(_unlockedBannerAcc))
+                {
+                    _unlockedBannerAcc = "";
+                    UpdateVisualState();
+                    SyncFullscreenAndEdgeState();
+                    return;
+                }
                 if (!string.IsNullOrEmpty(_availableUpdateVersion) && !_isUpdatingSelf)
                 {
                     StartTransient(TransientAction.Jump, 5);
@@ -2182,6 +2189,14 @@ namespace AntigravityPet
                 RecomputeEffectiveState();
             }
 
+            if (!string.IsNullOrEmpty(_unlockedBannerAcc) && _config.ReadyTimeoutSec > 0 &&
+                (now - _unlockedBannerShownAt).TotalSeconds >= _config.ReadyTimeoutSec)
+            {
+                _unlockedBannerAcc = "";
+                UpdateVisualState();
+                SyncFullscreenAndEdgeState();
+            }
+
             if (!string.IsNullOrEmpty(_availableUpdateVersion) && !_isUpdatingSelf &&
                 _config.ReadyTimeoutSec > 0 && (now - _updatePromptShownAt).TotalSeconds >= _config.ReadyTimeoutSec)
             {
@@ -2496,13 +2511,13 @@ namespace AntigravityPet
                 RenderCurrentFrame();
             }
 
-            if (!string.IsNullOrEmpty(_unlockedBannerAcc) && DateTime.UtcNow >= _unlockedBannerUntil)
+            if (!string.IsNullOrEmpty(_unlockedBannerAcc) && _config.ReadyTimeoutSec > 0 && DateTime.Now >= _unlockedBannerShownAt.AddSeconds(_config.ReadyTimeoutSec))
             {
                 _unlockedBannerAcc = "";
                 UpdateVisualState();
             }
 
-            bool showHalo = _state != PetState.Idle || HasPendingApproval() || !string.IsNullOrEmpty(_availableUpdateVersion) || (!string.IsNullOrEmpty(_unlockedBannerAcc) && DateTime.UtcNow < _unlockedBannerUntil);
+            bool showHalo = _state != PetState.Idle || HasPendingApproval() || !string.IsNullOrEmpty(_availableUpdateVersion) || !string.IsNullOrEmpty(_unlockedBannerAcc);
             if (showHalo)
             {
                 double t = Environment.TickCount / 260.0;
@@ -2717,7 +2732,7 @@ namespace AntigravityPet
                     if (!string.IsNullOrEmpty(newly))
                     {
                         _unlockedBannerAcc = newly;
-                        _unlockedBannerUntil = DateTime.UtcNow.AddSeconds(7.0);
+                        _unlockedBannerShownAt = DateTime.Now;
                     }
                 }
                 _tasks[conversationId] = new TaskItem
@@ -4312,7 +4327,7 @@ namespace AntigravityPet
                 return;
             }
 
-            if (!string.IsNullOrEmpty(_unlockedBannerAcc) && DateTime.UtcNow < _unlockedBannerUntil)
+            if (!string.IsNullOrEmpty(_unlockedBannerAcc))
             {
                 _stackBack1.Visibility = Visibility.Collapsed;
                 _stackBack2.Visibility = Visibility.Collapsed;

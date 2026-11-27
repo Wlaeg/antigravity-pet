@@ -353,7 +353,7 @@ final class PetCanvasView: NSView {
 
         if ctrl.config.BubbleMode == "off" { return }
 
-        if !ctrl.unlockedBannerAcc.isEmpty && Date() < ctrl.unlockedBannerUntil {
+        if !ctrl.unlockedBannerAcc.isEmpty {
             let isEn = I18n.effectiveLanguage(config: ctrl.config) == "en"
             let accName = ctrl.accessoryDisplayName(ctrl.unlockedBannerAcc)
             let label = isEn ? "Unlocked Accessory: \(accName)" : "已解锁新配饰: \(accName)"
@@ -855,7 +855,7 @@ final class PetController: NSObject, NSApplicationDelegate {
     var isUpdatingSelf: Bool = false
     var selfUpdateStatusMsg: String = ""
     var unlockedBannerAcc: String = ""
-    var unlockedBannerUntil: Date = Date.distantPast
+    var unlockedBannerShownAt: Date = Date.distantPast
 
     lazy var pluginRoot: URL = {
         let exeUrl = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
@@ -1273,7 +1273,7 @@ final class PetController: NSObject, NSApplicationDelegate {
     func currentBubbleText() -> String? {
         let mode = config.BubbleMode
         if mode == "off" { return nil }
-        if !unlockedBannerAcc.isEmpty && now >= unlockedBannerUntil {
+        if !unlockedBannerAcc.isEmpty && config.ReadyTimeoutSec > 0 && now.timeIntervalSince(unlockedBannerShownAt) >= Double(config.ReadyTimeoutSec) {
             unlockedBannerAcc = ""
             canvasView.needsDisplay = true
             syncWindowSizeForBubbles()
@@ -1386,7 +1386,7 @@ final class PetController: NSObject, NSApplicationDelegate {
         if now < overrideUntil, let ov = overrideRow {
             row = ov
         } else {
-            if !unlockedBannerAcc.isEmpty && now >= unlockedBannerUntil {
+            if !unlockedBannerAcc.isEmpty && config.ReadyTimeoutSec > 0 && now.timeIntervalSince(unlockedBannerShownAt) >= Double(config.ReadyTimeoutSec) {
             unlockedBannerAcc = ""
             canvasView.needsDisplay = true
             syncWindowSizeForBubbles()
@@ -1430,7 +1430,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             }
         }
 
-        if !unlockedBannerAcc.isEmpty && now >= unlockedBannerUntil {
+        if !unlockedBannerAcc.isEmpty && config.ReadyTimeoutSec > 0 && now.timeIntervalSince(unlockedBannerShownAt) >= Double(config.ReadyTimeoutSec) {
             unlockedBannerAcc = ""
             canvasView.needsDisplay = true
             syncWindowSizeForBubbles()
@@ -2003,7 +2003,7 @@ final class PetController: NSObject, NSApplicationDelegate {
                 let newly = newlyUnlockedAccessory(prevDone: prevDone, newDone: config.CompletedTasksCount)
                 if !newly.isEmpty {
                     unlockedBannerAcc = newly
-                    unlockedBannerUntil = Date().addingTimeInterval(7.0)
+                    unlockedBannerShownAt = Date()
                 }
             }
 
