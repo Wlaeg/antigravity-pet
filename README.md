@@ -46,7 +46,9 @@ Native Overlay (app/AntigravityPet.cs | app/AntigravityPet.swift) ◀──┘
 
 ## Install & Download
 
-**Runtime requirements:** Zero extra dependencies. Uses built-in `.NET Framework 4.x` on Windows 10/11 and built-in `swiftc` on macOS 12+.
+**Runtime requirements:**
+- **Desktop overlay:** Built-in `.NET Framework 4.x` on Windows 10/11 and `swiftc` (Xcode Command Line Tools) on macOS 12+.
+- **Node.js 18+ (`node` in `PATH`):** **Required** for the Antigravity MCP server, Settings panel (both sidecar & standalone window), Community Workshop, GitHub Star unlock verification, and Surprise Mode accessory generation.
 
 ### For AI Agents (Quick Install)
 
