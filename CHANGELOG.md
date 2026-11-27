@@ -5,6 +5,17 @@ All notable changes to **Antigravity Pet** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.1] - 2026-11-27
+
+### Fixed
+- **Cross-Machine Community Pet Download Sync (`sidecars/panel/server.mjs`, `sidecars/panel/index.html`, `scripts/sync-community-stats.mjs`)**:
+  - Replaced local-only download counting with a zero-release global counter (`abacus.jasoncameron.dev`) so community pet download counts sync in real time across all machines without creating extra GitHub Releases.
+  - Updated `sync-community-stats.mjs` to periodically snapshot live global download counts into `community-stats.json` as a persistent fallback.
+
+### Changed
+- **English README & Desktop Showcase Banner (`README.md`, `assets/hero-showcase.gif`)**:
+  - Rebuilt `README.md` into a concise English-only developer layout with an ASCII architecture overview, AI agent quick-install matrix, and an original 6-second seamless desktop showcase GIF (`hero-showcase.gif`).
+
 ## [4.6.0] - 2026-11-27
 
 ### Added

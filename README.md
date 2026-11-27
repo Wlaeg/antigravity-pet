@@ -1,15 +1,13 @@
-# Antigravity Pet — a free, open-source pixel desktop pet for Google Antigravity
+# Antigravity Pet — a native pixel-art desktop companion for Antigravity
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Release](https://img.shields.io/badge/Release-v4.6.0-0EA5E9?style=flat-square)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v4.6.1-0EA5E9?style=flat-square)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20%7C%20macOS%2012%2B-0078D6?style=flat-square)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
 [![Runtime](https://img.shields.io/badge/Runtime-Zero%20External%20Dependencies-10B981?style=flat-square)](#install--download)
 
 ![Antigravity Pet Showcase](assets/hero-showcase.gif)
 
-Antigravity Pet is a free, open-source pixel desktop pet for **Google Antigravity**. It lives on your **Windows** or **macOS** desktop and shows what your AI agent is doing in real time — which file it is reading, which test it is running, whether it needs your input or is stuck — so you can tell at a glance without switching windows. It is a native app with zero external runtime dependencies, so there is nothing extra to install and nothing running in the background beyond the pet itself.
-
-**New in v4.6.0:** a Community Workshop where anyone can submit a pet pack through a GitHub issue — approved packs publish themselves with no server involved — plus community-wide stars and download counts synced from GitHub every 30 minutes.
+An open-source native pixel-art desktop companion for **Google Antigravity** on **Windows** and **macOS** — built with zero external runtime dependencies. It reflects what your AI agent is doing in real time, tracks background tasks without stealing focus, and reacts playfully while you type.
 
 - **Live tool status & calm `BackgroundRunning` (`🌙`):** Shows single-line live action bubbles (`Reading server.mjs`, `Editing App.tsx`, `Tests passed`) directly above your pet. When the foreground chat is idle while background tasks run, the pet switches to a calm lavender-blue resting pose with a `🌙` badge — click stacked task bubbles to expand the list and jump straight to any session.
 - **8 built-in mascots + Community Workshop:** Switch between 8 built-in pixel companions (`cyber-fox`, `astro-bot`, `shadow-cat`, `byte-ghost`, `shiba-dog`, `pixel-dragon`, `android-bugdroid`, `flutter-dash`) or install community packs (`gemini-chan`, `cyber-panda`, `pixel-octopus`, `coffee-slime`, `star-hamster`) in one click inside the Settings panel.
@@ -145,17 +143,12 @@ skills/                         Built-in `pet` and `hatch-pet` Antigravity skill
 docs/DEVELOPMENT.md             Architecture, state machine & local HTTP API reference
 CUSTOM_PET_SPEC.md              v3 sprite sheet & community submission specification
 build.ps1, build.sh             Zero-dependency Windows & macOS build/launch scripts
-CHANGELOG.md                    Full release history (v3.0.0 – v4.6.0)
+CHANGELOG.md                    Full release history (v3.0.0 – v4.6.1)
 LICENSE                         MIT License
 ```
 
-## FAQ
+## Notes
 
-- **What is Antigravity Pet?** A free, open-source pixel desktop pet for Google Antigravity. It sits on your desktop and mirrors your AI agent's status live, so you always know whether your agent is working, waiting on you, or done — without keeping the Antigravity window in front of you.
-- **How do I install Antigravity Pet?** Download the latest release, extract it into your Antigravity plugins folder, and run the one-click launcher — see [Install & Download](#install--download). No extra runtime, account, or setup step is required.
-- **Does Antigravity Pet work on Windows and Mac?** Yes — native apps for Windows 10/11 and macOS 12+, built with each operating system's own toolchains.
-- **Is Antigravity Pet free?** Yes, free and open source under the [MIT License](LICENSE).
-- **How is it different from other Antigravity pets?** It lives on your desktop instead of inside the app window, shows the agent's live tool activity instead of just a status name, lets you send work with a double-click and approve risky commands in the bubble, gives background tasks their own moon state, and has a community workshop for sharing pet packs. It also gets bored and falls asleep if you ignore it.
 - **Why is there no taskbar / Dock icon?** The overlay uses `WS_EX_TOOLWINDOW` (Windows) and `LSUIElement` (macOS) intentionally to stay out of your window switcher. Use `Win + Alt + P` (`⌥ + ⌘ + P` on macOS) or right-click the pet anytime.
 - **Does it stay running in the background after closing Antigravity?** No — by default it follows Antigravity's lifecycle and exits automatically when Antigravity closes.
 - Released under the [MIT License](LICENSE).
