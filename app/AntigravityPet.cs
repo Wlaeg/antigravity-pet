@@ -2731,6 +2731,26 @@ namespace AntigravityPet
             return fallback;
         }
 
+        private static int GetAccessoryUnlockMilestone(string acc)
+        {
+            switch ((acc ?? "").Trim().ToLowerInvariant())
+            {
+                case "glasses": return 20;
+                case "cap": return 50;
+                case "coffee": return 100;
+                case "crown": return 200;
+                default: return 0;
+            }
+        }
+
+        private static bool IsAccessoryUnlocked(string acc, int done)
+        {
+            string norm = (acc ?? "").Trim().ToLowerInvariant();
+            if (norm == "auto" || norm == "none" || string.IsNullOrEmpty(norm)) return true;
+            int req = GetAccessoryUnlockMilestone(norm);
+            return req > 0 && done >= req;
+        }
+
         private string GetEffectiveAccessoryId()
         {
             string pref = (_config.Accessory ?? "auto").Trim().ToLowerInvariant();
@@ -2738,13 +2758,13 @@ namespace AntigravityPet
             int done = _config.CompletedTasksCount;
             if (pref == "auto")
             {
-                if (done >= 300) return "crown";
-                if (done >= 150) return "coffee";
+                if (done >= 200) return "crown";
+                if (done >= 100) return "coffee";
                 if (done >= 50) return "cap";
-                if (done >= 10) return "glasses";
+                if (done >= 20) return "glasses";
                 return "none";
             }
-            return pref;
+            return IsAccessoryUnlocked(pref, done) ? pref : "none";
         }
 
         private void UpdateAccessoryVisual()
@@ -2857,39 +2877,76 @@ namespace AntigravityPet
                 if (acc == "glasses")
                 {
                     int gy = ey + 1;
-                    for (int x = cx - 7; x <= cx + 6; x++) px(x, gy, 15, 23, 42, 245);
-                    for (int x = cx - 6; x <= cx - 3; x++) for (int y = gy; y <= gy + 2; y++) px(x, y, 15, 23, 42, 230);
-                    for (int x = cx + 2; x <= cx + 5; x++) for (int y = gy; y <= gy + 2; y++) px(x, y, 15, 23, 42, 230);
-                    px(cx - 5, gy, 56, 189, 248, 255);
-                    px(cx + 3, gy, 56, 189, 248, 255);
+                    // 镜腿与鼻梁连接
+                    px(cx - 8, gy, 30, 41, 59, 255);
+                    px(cx + 7, gy, 30, 41, 59, 255);
+                    for (int x = cx - 2; x <= cx + 1; x++) px(x, gy, 15, 23, 42, 255);
+                    // 左镜框与镜片
+                    for (int x = cx - 7; x <= cx - 2; x++) px(x, gy, 15, 23, 42, 255);
+                    for (int x = cx - 6; x <= cx - 3; x++) for (int y = gy + 1; y <= gy + 2; y++) px(x, y, 30, 41, 59, 240);
+                    px(cx - 6, gy + 1, 56, 189, 248, 255);
+                    px(cx - 5, gy + 1, 224, 242, 254, 255);
+                    px(cx - 5, gy + 2, 56, 189, 248, 255);
+                    // 右镜框与镜片
+                    for (int x = cx + 1; x <= cx + 6; x++) px(x, gy, 15, 23, 42, 255);
+                    for (int x = cx + 2; x <= cx + 5; x++) for (int y = gy + 1; y <= gy + 2; y++) px(x, y, 30, 41, 59, 240);
+                    px(cx + 2, gy + 1, 56, 189, 248, 255);
+                    px(cx + 3, gy + 1, 224, 242, 254, 255);
+                    px(cx + 3, gy + 2, 56, 189, 248, 255);
                 }
                 else if (acc == "cap")
                 {
-                    for (int x = cx - 7; x <= cx + 6; x++) for (int y = headY - 3; y <= headY; y++) px(x, y, 14, 165, 233, 255);
-                    for (int x = cx - 5; x <= cx + 4; x++) px(x, headY - 4, 56, 189, 248, 255);
-                    for (int x = cx - 3; x <= cx + 8; x++) px(x, headY, 2, 132, 199, 255);
+                    // 圆润帽顶高光与帽冠
+                    for (int x = cx - 4; x <= cx + 3; x++) px(x, headY - 4, 56, 189, 248, 255);
+                    for (int x = cx - 6; x <= cx + 5; x++) px(x, headY - 3, 14, 165, 233, 255);
+                    for (int x = cx - 7; x <= cx + 5; x++) for (int y = headY - 2; y <= headY - 1; y++) px(x, y, 2, 132, 199, 255);
+                    // 正面极客帽徽
+                    px(cx - 1, headY - 2, 248, 250, 252, 255);
+                    px(cx, headY - 2, 250, 204, 21, 255);
+                    // 立体前伸帽檐与檐下阴影
+                    for (int x = cx - 5; x <= cx + 8; x++) px(x, headY, 3, 105, 161, 255);
+                    for (int x = cx + 2; x <= cx + 9; x++) px(x, headY + 1, 7, 89, 133, 255);
                 }
                 else if (acc == "crown")
                 {
-                    for (int x = cx - 5; x <= cx + 4; x++) { px(x, headY - 1, 250, 204, 21, 255); px(x, headY, 245, 158, 11, 255); }
-                    px(cx - 5, headY - 3, 250, 204, 21, 255); px(cx - 5, headY - 2, 250, 204, 21, 255);
-                    px(cx - 1, headY - 4, 250, 204, 21, 255); px(cx, headY - 4, 250, 204, 21, 255);
-                    px(cx - 1, headY - 3, 250, 204, 21, 255); px(cx, headY - 3, 250, 204, 21, 255);
-                    px(cx - 1, headY - 2, 56, 189, 248, 255); px(cx, headY - 2, 56, 189, 248, 255);
-                    px(cx + 4, headY - 3, 250, 204, 21, 255); px(cx + 4, headY - 2, 250, 204, 21, 255);
+                    // 金冠双色底座
+                    for (int x = cx - 5; x <= cx + 4; x++) { px(x, headY - 1, 250, 204, 21, 255); px(x, headY, 217, 119, 6, 255); }
+                    // 左右双尖峰与珍珠
+                    px(cx - 5, headY - 2, 250, 204, 21, 255); px(cx - 5, headY - 3, 253, 224, 71, 255); px(cx - 5, headY - 4, 254, 249, 195, 255);
+                    px(cx + 4, headY - 2, 250, 204, 21, 255); px(cx + 4, headY - 3, 253, 224, 71, 255); px(cx + 4, headY - 4, 254, 249, 195, 255);
+                    // 中央主峰
+                    for (int x = cx - 2; x <= cx + 1; x++) px(x, headY - 2, 250, 204, 21, 255);
+                    px(cx - 1, headY - 3, 253, 224, 71, 255); px(cx, headY - 3, 253, 224, 71, 255);
+                    px(cx - 1, headY - 4, 253, 224, 71, 255); px(cx, headY - 4, 253, 224, 71, 255);
+                    px(cx - 1, headY - 5, 254, 249, 195, 255); px(cx, headY - 5, 254, 249, 195, 255);
+                    // 宝石镶嵌（中央蓝宝 + 左右红宝点缀）
+                    px(cx - 1, headY - 2, 56, 189, 248, 255); px(cx, headY - 2, 186, 230, 253, 255);
+                    px(cx - 4, headY - 1, 244, 63, 94, 255);
+                    px(cx + 3, headY - 1, 244, 63, 94, 255);
                 }
                 else if (acc == "coffee")
                 {
                     int cupX = cx + 8;
-                    int cupY = cy + 2;
-                    for (int x = cupX; x <= cupX + 4; x++) for (int y = cupY; y <= cupY + 4; y++) px(x, y, 241, 245, 249, 255);
-                    for (int x = cupX + 1; x <= cupX + 3; x++) px(x, cupY, 120, 53, 15, 255);
-                    px(cupX + 5, cupY + 1, 241, 245, 249, 255);
-                    px(cupX + 5, cupY + 3, 241, 245, 249, 255);
-                    px(cupX + 6, cupY + 2, 241, 245, 249, 255);
+                    int cupY = cy + 1;
+                    // 瓷白杯身与右侧微阴影
+                    for (int x = cupX; x <= cupX + 3; x++) for (int y = cupY + 1; y <= cupY + 5; y++) px(x, y, 248, 250, 252, 255);
+                    for (int y = cupY + 1; y <= cupY + 5; y++) px(cupX + 4, y, 203, 213, 225, 255);
+                    // 杯口高光与浓醇咖啡液面
+                    px(cupX, cupY, 248, 250, 252, 255); px(cupX + 4, cupY, 226, 232, 240, 255);
+                    px(cupX + 1, cupY, 120, 53, 15, 255); px(cupX + 2, cupY, 146, 64, 14, 255); px(cupX + 3, cupY, 120, 53, 15, 255);
+                    // 暖色咖啡杯腰带
+                    for (int x = cupX + 1; x <= cupX + 3; x++) px(x, cupY + 3, 217, 119, 6, 255);
+                    // C 形弧度杯柄
+                    px(cupX + 5, cupY + 1, 226, 232, 240, 255);
+                    px(cupX + 6, cupY + 2, 226, 232, 240, 255);
+                    px(cupX + 6, cupY + 3, 203, 213, 225, 255);
+                    px(cupX + 5, cupY + 4, 203, 213, 225, 255);
+                    // 双缕动态热气
                     int steamOff = frame % 2;
-                    px(cupX + 1, cupY - 2 - steamOff, 203, 213, 225, 210);
-                    px(cupX + 3, cupY - 3 + steamOff, 203, 213, 225, 210);
+                    px(cupX + 1, cupY - 2 - steamOff, 226, 232, 240, 220);
+                    px(cupX + 2, cupY - 3 - steamOff, 203, 213, 225, 170);
+                    px(cupX + 3, cupY - 2 + steamOff, 226, 232, 240, 220);
+                    px(cupX + 4, cupY - 3 + steamOff, 203, 213, 225, 170);
                 }
 
                 // 为配饰添加 1px 深色像素外轮廓（与角色本体融合）
@@ -5370,10 +5427,14 @@ namespace AntigravityPet
                         }
                         else if (action == "accessory")
                         {
-                            _config.Accessory = string.IsNullOrWhiteSpace(val) ? "auto" : val.Trim().ToLowerInvariant();
-                            UpdateAccessoryVisual();
-                            SaveConfig();
-                            RebuildContextMenu();
+                            string reqAcc = string.IsNullOrWhiteSpace(val) ? "auto" : val.Trim().ToLowerInvariant();
+                            if (IsAccessoryUnlocked(reqAcc, _config.CompletedTasksCount))
+                            {
+                                _config.Accessory = reqAcc;
+                                UpdateAccessoryVisual();
+                                SaveConfig();
+                                RebuildContextMenu();
+                            }
                         }
                         else if (action == "quickdispatch")
                         {
@@ -5486,7 +5547,11 @@ namespace AntigravityPet
             if (data.ContainsKey("soundAlert")) _config.SoundAlert = GetBool(data, "soundAlert", _config.SoundAlert);
             if (data.ContainsKey("snapToAgy")) _config.SnapToAgy = GetBool(data, "snapToAgy", _config.SnapToAgy);
             if (data.ContainsKey("hideOnFullscreen")) _config.HideOnFullscreen = GetBool(data, "hideOnFullscreen", _config.HideOnFullscreen);
-            if (data.ContainsKey("accessory") && data["accessory"] != null) { _config.Accessory = data["accessory"].ToString().ToLowerInvariant(); UpdateAccessoryVisual(); }
+            if (data.ContainsKey("accessory") && data["accessory"] != null)
+            {
+                string reqAcc = data["accessory"].ToString().Trim().ToLowerInvariant();
+                if (IsAccessoryUnlocked(reqAcc, _config.CompletedTasksCount)) { _config.Accessory = reqAcc; UpdateAccessoryVisual(); }
+            }
 
             UpdateVisualState();
             SaveConfig();

@@ -523,42 +523,72 @@ final class PetCanvasView: NSView {
 
         switch accessory {
         case "glasses":
-            let frameC = NSColor(calibratedRed: 0.06, green: 0.09, blue: 0.16, alpha: 0.96)
+            let frameC = NSColor(calibratedRed: 0.06, green: 0.09, blue: 0.16, alpha: 1.0)
+            let templeC = NSColor(calibratedRed: 0.12, green: 0.16, blue: 0.23, alpha: 1.0)
+            let lensC = NSColor(calibratedRed: 0.12, green: 0.16, blue: 0.23, alpha: 0.94)
             let glint = NSColor(calibratedRed: 0.22, green: 0.74, blue: 0.97, alpha: 1.0)
+            let glintHi = NSColor(calibratedRed: 0.88, green: 0.95, blue: 1.0, alpha: 1.0)
             let gy = ey + 1
-            for x in (cx - 7)...(cx + 6) { px(x, gy, frameC) }
-            for x in (cx - 6)...(cx - 3) { for y in gy...(gy + 2) { px(x, y, frameC) } }
-            for x in (cx + 2)...(cx + 5) { for y in gy...(gy + 2) { px(x, y, frameC) } }
-            px(cx - 5, gy, glint); px(cx + 3, gy, glint)
+            px(cx - 8, gy, templeC); px(cx + 7, gy, templeC)
+            for x in (cx - 2)...(cx + 1) { px(x, gy, frameC) }
+            for x in (cx - 7)...(cx - 2) { px(x, gy, frameC) }
+            for x in (cx - 6)...(cx - 3) { for y in (gy + 1)...(gy + 2) { px(x, y, lensC) } }
+            px(cx - 6, gy + 1, glint); px(cx - 5, gy + 1, glintHi); px(cx - 5, gy + 2, glint)
+            for x in (cx + 1)...(cx + 6) { px(x, gy, frameC) }
+            for x in (cx + 2)...(cx + 5) { for y in (gy + 1)...(gy + 2) { px(x, y, lensC) } }
+            px(cx + 2, gy + 1, glint); px(cx + 3, gy + 1, glintHi); px(cx + 3, gy + 2, glint)
         case "cap":
-            let capBlue = NSColor(calibratedRed: 0.05, green: 0.65, blue: 0.91, alpha: 1.0)
             let capHi = NSColor(calibratedRed: 0.22, green: 0.74, blue: 0.97, alpha: 1.0)
-            let capDark = NSColor(calibratedRed: 0.01, green: 0.52, blue: 0.78, alpha: 1.0)
-            for x in (cx - 7)...(cx + 6) { for y in (headY - 3)...headY { px(x, y, capBlue) } }
-            for x in (cx - 5)...(cx + 4) { px(x, headY - 4, capHi) }
-            for x in (cx - 3)...(cx + 8) { px(x, headY, capDark) }
+            let capMid = NSColor(calibratedRed: 0.05, green: 0.65, blue: 0.91, alpha: 1.0)
+            let capBlue = NSColor(calibratedRed: 0.01, green: 0.52, blue: 0.78, alpha: 1.0)
+            let capDark = NSColor(calibratedRed: 0.01, green: 0.41, blue: 0.63, alpha: 1.0)
+            let capDeep = NSColor(calibratedRed: 0.03, green: 0.35, blue: 0.52, alpha: 1.0)
+            let badgeW = NSColor(calibratedRed: 0.97, green: 0.98, blue: 0.99, alpha: 1.0)
+            let badgeG = NSColor(calibratedRed: 0.98, green: 0.80, blue: 0.08, alpha: 1.0)
+            for x in (cx - 4)...(cx + 3) { px(x, headY - 4, capHi) }
+            for x in (cx - 6)...(cx + 5) { px(x, headY - 3, capMid) }
+            for x in (cx - 7)...(cx + 5) { for y in (headY - 2)...(headY - 1) { px(x, y, capBlue) } }
+            px(cx - 1, headY - 2, badgeW); px(cx, headY - 2, badgeG)
+            for x in (cx - 5)...(cx + 8) { px(x, headY, capDark) }
+            for x in (cx + 2)...(cx + 9) { px(x, headY + 1, capDeep) }
         case "crown":
             let gold = NSColor(calibratedRed: 0.98, green: 0.80, blue: 0.08, alpha: 1.0)
-            let amber = NSColor(calibratedRed: 0.96, green: 0.62, blue: 0.04, alpha: 1.0)
+            let goldHi = NSColor(calibratedRed: 0.99, green: 0.88, blue: 0.28, alpha: 1.0)
+            let pearl = NSColor(calibratedRed: 1.0, green: 0.98, blue: 0.76, alpha: 1.0)
+            let amber = NSColor(calibratedRed: 0.85, green: 0.47, blue: 0.02, alpha: 1.0)
             let gem = NSColor(calibratedRed: 0.22, green: 0.74, blue: 0.97, alpha: 1.0)
+            let gemHi = NSColor(calibratedRed: 0.73, green: 0.90, blue: 0.99, alpha: 1.0)
+            let ruby = NSColor(calibratedRed: 0.96, green: 0.25, blue: 0.37, alpha: 1.0)
             for x in (cx - 5)...(cx + 4) { px(x, headY - 1, gold); px(x, headY, amber) }
-            px(cx - 5, headY - 3, gold); px(cx - 5, headY - 2, gold)
-            px(cx - 1, headY - 4, gold); px(cx, headY - 4, gold)
-            px(cx - 1, headY - 3, gold); px(cx, headY - 3, gold)
-            px(cx - 1, headY - 2, gem); px(cx, headY - 2, gem)
-            px(cx + 4, headY - 3, gold); px(cx + 4, headY - 2, gold)
+            px(cx - 5, headY - 2, gold); px(cx - 5, headY - 3, goldHi); px(cx - 5, headY - 4, pearl)
+            px(cx + 4, headY - 2, gold); px(cx + 4, headY - 3, goldHi); px(cx + 4, headY - 4, pearl)
+            for x in (cx - 2)...(cx + 1) { px(x, headY - 2, gold) }
+            px(cx - 1, headY - 3, goldHi); px(cx, headY - 3, goldHi)
+            px(cx - 1, headY - 4, goldHi); px(cx, headY - 4, goldHi)
+            px(cx - 1, headY - 5, pearl); px(cx, headY - 5, pearl)
+            px(cx - 1, headY - 2, gem); px(cx, headY - 2, gemHi)
+            px(cx - 4, headY - 1, ruby); px(cx + 3, headY - 1, ruby)
         case "coffee":
-            let cup = NSColor(calibratedRed: 0.95, green: 0.96, blue: 0.98, alpha: 1.0)
+            let cup = NSColor(calibratedRed: 0.97, green: 0.98, blue: 0.99, alpha: 1.0)
+            let cupShad = NSColor(calibratedRed: 0.80, green: 0.84, blue: 0.88, alpha: 1.0)
+            let cupRim = NSColor(calibratedRed: 0.89, green: 0.91, blue: 0.94, alpha: 1.0)
             let coffee = NSColor(calibratedRed: 0.47, green: 0.21, blue: 0.06, alpha: 1.0)
-            let steam = NSColor(calibratedRed: 0.80, green: 0.84, blue: 0.88, alpha: 0.82)
+            let crema = NSColor(calibratedRed: 0.57, green: 0.25, blue: 0.05, alpha: 1.0)
+            let sleeve = NSColor(calibratedRed: 0.85, green: 0.47, blue: 0.02, alpha: 1.0)
+            let steam = NSColor(calibratedRed: 0.89, green: 0.91, blue: 0.94, alpha: 0.86)
+            let steamFade = NSColor(calibratedRed: 0.80, green: 0.84, blue: 0.88, alpha: 0.66)
             let cupX = cx + 8
-            let cupY = cy + 2
-            for x in cupX...(cupX + 4) { for y in cupY...(cupY + 4) { px(x, y, cup) } }
-            for x in (cupX + 1)...(cupX + 3) { px(x, cupY, coffee) }
-            px(cupX + 5, cupY + 1, cup); px(cupX + 5, cupY + 3, cup); px(cupX + 6, cupY + 2, cup)
+            let cupY = cy + 1
+            for x in cupX...(cupX + 3) { for y in (cupY + 1)...(cupY + 5) { px(x, y, cup) } }
+            for y in (cupY + 1)...(cupY + 5) { px(cupX + 4, y, cupShad) }
+            px(cupX, cupY, cup); px(cupX + 4, cupY, cupRim)
+            px(cupX + 1, cupY, coffee); px(cupX + 2, cupY, crema); px(cupX + 3, cupY, coffee)
+            for x in (cupX + 1)...(cupX + 3) { px(x, cupY + 3, sleeve) }
+            px(cupX + 5, cupY + 1, cupRim); px(cupX + 6, cupY + 2, cupRim)
+            px(cupX + 6, cupY + 3, cupShad); px(cupX + 5, cupY + 4, cupShad)
             let steamOff = frame % 2
-            px(cupX + 1, cupY - 2 - steamOff, steam)
-            px(cupX + 3, cupY - 3 + steamOff, steam)
+            px(cupX + 1, cupY - 2 - steamOff, steam); px(cupX + 2, cupY - 3 - steamOff, steamFade)
+            px(cupX + 3, cupY - 2 + steamOff, steam); px(cupX + 4, cupY - 3 + steamOff, steamFade)
         default:
             return
         }
@@ -1205,14 +1235,34 @@ final class PetController: NSObject, NSApplicationDelegate {
         }
     }
 
+    func accessoryUnlockMilestone(_ acc: String) -> Int {
+        switch acc.lowercased() {
+        case "glasses": return 20
+        case "cap": return 50
+        case "coffee": return 100
+        case "crown": return 200
+        default: return 0
+        }
+    }
+
+    func isAccessoryUnlocked(_ acc: String) -> Bool {
+        let mode = acc.lowercased()
+        if mode == "auto" || mode == "none" || mode.isEmpty { return true }
+        let req = accessoryUnlockMilestone(mode)
+        return req > 0 && config.CompletedTasksCount >= req
+    }
+
     func effectiveAccessory() -> String {
         let mode = config.Accessory.lowercased()
-        if mode == "none" || mode == "glasses" || mode == "cap" || mode == "coffee" || mode == "crown" { return mode }
+        if mode == "none" { return "none" }
+        if mode == "glasses" || mode == "cap" || mode == "coffee" || mode == "crown" {
+            return isAccessoryUnlocked(mode) ? mode : "none"
+        }
         let c = config.CompletedTasksCount
-        if c >= 100 { return "crown" }
-        if c >= 50 { return "coffee" }
-        if c >= 20 { return "cap" }
-        if c >= 5 { return "glasses" }
+        if c >= 200 { return "crown" }
+        if c >= 100 { return "coffee" }
+        if c >= 50 { return "cap" }
+        if c >= 20 { return "glasses" }
         return "none"
     }
 
@@ -1609,7 +1659,7 @@ final class PetController: NSObject, NSApplicationDelegate {
     }
 
     @objc func menuSelectAccessory(_ sender: NSMenuItem) {
-        if let k = sender.representedObject as? String {
+        if let k = sender.representedObject as? String, isAccessoryUnlocked(k) {
             config.Accessory = k
             saveConfig()
             canvasView.needsDisplay = true
@@ -1938,7 +1988,8 @@ final class PetController: NSObject, NSApplicationDelegate {
             case "hideonfullscreen":
                 config.HideOnFullscreen = (val.lowercased() == "true" || val == "1"); saveConfig()
             case "accessory":
-                config.Accessory = val.isEmpty ? "auto" : val.lowercased(); saveConfig()
+                let reqAcc = val.isEmpty ? "auto" : val.lowercased()
+                if isAccessoryUnlocked(reqAcc) { config.Accessory = reqAcc; saveConfig() }
             case "checkupdatesonstartup":
                 config.CheckUpdatesOnStartup = (val.lowercased() == "true" || val == "1"); saveConfig()
             case "dockleft":

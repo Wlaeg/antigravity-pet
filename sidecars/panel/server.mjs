@@ -296,14 +296,28 @@ async function waitForHealth(maxWaitMs = 2800) {
   return null;
 }
 
-export async function getSnapshot() {
-  const res = await httpRequest('GET', '/health', null, 600);
-  if (res.ok && res.data) {
-    const effLang = res.data.effectiveLanguage || 'zh';
-    res.data.availablePets = scanPetPacks(effLang);
-    return res.data;
-  }
-  const cfg = readOfflineConfig();
+const ACCESSORY_MILESTONES = { glasses: 20, cap: 50, coffee: 100, crown: 200 };
+
+function isAccessoryUnlocked(acc, done) {
+  const norm = String(acc || 'auto').toLowerCase();
+  if (norm === 'auto' || norm === 'none') return true;
+  const req = ACCESSORY_MILESTONES[norm];
+  return typeof req === 'number' && Number(done || 0) >= req;
+}
+
+function resolveEffectiveAccessory(pref, done) {
+  const norm = String(pref || 'auto').toLowerCase();
+  const c = Number(done || 0);
+  if (norm === 'none') return 'none';
+  if (norm !== 'auto') return isAccessoryUnlocked(norm, c) ? norm : 'none';
+  if (c >= 200) return 'crown';
+  if (c >= 100) return 'coffee';
+  if (c >= 50) return 'cap';
+  if (c >= 20) return 'glasses';
+  return 'none';
+}
+
+function buildOfflineStatus(cfg) {
   const effLang = detectEffectiveLang(cfg);
   return {
     ok: true,
@@ -321,7 +335,8 @@ export async function getSnapshot() {
     snapToAgy: !!cfg.SnapToAgy,
     hideOnFullscreen: cfg.HideOnFullscreen !== false,
     accessory: cfg.Accessory || 'auto',
-    effectiveAccessory: cfg.Accessory && cfg.Accessory !== 'auto' ? cfg.Accessory : (cfg.CompletedTasksCount >= 100 ? 'crown' : cfg.CompletedTasksCount >= 50 ? 'coffee' : cfg.CompletedTasksCount >= 20 ? 'cap' : cfg.CompletedTasksCount >= 5 ? 'glasses' : 'none'),
+    effectiveAccessory: resolveEffectiveAccessory(cfg.Accessory, cfg.CompletedTasksCount),
+    accessoryMilestones: ACCESSORY_MILESTONES,
     autoWalk: cfg.AutoWalk !== false,
     eyeFollow: cfg.EyeFollow !== false,
     boredomIdle: cfg.BoredomIdle !== false,
@@ -341,6 +356,17 @@ export async function getSnapshot() {
     recentConversations: [],
     availablePets: scanPetPacks(effLang)
   };
+}
+
+export async function getSnapshot() {
+  const res = await httpRequest('GET', '/health', null, 600);
+  if (res.ok && res.data) {
+    const effLang = res.data.effectiveLanguage || 'zh';
+    res.data.availablePets = scanPetPacks(effLang);
+    res.data.accessoryMilestones = ACCESSORY_MILESTONES;
+    return res.data;
+  }
+  return buildOfflineStatus(readOfflineConfig());
 }
 
 function parseBool(v, fallback = true) {
@@ -457,6 +483,18 @@ export async function applySetting(args = {}) {
     if (isRunning) await httpRequest('POST', '/control', { action: 'hideOnFullscreen', value: String(b) });
   } else if (action === 'accessory') {
     const acc = String(value || args.accessory || 'auto').toLowerCase();
+    const cfg = readOfflineConfig();
+    const done = Number(cfg.CompletedTasksCount || 0);
+    if (!isAccessoryUnlocked(acc, done)) {
+      return {
+        ok: false,
+        locked: true,
+        accessory: acc,
+        required: ACCESSORY_MILESTONES[acc] || 0,
+        completedTasksCount: done,
+        status: isRunning ? (await httpRequest('GET', '/status', null, 600)).data || buildOfflineStatus(cfg) : buildOfflineStatus(cfg)
+      };
+    }
     writeOfflineConfig({ Accessory: acc });
     if (isRunning) await httpRequest('POST', '/control', { action: 'accessory', value: acc });
   } else if (action === 'quickDispatch') {
