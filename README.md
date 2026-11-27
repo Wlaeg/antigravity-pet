@@ -3,11 +3,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/Wlaeg/antigravity-pet?style=flat-square&color=0EA5E9)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20%7C%20macOS%2012%2B-0078D6?style=flat-square)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
-[![Runtime](https://img.shields.io/badge/Runtime-Zero%20External%20Dependencies-10B981?style=flat-square)](#install--download)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-10B981?style=flat-square)](#install--download)
 
 ![Antigravity Pet Showcase](assets/hero-showcase.gif)
 
-An open-source, zero-dependency native pixel-art desktop companion for **Google Antigravity** on **Windows** and **macOS**. It lives quietly on your desktop, mirrors what your AI agent is doing in real time without stealing window focus, and turns long coding sessions into a lively, tactile experience.
+An open-source, native pixel-art desktop companion for **Google Antigravity** on **Windows** and **macOS**. It lives quietly on your desktop, mirrors what your AI agent is doing in real time without stealing window focus, and turns long coding sessions into a lively, tactile experience.
 
 ## Why Antigravity Pet?
 
@@ -20,7 +20,7 @@ An open-source, zero-dependency native pixel-art desktop companion for **Google 
 - **8 built-in mascots:** Switch anytime between `cyber-fox`, `astro-bot`, `shadow-cat`, `byte-ghost`, `shiba-dog`, `pixel-dragon`, `android-bugdroid`, and `flutter-dash`.
 - **Built-in Community Workshop:** Browse, search, star, and 1-click install or remove community-created pets directly inside **Settings → Community**.
 - **Bring any static PNG to life:** Drop a single static PNG into **Pack Studio** (or use the `hatch-pet` skill) and the procedural animation engine generates breathing, parabolic hops, and squash-and-stretch motion automatically — or supply a full `8×11` multi-frame sprite sheet.
-- **Unlockable accessories:** Earn frame-synced wearables (**Glasses**, **Dev Cap**, **Coffee Cup**, **Gold Crown**) as your completed task count grows.
+- **Randomized starter gear & Surprise Mode:** Each user starts with 4 randomized non-conflicting wearables drawn from `head`, `face`, `hand`, and `back` slots (`20 / 50 / 100 / 150` tasks). Reaching **200 tasks** (or starring the repo on GitHub) unlocks **Surprise Mode**, where your local Agent generates 150 additional unique pixel accessories and equips a fresh 2-slot combo every 1–5 completed tasks.
 
 ### 3. Playful Desktop Interactions
 - **Typing rhythm sync & dizzy easter egg:** Bounces along with your typing cadence using a frequency-only sliding window (**zero keylogging**); type faster than 5 keys/s to trigger orbiting pixel stars.
@@ -28,7 +28,7 @@ An open-source, zero-dependency native pixel-art desktop companion for **Google 
 - **Edge peeking & fullscreen auto-hide:** Drag it to either monitor border to peek with half its body, scale cleanly from `0.33x` to `3.00x`, and hide automatically during fullscreen apps or games.
 
 ### 4. Native Performance, Clean Controls & 11 Locales
-- **Zero external runtime dependencies:** Compiled directly with built-in OS toolchains (`csc.exe` / `.NET Framework 4.x` on Windows; `swiftc` on macOS) — no Electron, no Python runtime, and no taskbar/Dock clutter.
+- **Lightweight native overlay:** Compiled directly with built-in OS toolchains (`csc.exe` / `.NET Framework 4.x` on Windows; `swiftc` on macOS) with no Electron bloat or taskbar/Dock clutter (paired with Node.js 18+ for MCP, Settings, and local accessory generation).
 - **Standalone Settings window:** Right-click the pet for a dedicated `460×800` Settings panel (**Characters / Behavior / Bubbles / System / Updates**) with one-click in-app self-updates.
 - **11-locale full-stack localization:** Automatically matches your Antigravity language (or switch anytime) across Settings, live bubbles, counters, prompts, and context menus: `English`, `简体中文`, `繁體中文 (TW)`, `Français`, `Deutsch`, `日本語`, `한국어`, `हिन्दी`, `ไทย`, `Español (ES)`, and `Español (MX)`.
 

@@ -5,6 +5,8 @@ import Foundation
 
 // MARK: - Models & Config
 
+struct SurpriseAccessoryItem { let id: String; let slot: String; let nameZh: String; let nameEn: String; let pixels: [[Int]] }
+
 struct PetConfig: Codable {
     var Enabled: Bool = true
     var Skin: String = "cyber-fox"
@@ -294,7 +296,7 @@ final class PetCanvasView: NSView {
                 // 轻度成长像素配饰直接融入精灵动画与变换层
                 let acc = ctrl.effectiveAccessory()
                 if acc == "surprise" || acc == "slot1" || acc == "slot2" || acc == "slot3" || acc == "slot4" {
-                    let items: [PetController.SurpriseAccessoryItem]
+                    let items: [SurpriseAccessoryItem]
                     if acc == "surprise" {
                         items = ctrl.activeSurpriseItems()
                     } else if let single = ctrl.starterAccessoryItem(acc) {
@@ -647,7 +649,7 @@ final class PetCanvasView: NSView {
             guard x >= 0, x < gw, y >= 0, y < gh else { return }
             grid[y][x] = c
         }
-        if let starter = ctrl.starterAccessoryItem(accessory), !starter.pixels.isEmpty {
+        if let starter = controller?.starterAccessoryItem(accessory), !starter.pixels.isEmpty {
             let xs = starter.pixels.map { $0[0] }, ys = starter.pixels.map { $0[1] }
             let ox = 10 - ((xs.min()! + xs.max()!) / 2)
             let oy = 10 - ((ys.min()! + ys.max()!) / 2)
@@ -1431,14 +1433,13 @@ final class PetController: NSObject, NSApplicationDelegate {
         }
     }
 
-    struct SurpriseAccessoryItem { let id: String; let slot: String; let nameZh: String; let nameEn: String; let pixels: [[Int]] }
     private var surpriseCatalog: [String: SurpriseAccessoryItem] = [:]
     private var debugAccessoryOverride: String = ""
 
     func ensureSurpriseCatalogLoaded(force: Bool = false) {
         if !surpriseCatalog.isEmpty && !force { return }
         var map: [String: SurpriseAccessoryItem] = [:]
-        let basePath = pluginRoot + "/scripts/surprise-base.json"
+        let basePath = pluginRoot.appendingPathComponent("scripts/surprise-base.json").path
         let userPath = NSHomeDirectory() + "/.antigravity-pet/surprise-accessories/manifest.json"
         for p in [basePath, userPath] {
             guard let data = FileManager.default.contents(atPath: p),
