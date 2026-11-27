@@ -5719,7 +5719,7 @@ namespace AntigravityPet
                                 EnsureSurpriseCatalogLoaded(false);
                                 _config.SurpriseCurrentPair = PickTwoDistinctSurpriseAccessories();
                             }
-                            _debugAccessoryOverride = target == "none" ? null : target;
+                            _debugAccessoryOverride = target;
                             if (!IsVisible && _config.Enabled) Show();
                             UpdateAccessoryVisual();
                             UpdateVisualState();

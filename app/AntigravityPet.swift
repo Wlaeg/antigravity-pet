@@ -2228,7 +2228,7 @@ final class PetController: NSObject, NSApplicationDelegate {
                     ensureSurpriseCatalogLoaded()
                     config.SurpriseCurrentPair = pickTwoDistinctSurprise()
                 }
-                debugAccessoryOverride = (target == "none") ? "" : target
+                debugAccessoryOverride = target
                 if !visible && config.Enabled { setPetVisible(true) }
                 canvasView.needsDisplay = true
                 syncWindowSizeForBubbles()
