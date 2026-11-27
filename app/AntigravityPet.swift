@@ -353,6 +353,32 @@ final class PetCanvasView: NSView {
 
         if ctrl.config.BubbleMode == "off" { return }
 
+        if !ctrl.unlockedBannerAcc.isEmpty && Date() < ctrl.unlockedBannerUntil {
+            let isEn = I18n.effectiveLanguage(config: ctrl.config) == "en"
+            let accName = ctrl.accessoryDisplayName(ctrl.unlockedBannerAcc)
+            let label = isEn ? "Unlocked Accessory: \(accName)" : "已解锁新配饰: \(accName)"
+            let font = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .bold)
+            let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+            let attrStr = NSAttributedString(string: label, attributes: attrs)
+            let textSize = attrStr.size()
+            let iconSize: CGFloat = 20.0
+            let iconGap: CGFloat = 6.0
+            let padX: CGFloat = 12.0
+            let padY: CGFloat = 6.5
+            let bw = min(bounds.width - 12.0, max(160.0, iconSize + iconGap + textSize.width + padX * 2.0))
+            let bh = max(30.0, max(iconSize, ceil(textSize.height)) + padY * 2.0)
+            let bx = (bounds.width - bw) / 2.0
+            let by = max(8.0, spriteY - bh - 10.0)
+            let rect = NSRect(x: bx, y: by, width: bw, height: bh)
+            drawPixelBox(rect: rect, fill: NSColor(calibratedRed: 0.09, green: 0.09, blue: 0.15, alpha: 0.96), border: NSColor(calibratedRed: 0.98, green: 0.80, blue: 0.08, alpha: 1.0), lineWidth: 2.0)
+            if let ctx = NSGraphicsContext.current?.cgContext {
+                let iconRect = NSRect(x: bx + padX, y: by + (bh - iconSize) / 2.0, width: iconSize, height: iconSize)
+                drawPixelAccessoryIcon(ctx: ctx, accessory: ctrl.unlockedBannerAcc, rect: iconRect)
+            }
+            attrStr.draw(in: NSRect(x: bx + padX + iconSize + iconGap, y: by + (bh - textSize.height) / 2.0, width: bw - padX * 2.0 - iconSize - iconGap, height: textSize.height + 2.0))
+            return
+        }
+
         if !ctrl.dockSide.isEmpty && !ctrl.dockPeekOut && !ctrl.fullscreenPeekActive && !ctrl.bubbleExpanded {
             let isAlertState = (effState == "needs_input" || effState == "ready" || effState == "blocked")
             if effState != "idle" && (ctrl.config.BubbleMode != "alerts" || isAlertState) {
@@ -507,21 +533,7 @@ final class PetCanvasView: NSView {
         }
     }
 
-    private func drawPixelAccessory(ctx: CGContext, accessory: String, skinId: String, row: Int, frame: Int, destRect: NSRect) {
-        let gw = 36
-        let gh = 39
-        var grid = [[NSColor?]](repeating: [NSColor?](repeating: nil, count: gw), count: gh)
-        func px(_ x: Int, _ y: Int, _ color: NSColor) {
-            if x >= 0 && x < gw && y >= 0 && y < gh { grid[y][x] = color }
-        }
-
-        let (bodyX, bodyY, flipX) = getFrameMotionOffset(row: row, frame: frame)
-        let cx = 18 + bodyX
-        let cy = 22 + bodyY
-        let ey = cy - 7
-        let headOffset = skinId == "flutter-dash" ? -1 : (skinId == "android-bugdroid" ? 1 : 0)
-        let headY = cy - 11 + headOffset
-
+    private func drawAccessoryPixelsToGrid(accessory: String, cx: Int, cy: Int, ey: Int, headY: Int, frame: Int, px: (Int, Int, NSColor) -> Void) {
         switch accessory {
         case "glasses":
             let frameC = NSColor(calibratedRed: 0.06, green: 0.09, blue: 0.16, alpha: 1.0)
@@ -591,8 +603,61 @@ final class PetCanvasView: NSView {
             px(cupX + 1, cupY - 2 - steamOff, steam); px(cupX + 2, cupY - 3 - steamOff, steamFade)
             px(cupX + 3, cupY - 2 + steamOff, steam); px(cupX + 4, cupY - 3 + steamOff, steamFade)
         default:
-            return
+            break
         }
+    }
+
+    private func drawPixelAccessoryIcon(ctx: CGContext, accessory: String, rect: NSRect) {
+        let gw = 20, gh = 20
+        var grid = Array(repeating: Array<NSColor?>(repeating: nil, count: gw), count: gh)
+        let px: (Int, Int, NSColor) -> Void = { x, y, c in
+            guard x >= 0, x < gw, y >= 0, y < gh else { return }
+            grid[y][x] = c
+        }
+        if accessory == "glasses" { drawAccessoryPixelsToGrid(accessory: accessory, cx: 10, cy: 0, ey: 7, headY: 0, frame: 0, px: px) }
+        else if accessory == "cap" { drawAccessoryPixelsToGrid(accessory: accessory, cx: 9, cy: 0, ey: 0, headY: 12, frame: 0, px: px) }
+        else if accessory == "crown" { drawAccessoryPixelsToGrid(accessory: accessory, cx: 10, cy: 0, ey: 0, headY: 12, frame: 0, px: px) }
+        else if accessory == "coffee" { drawAccessoryPixelsToGrid(accessory: accessory, cx: -2, cy: 8, ey: 0, headY: 0, frame: 0, px: px) }
+        let outline = NSColor(calibratedRed: 0.06, green: 0.09, blue: 0.16, alpha: 1.0)
+        var finalGrid = grid
+        for y in 0..<gh {
+            for x in 0..<gw where grid[y][x] == nil {
+                for (dx, dy) in [(1,0),(-1,0),(0,1),(0,-1)] {
+                    let nx = x + dx, ny = y + dy
+                    if nx >= 0, nx < gw, ny >= 0, ny < gh, let nc = grid[ny][nx], nc.alphaComponent >= 0.85 {
+                        finalGrid[y][x] = outline
+                        break
+                    }
+                }
+            }
+        }
+        let pw = rect.width / CGFloat(gw)
+        let ph = rect.height / CGFloat(gh)
+        for y in 0..<gh {
+            for x in 0..<gw {
+                guard let c = finalGrid[y][x] else { continue }
+                c.setFill()
+                ctx.fill(CGRect(x: rect.minX + CGFloat(x) * pw, y: rect.minY + CGFloat(y) * ph, width: pw, height: ph))
+            }
+        }
+    }
+
+    private func drawPixelAccessory(ctx: CGContext, accessory: String, skinId: String, row: Int, frame: Int, destRect: NSRect) {
+        let gw = 36
+        let gh = 39
+        var grid = [[NSColor?]](repeating: [NSColor?](repeating: nil, count: gw), count: gh)
+        func px(_ x: Int, _ y: Int, _ color: NSColor) {
+            if x >= 0 && x < gw && y >= 0 && y < gh { grid[y][x] = color }
+        }
+
+        let (bodyX, bodyY, flipX) = getFrameMotionOffset(row: row, frame: frame)
+        let cx = 18 + bodyX
+        let cy = 22 + bodyY
+        let ey = cy - 7
+        let headOffset = skinId == "flutter-dash" ? -1 : (skinId == "android-bugdroid" ? 1 : 0)
+        let headY = cy - 11 + headOffset
+
+        drawAccessoryPixelsToGrid(accessory: accessory, cx: cx, cy: cy, ey: ey, headY: headY, frame: frame, px: px)
 
         // 添加 1px 深色轮廓像素
         let outline = NSColor(calibratedRed: 0.06, green: 0.09, blue: 0.16, alpha: 1.0)
@@ -789,6 +854,8 @@ final class PetController: NSObject, NSApplicationDelegate {
     var updatePromptShownAt: Date = Date.distantPast
     var isUpdatingSelf: Bool = false
     var selfUpdateStatusMsg: String = ""
+    var unlockedBannerAcc: String = ""
+    var unlockedBannerUntil: Date = Date.distantPast
 
     lazy var pluginRoot: URL = {
         let exeUrl = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
@@ -1206,6 +1273,12 @@ final class PetController: NSObject, NSApplicationDelegate {
     func currentBubbleText() -> String? {
         let mode = config.BubbleMode
         if mode == "off" { return nil }
+        if !unlockedBannerAcc.isEmpty && now >= unlockedBannerUntil {
+            unlockedBannerAcc = ""
+            canvasView.needsDisplay = true
+            syncWindowSizeForBubbles()
+        }
+
         let st = currentEffectiveState()
         if mode == "alerts" && st != "needs_input" && st != "blocked" && st != "ready" { return nil }
         guard let top = currentTopConversation() else { return nil }
@@ -1254,6 +1327,25 @@ final class PetController: NSObject, NSApplicationDelegate {
         return req > 0 && config.CompletedTasksCount >= req
     }
 
+    func newlyUnlockedAccessory(prevDone: Int, newDone: Int) -> String {
+        if prevDone < 200 && newDone >= 200 { return "crown" }
+        if prevDone < 100 && newDone >= 100 { return "coffee" }
+        if prevDone < 50 && newDone >= 50 { return "cap" }
+        if prevDone < 20 && newDone >= 20 { return "glasses" }
+        return ""
+    }
+
+    func accessoryDisplayName(_ acc: String) -> String {
+        let isEn = I18n.effectiveLanguage(config: config) == "en"
+        switch acc.lowercased() {
+        case "glasses": return isEn ? "Glasses" : "墨镜"
+        case "cap": return isEn ? "Dev Cap" : "鸭舌帽"
+        case "coffee": return isEn ? "Coffee Cup" : "咖啡杯"
+        case "crown": return isEn ? "Gold Crown" : "皇冠"
+        default: return acc
+        }
+    }
+
     func isAccessorySupportedForCurrentSkin() -> Bool {
         return !(activePack()?.isCustom ?? false)
     }
@@ -1294,7 +1386,13 @@ final class PetController: NSObject, NSApplicationDelegate {
         if now < overrideUntil, let ov = overrideRow {
             row = ov
         } else {
-            let st = currentEffectiveState()
+            if !unlockedBannerAcc.isEmpty && now >= unlockedBannerUntil {
+            unlockedBannerAcc = ""
+            canvasView.needsDisplay = true
+            syncWindowSizeForBubbles()
+        }
+
+        let st = currentEffectiveState()
             switch st {
             case "running": row = PetAnimRow.running.rawValue
             case "needs_input": row = PetAnimRow.needsInput.rawValue
@@ -1330,6 +1428,12 @@ final class PetController: NSObject, NSApplicationDelegate {
                 canvasView.needsDisplay = true
                 syncWindowSizeForBubbles()
             }
+        }
+
+        if !unlockedBannerAcc.isEmpty && now >= unlockedBannerUntil {
+            unlockedBannerAcc = ""
+            canvasView.needsDisplay = true
+            syncWindowSizeForBubbles()
         }
 
         let st = currentEffectiveState()
@@ -1893,7 +1997,15 @@ final class PetController: NSObject, NSApplicationDelegate {
             if !title.isEmpty { activeTitle = title }
 
             if isTool { config.ToolCallsCount += 1 }
-            if st == "ready" && prev != "ready" { config.CompletedTasksCount += 1 }
+            if st == "ready" && prev != "ready" {
+                let prevDone = config.CompletedTasksCount
+                config.CompletedTasksCount = prevDone + 1
+                let newly = newlyUnlockedAccessory(prevDone: prevDone, newDone: config.CompletedTasksCount)
+                if !newly.isEmpty {
+                    unlockedBannerAcc = newly
+                    unlockedBannerUntil = Date().addingTimeInterval(7.0)
+                }
+            }
 
             if !title.isEmpty && cid != "default" && cid != "preview" {
                 recentConversations.removeAll { ($0["id"] as? String) == cid }

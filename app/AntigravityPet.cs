@@ -263,7 +263,11 @@ namespace AntigravityPet
         private readonly Border _stackBack2;
         private readonly Border _stackBack1;
         private readonly Border _bubbleBorder;
+        private readonly Image _bubbleAccIcon;
         private readonly TextBlock _bubbleText;
+        private readonly Dictionary<string, BitmapSource> _accIconCache = new Dictionary<string, BitmapSource>();
+        private string _unlockedBannerAcc = "";
+        private DateTime _unlockedBannerUntil = DateTime.MinValue;
         private readonly StackPanel _expandedStackPanel;
         private readonly DispatcherTimer _bubbleCollapseTimer;
         private bool _bubbleExpanded = false;
@@ -489,6 +493,18 @@ namespace AntigravityPet
             };
             _bubbleHost.Children.Add(_stackBack1);
 
+            _bubbleAccIcon = new Image
+            {
+                Width = 20,
+                Height = 20,
+                Margin = new Thickness(0, 0, 6, 0),
+                Stretch = Stretch.Uniform,
+                SnapsToDevicePixels = true,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = Visibility.Collapsed
+            };
+            RenderOptions.SetBitmapScalingMode(_bubbleAccIcon, BitmapScalingMode.NearestNeighbor);
+
             _bubbleText = new TextBlock
             {
                 Text = "",
@@ -498,10 +514,14 @@ namespace AntigravityPet
                 FontWeight = FontWeights.Bold,
                 TextWrapping = TextWrapping.NoWrap,
                 TextTrimming = TextTrimming.None,
+                VerticalAlignment = VerticalAlignment.Center,
                 MaxWidth = 208
             };
+            var bubbleHeaderRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            bubbleHeaderRow.Children.Add(_bubbleAccIcon);
+            bubbleHeaderRow.Children.Add(_bubbleText);
             _bubbleWrapperPanel = new StackPanel { Orientation = Orientation.Vertical };
-            _bubbleWrapperPanel.Children.Add(_bubbleText);
+            _bubbleWrapperPanel.Children.Add(bubbleHeaderRow);
 
             _approvalBar = new Border
             {
@@ -2476,7 +2496,13 @@ namespace AntigravityPet
                 RenderCurrentFrame();
             }
 
-            bool showHalo = _state != PetState.Idle || HasPendingApproval() || !string.IsNullOrEmpty(_availableUpdateVersion);
+            if (!string.IsNullOrEmpty(_unlockedBannerAcc) && DateTime.UtcNow >= _unlockedBannerUntil)
+            {
+                _unlockedBannerAcc = "";
+                UpdateVisualState();
+            }
+
+            bool showHalo = _state != PetState.Idle || HasPendingApproval() || !string.IsNullOrEmpty(_availableUpdateVersion) || (!string.IsNullOrEmpty(_unlockedBannerAcc) && DateTime.UtcNow < _unlockedBannerUntil);
             if (showHalo)
             {
                 double t = Environment.TickCount / 260.0;
@@ -2685,7 +2711,14 @@ namespace AntigravityPet
                 string useParent = !string.IsNullOrWhiteSpace(parentConversationId) ? parentConversationId : existingParent;
                 if (newState == PetState.Ready && prevState != PetState.Ready && !isPreview)
                 {
-                    _config.CompletedTasksCount++;
+                    int prevDone = _config.CompletedTasksCount;
+                    _config.CompletedTasksCount = prevDone + 1;
+                    string newly = GetNewlyUnlockedAccessory(prevDone, _config.CompletedTasksCount);
+                    if (!string.IsNullOrEmpty(newly))
+                    {
+                        _unlockedBannerAcc = newly;
+                        _unlockedBannerUntil = DateTime.UtcNow.AddSeconds(7.0);
+                    }
                 }
                 _tasks[conversationId] = new TaskItem
                 {
@@ -2743,6 +2776,150 @@ namespace AntigravityPet
             }
             catch { }
             return fallback;
+        }
+
+        private static string GetNewlyUnlockedAccessory(int prevDone, int newDone)
+        {
+            if (prevDone < 200 && newDone >= 200) return "crown";
+            if (prevDone < 100 && newDone >= 100) return "coffee";
+            if (prevDone < 50 && newDone >= 50) return "cap";
+            if (prevDone < 20 && newDone >= 20) return "glasses";
+            return "";
+        }
+
+        private string GetAccessoryDisplayName(string acc)
+        {
+            switch ((acc ?? "").ToLowerInvariant())
+            {
+                case "glasses": return T("墨镜", "Glasses");
+                case "cap": return T("鸭舌帽", "Dev Cap");
+                case "coffee": return T("咖啡杯", "Coffee Cup");
+                case "crown": return T("皇冠", "Gold Crown");
+                default: return acc ?? "";
+            }
+        }
+
+        private static void DrawAccessoryPixels(string acc, int cx, int cy, int ey, int headY, int frame, Action<int, int, byte, byte, byte, byte> px)
+        {
+            if (acc == "glasses")
+            {
+                int gy = ey + 1;
+                px(cx - 8, gy, 30, 41, 59, 255);
+                px(cx + 7, gy, 30, 41, 59, 255);
+                for (int x = cx - 2; x <= cx + 1; x++) px(x, gy, 15, 23, 42, 255);
+                for (int x = cx - 7; x <= cx - 2; x++) px(x, gy, 15, 23, 42, 255);
+                for (int x = cx - 6; x <= cx - 3; x++) for (int y = gy + 1; y <= gy + 2; y++) px(x, y, 30, 41, 59, 240);
+                px(cx - 6, gy + 1, 56, 189, 248, 255);
+                px(cx - 5, gy + 1, 224, 242, 254, 255);
+                px(cx - 5, gy + 2, 56, 189, 248, 255);
+                for (int x = cx + 1; x <= cx + 6; x++) px(x, gy, 15, 23, 42, 255);
+                for (int x = cx + 2; x <= cx + 5; x++) for (int y = gy + 1; y <= gy + 2; y++) px(x, y, 30, 41, 59, 240);
+                px(cx + 2, gy + 1, 56, 189, 248, 255);
+                px(cx + 3, gy + 1, 224, 242, 254, 255);
+                px(cx + 3, gy + 2, 56, 189, 248, 255);
+            }
+            else if (acc == "cap")
+            {
+                for (int x = cx - 4; x <= cx + 3; x++) px(x, headY - 4, 56, 189, 248, 255);
+                for (int x = cx - 6; x <= cx + 5; x++) px(x, headY - 3, 14, 165, 233, 255);
+                for (int x = cx - 7; x <= cx + 5; x++) for (int y = headY - 2; y <= headY - 1; y++) px(x, y, 2, 132, 199, 255);
+                px(cx - 1, headY - 2, 248, 250, 252, 255);
+                px(cx, headY - 2, 250, 204, 21, 255);
+                for (int x = cx - 5; x <= cx + 8; x++) px(x, headY, 3, 105, 161, 255);
+                for (int x = cx + 2; x <= cx + 9; x++) px(x, headY + 1, 7, 89, 133, 255);
+            }
+            else if (acc == "crown")
+            {
+                for (int x = cx - 5; x <= cx + 4; x++) { px(x, headY - 1, 250, 204, 21, 255); px(x, headY, 217, 119, 6, 255); }
+                px(cx - 5, headY - 2, 250, 204, 21, 255); px(cx - 5, headY - 3, 253, 224, 71, 255); px(cx - 5, headY - 4, 254, 249, 195, 255);
+                px(cx + 4, headY - 2, 250, 204, 21, 255); px(cx + 4, headY - 3, 253, 224, 71, 255); px(cx + 4, headY - 4, 254, 249, 195, 255);
+                for (int x = cx - 2; x <= cx + 1; x++) px(x, headY - 2, 250, 204, 21, 255);
+                px(cx - 1, headY - 3, 253, 224, 71, 255); px(cx, headY - 3, 253, 224, 71, 255);
+                px(cx - 1, headY - 4, 253, 224, 71, 255); px(cx, headY - 4, 253, 224, 71, 255);
+                px(cx - 1, headY - 5, 254, 249, 195, 255); px(cx, headY - 5, 254, 249, 195, 255);
+                px(cx - 1, headY - 2, 56, 189, 248, 255); px(cx, headY - 2, 186, 230, 253, 255);
+                px(cx - 4, headY - 1, 244, 63, 94, 255);
+                px(cx + 3, headY - 1, 244, 63, 94, 255);
+            }
+            else if (acc == "coffee")
+            {
+                int cupX = cx + 8;
+                int cupY = cy + 1;
+                for (int x = cupX; x <= cupX + 3; x++) for (int y = cupY + 1; y <= cupY + 5; y++) px(x, y, 248, 250, 252, 255);
+                for (int y = cupY + 1; y <= cupY + 5; y++) px(cupX + 4, y, 203, 213, 225, 255);
+                px(cupX, cupY, 248, 250, 252, 255); px(cupX + 4, cupY, 226, 232, 240, 255);
+                px(cupX + 1, cupY, 120, 53, 15, 255); px(cupX + 2, cupY, 146, 64, 14, 255); px(cupX + 3, cupY, 120, 53, 15, 255);
+                for (int x = cupX + 1; x <= cupX + 3; x++) px(x, cupY + 3, 217, 119, 6, 255);
+                px(cupX + 5, cupY + 1, 226, 232, 240, 255);
+                px(cupX + 6, cupY + 2, 226, 232, 240, 255);
+                px(cupX + 6, cupY + 3, 203, 213, 225, 255);
+                px(cupX + 5, cupY + 4, 203, 213, 225, 255);
+                int steamOff = frame % 2;
+                px(cupX + 1, cupY - 2 - steamOff, 226, 232, 240, 220);
+                px(cupX + 2, cupY - 3 - steamOff, 203, 213, 225, 170);
+                px(cupX + 3, cupY - 2 + steamOff, 226, 232, 240, 220);
+                px(cupX + 4, cupY - 3 + steamOff, 203, 213, 225, 170);
+            }
+        }
+
+        private BitmapSource CreateAccessoryIconBitmap(string acc)
+        {
+            if (string.IsNullOrEmpty(acc)) return null;
+            BitmapSource cached;
+            if (_accIconCache.TryGetValue(acc, out cached)) return cached;
+
+            const int gw = 20;
+            const int gh = 20;
+            byte[] ovR = new byte[gw * gh];
+            byte[] ovG = new byte[gw * gh];
+            byte[] ovB = new byte[gw * gh];
+            byte[] ovA = new byte[gw * gh];
+
+            Action<int, int, byte, byte, byte, byte> px = (x, y, r, g, b, a) =>
+            {
+                if (x < 0 || x >= gw || y < 0 || y >= gh) return;
+                int idx = y * gw + x;
+                ovR[idx] = r; ovG[idx] = g; ovB[idx] = b; ovA[idx] = a;
+            };
+
+            if (acc == "glasses") DrawAccessoryPixels(acc, 10, 0, 7, 0, 0, px);
+            else if (acc == "cap") DrawAccessoryPixels(acc, 9, 0, 0, 12, 0, px);
+            else if (acc == "crown") DrawAccessoryPixels(acc, 10, 0, 0, 12, 0, px);
+            else if (acc == "coffee") DrawAccessoryPixels(acc, -2, 8, 0, 0, 0, px);
+
+            byte[] bgra = new byte[gw * gh * 4];
+            int[] odx = new int[] { 1, -1, 0, 0 };
+            int[] ody = new int[] { 0, 0, 1, -1 };
+            for (int y = 0; y < gh; y++)
+            {
+                for (int x = 0; x < gw; x++)
+                {
+                    int i = y * gw + x;
+                    byte a = ovA[i];
+                    byte r = ovR[i], g = ovG[i], b = ovB[i];
+                    if (a == 0)
+                    {
+                        for (int k = 0; k < 4; k++)
+                        {
+                            int nx = x + odx[k], ny = y + ody[k];
+                            if (nx >= 0 && nx < gw && ny >= 0 && ny < gh && ovA[ny * gw + nx] >= 220)
+                            {
+                                r = 15; g = 23; b = 42; a = 255;
+                                break;
+                            }
+                        }
+                    }
+                    int bi = i * 4;
+                    bgra[bi] = (byte)((b * a + 127) / 255);
+                    bgra[bi + 1] = (byte)((g * a + 127) / 255);
+                    bgra[bi + 2] = (byte)((r * a + 127) / 255);
+                    bgra[bi + 3] = a;
+                }
+            }
+            var bmp = BitmapSource.Create(gw, gh, 96, 96, PixelFormats.Pbgra32, null, bgra, gw * 4);
+            bmp.Freeze();
+            _accIconCache[acc] = bmp;
+            return bmp;
         }
 
         private static int GetAccessoryUnlockMilestone(string acc)
@@ -2894,80 +3071,7 @@ namespace AntigravityPet
                     ovA[idx] = a;
                 };
 
-                if (acc == "glasses")
-                {
-                    int gy = ey + 1;
-                    // 镜腿与鼻梁连接
-                    px(cx - 8, gy, 30, 41, 59, 255);
-                    px(cx + 7, gy, 30, 41, 59, 255);
-                    for (int x = cx - 2; x <= cx + 1; x++) px(x, gy, 15, 23, 42, 255);
-                    // 左镜框与镜片
-                    for (int x = cx - 7; x <= cx - 2; x++) px(x, gy, 15, 23, 42, 255);
-                    for (int x = cx - 6; x <= cx - 3; x++) for (int y = gy + 1; y <= gy + 2; y++) px(x, y, 30, 41, 59, 240);
-                    px(cx - 6, gy + 1, 56, 189, 248, 255);
-                    px(cx - 5, gy + 1, 224, 242, 254, 255);
-                    px(cx - 5, gy + 2, 56, 189, 248, 255);
-                    // 右镜框与镜片
-                    for (int x = cx + 1; x <= cx + 6; x++) px(x, gy, 15, 23, 42, 255);
-                    for (int x = cx + 2; x <= cx + 5; x++) for (int y = gy + 1; y <= gy + 2; y++) px(x, y, 30, 41, 59, 240);
-                    px(cx + 2, gy + 1, 56, 189, 248, 255);
-                    px(cx + 3, gy + 1, 224, 242, 254, 255);
-                    px(cx + 3, gy + 2, 56, 189, 248, 255);
-                }
-                else if (acc == "cap")
-                {
-                    // 圆润帽顶高光与帽冠
-                    for (int x = cx - 4; x <= cx + 3; x++) px(x, headY - 4, 56, 189, 248, 255);
-                    for (int x = cx - 6; x <= cx + 5; x++) px(x, headY - 3, 14, 165, 233, 255);
-                    for (int x = cx - 7; x <= cx + 5; x++) for (int y = headY - 2; y <= headY - 1; y++) px(x, y, 2, 132, 199, 255);
-                    // 正面极客帽徽
-                    px(cx - 1, headY - 2, 248, 250, 252, 255);
-                    px(cx, headY - 2, 250, 204, 21, 255);
-                    // 立体前伸帽檐与檐下阴影
-                    for (int x = cx - 5; x <= cx + 8; x++) px(x, headY, 3, 105, 161, 255);
-                    for (int x = cx + 2; x <= cx + 9; x++) px(x, headY + 1, 7, 89, 133, 255);
-                }
-                else if (acc == "crown")
-                {
-                    // 金冠双色底座
-                    for (int x = cx - 5; x <= cx + 4; x++) { px(x, headY - 1, 250, 204, 21, 255); px(x, headY, 217, 119, 6, 255); }
-                    // 左右双尖峰与珍珠
-                    px(cx - 5, headY - 2, 250, 204, 21, 255); px(cx - 5, headY - 3, 253, 224, 71, 255); px(cx - 5, headY - 4, 254, 249, 195, 255);
-                    px(cx + 4, headY - 2, 250, 204, 21, 255); px(cx + 4, headY - 3, 253, 224, 71, 255); px(cx + 4, headY - 4, 254, 249, 195, 255);
-                    // 中央主峰
-                    for (int x = cx - 2; x <= cx + 1; x++) px(x, headY - 2, 250, 204, 21, 255);
-                    px(cx - 1, headY - 3, 253, 224, 71, 255); px(cx, headY - 3, 253, 224, 71, 255);
-                    px(cx - 1, headY - 4, 253, 224, 71, 255); px(cx, headY - 4, 253, 224, 71, 255);
-                    px(cx - 1, headY - 5, 254, 249, 195, 255); px(cx, headY - 5, 254, 249, 195, 255);
-                    // 宝石镶嵌（中央蓝宝 + 左右红宝点缀）
-                    px(cx - 1, headY - 2, 56, 189, 248, 255); px(cx, headY - 2, 186, 230, 253, 255);
-                    px(cx - 4, headY - 1, 244, 63, 94, 255);
-                    px(cx + 3, headY - 1, 244, 63, 94, 255);
-                }
-                else if (acc == "coffee")
-                {
-                    int cupX = cx + 8;
-                    int cupY = cy + 1;
-                    // 瓷白杯身与右侧微阴影
-                    for (int x = cupX; x <= cupX + 3; x++) for (int y = cupY + 1; y <= cupY + 5; y++) px(x, y, 248, 250, 252, 255);
-                    for (int y = cupY + 1; y <= cupY + 5; y++) px(cupX + 4, y, 203, 213, 225, 255);
-                    // 杯口高光与浓醇咖啡液面
-                    px(cupX, cupY, 248, 250, 252, 255); px(cupX + 4, cupY, 226, 232, 240, 255);
-                    px(cupX + 1, cupY, 120, 53, 15, 255); px(cupX + 2, cupY, 146, 64, 14, 255); px(cupX + 3, cupY, 120, 53, 15, 255);
-                    // 暖色咖啡杯腰带
-                    for (int x = cupX + 1; x <= cupX + 3; x++) px(x, cupY + 3, 217, 119, 6, 255);
-                    // C 形弧度杯柄
-                    px(cupX + 5, cupY + 1, 226, 232, 240, 255);
-                    px(cupX + 6, cupY + 2, 226, 232, 240, 255);
-                    px(cupX + 6, cupY + 3, 203, 213, 225, 255);
-                    px(cupX + 5, cupY + 4, 203, 213, 225, 255);
-                    // 双缕动态热气
-                    int steamOff = frame % 2;
-                    px(cupX + 1, cupY - 2 - steamOff, 226, 232, 240, 220);
-                    px(cupX + 2, cupY - 3 - steamOff, 203, 213, 225, 170);
-                    px(cupX + 3, cupY - 2 + steamOff, 226, 232, 240, 220);
-                    px(cupX + 4, cupY - 3 + steamOff, 203, 213, 225, 170);
-                }
+                DrawAccessoryPixels(acc, cx, cy, ey, headY, frame, px);
 
                 // 为配饰添加 1px 深色像素外轮廓（与角色本体融合）
                 byte[] outA = (byte[])ovA.Clone();
@@ -4155,6 +4259,7 @@ namespace AntigravityPet
             _bubbleBorder.Margin = new Thickness(0);
             _bubbleBorder.Background = new SolidColorBrush(Color.FromArgb(242, 15, 23, 42));
             _bubbleText.Visibility = Visibility.Visible;
+            if (_bubbleAccIcon != null) _bubbleAccIcon.Visibility = Visibility.Collapsed;
 
             PendingApproval topApproval = null;
             lock (_approvalLock)
@@ -4204,6 +4309,28 @@ namespace AntigravityPet
                 _expandedStackPanel.Visibility = Visibility.Collapsed;
                 _bubbleExpanded = false;
                 SetWindowSizeKeepingAnchor(baseW, _baseWindowHeight);
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(_unlockedBannerAcc) && DateTime.UtcNow < _unlockedBannerUntil)
+            {
+                _stackBack1.Visibility = Visibility.Collapsed;
+                _stackBack2.Visibility = Visibility.Collapsed;
+                _expandedStackPanel.Visibility = Visibility.Collapsed;
+                _bubbleExpanded = false;
+                if (_bubbleAccIcon != null)
+                {
+                    _bubbleAccIcon.Source = CreateAccessoryIconBitmap(_unlockedBannerAcc);
+                    _bubbleAccIcon.Visibility = Visibility.Visible;
+                }
+                _bubbleText.MaxWidth = Math.Round(300 * _config.Scale);
+                string accTitle = GetAccessoryDisplayName(_unlockedBannerAcc);
+                _bubbleText.Text = T("已解锁新配饰: " + accTitle, "Unlocked Accessory: " + accTitle);
+                _bubbleBorder.Background = new SolidColorBrush(Color.FromArgb(245, 23, 23, 38));
+                _bubbleBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(250, 204, 21));
+                _bubbleBorder.Visibility = Visibility.Visible;
+                double wNeed = Math.Max(baseW, Math.Min(Math.Round(360 * _config.Scale), MeasureBubbleTextWidth(_bubbleText.Text, 11.5) + 68));
+                SetWindowSizeKeepingAnchor(wNeed, _baseWindowHeight);
                 return;
             }
 
