@@ -62,6 +62,33 @@ async function main() {
     console.warn('Release download fetch skipped:', err.message);
   }
 
+  // Collect live global downloads from Abacus counter (zero-release, cross-machine)
+  const liveDownloads = {};
+  await Promise.all((manifest.pets || []).map(async (pet) => {
+    const id = String(pet.id || '').trim().toLowerCase().replace(/[^a-z0-9-_]/g, '-');
+    if (!id) return;
+    try {
+      const val = await new Promise((resolve) => {
+        https.get(`https://abacus.jasoncameron.dev/get/wlaeg-antigravity-pet/dl-${id}`, {
+          headers: { 'User-Agent': 'AntigravityPet-Stats-Bot' },
+          timeout: 5000
+        }, (res) => {
+          let d = '';
+          res.on('data', (c) => (d += c));
+          res.on('end', () => {
+            try {
+              const j = JSON.parse(d || '{}');
+              resolve(typeof j.value === 'number' ? j.value : 0);
+            } catch {
+              resolve(0);
+            }
+          });
+        }).on('error', () => resolve(0));
+      });
+      liveDownloads[id] = val;
+    } catch {}
+  }));
+
   const nextPets = {};
   for (const pet of (manifest.pets || [])) {
     const id = String(pet.id || '').trim().toLowerCase();
@@ -83,7 +110,11 @@ async function main() {
       }
     }
 
-    const downloads = Math.max(Number(prev.downloads || 0), Number(releaseDownloads[id] || 0));
+    const downloads = Math.max(
+      Number(prev.downloads || 0),
+      Number(releaseDownloads[id] || 0),
+      Number(liveDownloads[id] || 0)
+    );
     nextPets[id] = { stars, downloads };
   }
 

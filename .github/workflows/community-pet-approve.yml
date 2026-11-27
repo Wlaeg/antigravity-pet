@@ -40,18 +40,6 @@ jobs:
           echo "pet_id=$PET_ID" >> $GITHUB_OUTPUT
           echo "pet_version=$PET_VER" >> $GITHUB_OUTPUT
 
-      - name: Upload pet pack to community-packs Release
-        if: success()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PET_ID="${{ steps.process.outputs.pet_id }}"
-          ZIP_FILE="community/packs/${PET_ID}.zip"
-          if ! gh release view community-packs >/dev/null 2>&1; then
-            gh release create community-packs --target main --title "Community Pet Packs" --notes "Hosted community pet pack archives for global download tracking."
-          fi
-          gh release upload community-packs "$ZIP_FILE" --clobber
-
       - name: Commit and push to main
         if: success()
         run: |
@@ -77,7 +65,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `✅ **Approved & Published!**\n\n\`${{ steps.process.outputs.pet_id }}\` (v${{ steps.process.outputs.pet_version }}) has been validated, archived to \`community/packs/${{ steps.process.outputs.pet_id }}.zip\`, uploaded to the \`community-packs\` Release, and registered in \`community-pets.json\`.\n\nUsers can now search and 1-click install it directly inside **Antigravity Pet → Characters → Community**!`
+              body: `✅ **Approved & Published!**\n\n\`${{ steps.process.outputs.pet_id }}\` (v${{ steps.process.outputs.pet_version }}) has been validated, archived to \`community/packs/${{ steps.process.outputs.pet_id }}.zip\`, and registered in \`community-pets.json\`.\n\nUsers can now search and 1-click install it directly inside **Antigravity Pet → Characters → Community**!`
             });
             await github.rest.issues.update({
               owner: context.repo.owner,

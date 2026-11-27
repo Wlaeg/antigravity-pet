@@ -20,11 +20,10 @@
       "hasWorkingAnim": true,
       "updatedAt": "2026-11-26",
       "localZip": "community/packs/cyber-panda.zip",
-      "zipUrl": "https://github.com/Wlaeg/antigravity-pet/releases/download/community-packs/cyber-panda.zip",
+      "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/cyber-panda.zip",
       "localPreview": "community/previews/cyber-panda.png",
       "previewUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/previews/cyber-panda.png",
-      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/5",
-      "rawZipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/cyber-panda.zip"
+      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/5"
     },
     {
       "id": "pixel-octopus",
@@ -45,11 +44,10 @@
       "hasWorkingAnim": true,
       "updatedAt": "2026-11-26",
       "localZip": "community/packs/pixel-octopus.zip",
-      "zipUrl": "https://github.com/Wlaeg/antigravity-pet/releases/download/community-packs/pixel-octopus.zip",
+      "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/pixel-octopus.zip",
       "localPreview": "community/previews/pixel-octopus.png",
       "previewUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/previews/pixel-octopus.png",
-      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/6",
-      "rawZipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/pixel-octopus.zip"
+      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/6"
     },
     {
       "id": "coffee-slime",
@@ -70,11 +68,10 @@
       "hasWorkingAnim": true,
       "updatedAt": "2026-11-26",
       "localZip": "community/packs/coffee-slime.zip",
-      "zipUrl": "https://github.com/Wlaeg/antigravity-pet/releases/download/community-packs/coffee-slime.zip",
+      "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/coffee-slime.zip",
       "localPreview": "community/previews/coffee-slime.png",
       "previewUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/previews/coffee-slime.png",
-      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/7",
-      "rawZipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/coffee-slime.zip"
+      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/7"
     },
     {
       "id": "star-hamster",
@@ -92,11 +89,10 @@
       "hasWorkingAnim": false,
       "updatedAt": "2026-11-26",
       "localZip": "community/packs/star-hamster.zip",
-      "zipUrl": "https://github.com/Wlaeg/antigravity-pet/releases/download/community-packs/star-hamster.zip",
+      "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/star-hamster.zip",
       "localPreview": "community/previews/star-hamster.png",
       "previewUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/previews/star-hamster.png",
-      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/8",
-      "rawZipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/star-hamster.zip"
+      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/8"
     },
     {
       "id": "gemini-chan",
@@ -115,11 +111,10 @@
       "hasWorkingAnim": true,
       "updatedAt": "2026-11-26",
       "localZip": "community/packs/gemini-chan.zip",
-      "zipUrl": "https://github.com/Wlaeg/antigravity-pet/releases/download/community-packs/gemini-chan.zip",
+      "zipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/gemini-chan.zip",
       "localPreview": "community/previews/gemini-chan.png",
       "previewUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/previews/gemini-chan.png",
-      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/10",
-      "rawZipUrl": "https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community/packs/gemini-chan.zip"
+      "githubUrl": "https://github.com/Wlaeg/antigravity-pet/issues/10"
     }
   ]
 }

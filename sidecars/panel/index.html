@@ -2437,7 +2437,7 @@
           apiCall('/api/install-community-pet', { id: p.id, zipUrl: p.zipUrl, localZip: p.localZip }).then(function (res) {
             if (res && res.ok) {
               p.installed = true;
-              p.downloads = Number(p.downloads || 0) + 1;
+              p.downloads = typeof res.downloads === 'number' ? res.downloads : Number(p.downloads || 0) + 1;
               if (res.snapshot) {
                 render(res.snapshot);
               } else {

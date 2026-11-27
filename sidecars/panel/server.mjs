@@ -22,7 +22,8 @@ const COMMUNITY_MANIFEST_PATH = path.join(PLUGIN_ROOT, 'community-pets.json');
 const COMMUNITY_MANIFEST_URL = 'https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community-pets.json';
 const COMMUNITY_STATS_PATH = path.join(PLUGIN_ROOT, 'community-stats.json');
 const COMMUNITY_STATS_URL = 'https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/community-stats.json';
-const COMMUNITY_RELEASE_URL = 'https://api.github.com/repos/Wlaeg/antigravity-pet/releases/tags/community-packs';
+const ABACUS_BASE_URL = 'https://abacus.jasoncameron.dev';
+const ABACUS_NS = 'wlaeg-antigravity-pet';
 const COMMUNITY_STARS_PATH = path.join(os.homedir(), '.antigravity-pet', 'community-stars.json');
 const COMMUNITY_DOWNLOADS_PATH = path.join(os.homedir(), '.antigravity-pet', 'community-downloads.json');
 const PORT = 47821;
@@ -705,16 +706,30 @@ function incrementCommunityDownload(id) {
   return map[key];
 }
 
+async function fetchAbacusCount(id, mode = 'get', timeoutMs = 2000) {
+  const key = String(id || '').trim().toLowerCase().replace(/[^a-z0-9-_]/g, '-');
+  if (!key) return null;
+  try {
+    const buf = await downloadHttpsBuffer(`${ABACUS_BASE_URL}/${mode}/${ABACUS_NS}/dl-${key}`, 64 * 1024, timeoutMs, 2);
+    const data = JSON.parse(buf.toString('utf8'));
+    if (data && typeof data.value === 'number' && Number.isFinite(data.value)) {
+      return Math.max(0, data.value);
+    }
+  } catch (err) {
+    if (mode === 'get' && err && /HTTP 404/.test(String(err.message || ''))) {
+      return 0;
+    }
+  }
+  return null;
+}
+
 export async function getCommunityPets() {
   let manifest = null;
   let globalStats = {};
-  const liveDownloads = {};
-  let hasLiveRelease = false;
   let source = 'local';
-  const [manifestRes, statsRes, releaseRes] = await Promise.allSettled([
+  const [manifestRes, statsRes] = await Promise.allSettled([
     downloadHttpsBuffer(COMMUNITY_MANIFEST_URL + '?t=' + Date.now(), 1024 * 1024, 3500),
-    downloadHttpsBuffer(COMMUNITY_STATS_URL + '?t=' + Date.now(), 512 * 1024, 3000),
-    downloadHttpsBuffer(COMMUNITY_RELEASE_URL, 512 * 1024, 2500)
+    downloadHttpsBuffer(COMMUNITY_STATS_URL + '?t=' + Date.now(), 512 * 1024, 3000)
   ]);
   if (manifestRes.status === 'fulfilled') {
     try {
@@ -733,21 +748,6 @@ export async function getCommunityPets() {
       }
     } catch {}
   }
-  if (releaseRes.status === 'fulfilled') {
-    try {
-      const parsedRel = JSON.parse(releaseRes.value.toString('utf8'));
-      if (parsedRel && Array.isArray(parsedRel.assets)) {
-        hasLiveRelease = true;
-        for (const asset of parsedRel.assets) {
-          const name = String(asset && asset.name || '').toLowerCase();
-          if (name.endsWith('.zip')) {
-            const id = name.replace(/\.zip$/, '');
-            liveDownloads[id] = Number(asset.download_count || 0);
-          }
-        }
-      }
-    } catch {}
-  }
   if (!manifest && fs.existsSync(COMMUNITY_MANIFEST_PATH)) {
     try {
       manifest = JSON.parse(fs.readFileSync(COMMUNITY_MANIFEST_PATH, 'utf8'));
@@ -759,21 +759,30 @@ export async function getCommunityPets() {
       if (parsedStats && parsedStats.pets) globalStats = parsedStats.pets;
     } catch {}
   }
+  const rawPets = manifest && Array.isArray(manifest.pets) ? manifest.pets : [];
+  const liveEntries = await Promise.all(
+    rawPets.map(async (p) => {
+      const key = String(p.id || '').toLowerCase();
+      return [key, await fetchAbacusCount(key, 'get', 2000)];
+    })
+  );
+  const liveDownloads = Object.fromEntries(liveEntries);
   const installedIds = new Set(scanPetPacks().map((p) => String(p.id || '').toLowerCase()));
   const starredSet = readCommunityStars();
   const downloadsMap = readCommunityDownloads();
-  const pets = (manifest && Array.isArray(manifest.pets) ? manifest.pets : []).map((p) => {
+  const pets = rawPets.map((p) => {
     const key = String(p.id || '').toLowerCase();
     const starred = starredSet.has(key);
     const stat = globalStats[key] || {};
     const baseStars = Math.max(Number(p.stars || 0), Number(stat.stars || 0));
-    const hasLivePet = hasLiveRelease && Object.prototype.hasOwnProperty.call(liveDownloads, key);
+    const liveVal = liveDownloads[key];
+    const hasLive = typeof liveVal === 'number';
     const baseDownloads = Math.max(
       Number(p.downloads || 0),
       Number(stat.downloads || 0),
-      hasLivePet ? Number(liveDownloads[key] || 0) : 0
+      hasLive ? liveVal : 0
     );
-    const localDownloads = hasLivePet ? 0 : Number(downloadsMap[key] || 0);
+    const localDownloads = hasLive ? 0 : Number(downloadsMap[key] || 0);
     const githubUrl = p.githubUrl || (p.localZip
       ? `https://github.com/Wlaeg/antigravity-pet/blob/main/${String(p.localZip).replace(/^[\\/]+/, '')}`
       : 'https://github.com/Wlaeg/antigravity-pet');
@@ -901,7 +910,13 @@ export async function installCommunityPet(args = {}) {
   }
   const res = await importPetPack({ zipUrl, rawZipUrl, localZip });
   if (res && res.ok) {
-    incrementCommunityDownload(id || res.id);
+    const petKey = id || res.id;
+    const remoteDl = await fetchAbacusCount(petKey, 'hit', 3000);
+    if (typeof remoteDl === 'number') {
+      res.downloads = remoteDl;
+    } else {
+      incrementCommunityDownload(petKey);
+    }
   }
   return res;
 }

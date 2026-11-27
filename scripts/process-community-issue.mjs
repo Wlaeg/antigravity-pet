@@ -151,8 +151,7 @@ async function main() {
       hasWorkingAnim: Boolean(validated.capabilities && validated.capabilities.hasWorkingAnim),
       updatedAt: new Date().toISOString().slice(0, 10),
       localZip: destZipRel,
-      zipUrl: `https://github.com/Wlaeg/antigravity-pet/releases/download/community-packs/${id}.zip`,
-      rawZipUrl: `https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/${destZipRel}`,
+      zipUrl: `https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/${destZipRel}`,
       localPreview: destPreviewRel,
       previewUrl: `https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/${destPreviewRel}`,
       ...(issueUrl ? { githubUrl: issueUrl } : {})
