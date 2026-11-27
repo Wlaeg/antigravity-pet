@@ -22,6 +22,8 @@ An open-source, native pixel-art desktop companion for **Google Antigravity** on
 - **Bring any static PNG to life:** Drop a single static PNG into **Pack Studio** (or use the `hatch-pet` skill) and the procedural animation engine generates breathing, parabolic hops, and squash-and-stretch motion automatically — or supply a full `8×11` multi-frame sprite sheet.
 - **Randomized starter gear & Surprise Mode:** Each user starts with 4 randomized non-conflicting wearables drawn from `head`, `face`, `hand`, and `back` slots (`20 / 50 / 100 / 150` tasks). Reaching **200 tasks** (or starring the repo on GitHub) unlocks **Surprise Mode**, where your local Agent generates 150 additional unique pixel accessories and equips a fresh 2-slot combo every 1–5 completed tasks.
 
+![Surprise Mode Accessories](demo/v47-surprise.gif)
+
 ### 3. Playful Desktop Interactions
 - **Typing rhythm sync & dizzy easter egg:** Bounces along with your typing cadence using a frequency-only sliding window (**zero keylogging**); type faster than 5 keys/s to trigger orbiting pixel stars.
 - **Autonomous wandering & naps:** Patrols your taskbar or dock, emits `?` / `♪` curiosity cues when idle, and curls up for a `Zzz` nap — any keystroke wakes it up smoothly.
