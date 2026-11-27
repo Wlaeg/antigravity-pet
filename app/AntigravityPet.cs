@@ -802,7 +802,7 @@ namespace AntigravityPet
 
             _mouseFollowTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
             _mouseFollowTimer.Tick += OnMouseFollowTick;
-            if (_config.KeyMouseInteract) _mouseFollowTimer.Start();
+            if (_config.EyeFollow) _mouseFollowTimer.Start();
 
             // 任务完成后气泡保留 5 分钟，确保用户随时点击聊天框跳转对话
             _autoIdleTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(300) };
@@ -878,6 +878,7 @@ namespace AntigravityPet
             }
             try { SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged; } catch { }
             SyncKeyMouseListeners();
+            SyncEyeFollowListener();
             ApplyScale(_config.Scale, false);
             EnsureInsideScreenBounds(false);
             if (_config.CheckUpdatesOnStartup) CheckGitHubReleaseAsync();
@@ -888,14 +889,24 @@ namespace AntigravityPet
             if (_config.KeyMouseInteract)
             {
                 RegisterRawKeyboard();
-                if (_mouseFollowTimer != null && !_mouseFollowTimer.IsEnabled) _mouseFollowTimer.Start();
             }
             else
             {
                 UnregisterRawKeyboard();
-                if (_mouseFollowTimer != null && _mouseFollowTimer.IsEnabled) _mouseFollowTimer.Stop();
                 _keyWindow.Clear();
                 _lastKeyAt = DateTime.MinValue;
+            }
+        }
+
+        private void SyncEyeFollowListener()
+        {
+            if (_config.EyeFollow)
+            {
+                if (_mouseFollowTimer != null && !_mouseFollowTimer.IsEnabled) _mouseFollowTimer.Start();
+            }
+            else
+            {
+                if (_mouseFollowTimer != null && _mouseFollowTimer.IsEnabled) _mouseFollowTimer.Stop();
                 _mouseFlipX = false;
             }
         }
@@ -1926,7 +1937,7 @@ namespace AntigravityPet
 
         private void OnMouseFollowTick(object sender, EventArgs e)
         {
-            if (!_config.KeyMouseInteract || !IsVisible || _isClosing || _isDragging || _transient == TransientAction.Walk) return;
+            if (!_config.EyeFollow || !IsVisible || _isClosing || _isDragging || _transient == TransientAction.Walk) return;
             bool isDockedCompact = !string.IsNullOrEmpty(_dockSide) && !_dockPeekOut && !_fullscreenPeekActive;
             if (isDockedCompact || _boredomTier == BoredomTier.Sleeping) return;
 
@@ -2343,7 +2354,7 @@ namespace AntigravityPet
                 {
                     _flipX = _boredLookFlipX;
                 }
-                else if (_config.KeyMouseInteract)
+                else if (_config.EyeFollow)
                 {
                     _flipX = _mouseFlipX;
                 }
@@ -2562,6 +2573,7 @@ namespace AntigravityPet
                 double cx = Left + Width * 0.5;
                 double cy = Top + Height * 0.62;
                 double dx = mx - cx;
+                if (_flipX) dx = -dx;
                 double dy = my - cy;
                 double dist = Math.Sqrt(dx * dx + dy * dy);
 
@@ -5372,6 +5384,7 @@ namespace AntigravityPet
                         else if (action == "eyefollow")
                         {
                             _config.EyeFollow = ParseBoolStr(val, !_config.EyeFollow);
+                            SyncEyeFollowListener();
                             SaveConfig();
                             RebuildContextMenu();
                         }
@@ -5386,6 +5399,7 @@ namespace AntigravityPet
                         {
                             _config.KeyMouseInteract = ParseBoolStr(val, !_config.KeyMouseInteract);
                             SyncKeyMouseListeners();
+            SyncEyeFollowListener();
                             SaveConfig();
                             RebuildContextMenu();
                         }
@@ -5538,7 +5552,7 @@ namespace AntigravityPet
                 if (lg == "auto" || lg == "en" || lg == "zh") _config.Language = lg;
             }
             if (data.ContainsKey("autoWalk")) { _config.AutoWalk = GetBool(data, "autoWalk", _config.AutoWalk); if (!_config.AutoWalk) CancelWalk(); }
-            if (data.ContainsKey("eyeFollow")) _config.EyeFollow = GetBool(data, "eyeFollow", _config.EyeFollow);
+            if (data.ContainsKey("eyeFollow")) { _config.EyeFollow = GetBool(data, "eyeFollow", _config.EyeFollow); SyncEyeFollowListener(); }
             if (data.ContainsKey("boredomIdle")) { _config.BoredomIdle = GetBool(data, "boredomIdle", _config.BoredomIdle); if (!_config.BoredomIdle) InterruptBoredom(false); }
             if (data.ContainsKey("keyMouseInteract")) { _config.KeyMouseInteract = GetBool(data, "keyMouseInteract", _config.KeyMouseInteract); SyncKeyMouseListeners(); }
             if (data.ContainsKey("topmost")) ApplyTopmost(GetBool(data, "topmost", _config.Topmost));
