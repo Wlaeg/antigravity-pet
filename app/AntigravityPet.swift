@@ -2085,6 +2085,21 @@ final class PetController: NSObject, NSApplicationDelegate {
                 config.PinnedConversationId = val; saveConfig()
             case "readytimeoutsec":
                 if let sec = Int(val), sec >= 0 && sec <= 3600 { config.ReadyTimeoutSec = sec; saveConfig() }
+            case "testunlock":
+                let order = ["glasses", "cap", "coffee", "crown"]
+                let req = val.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                let target: String
+                if order.contains(req) {
+                    target = req
+                } else {
+                    let curIdx = order.firstIndex(of: unlockedBannerAcc) ?? -1
+                    target = order[(curIdx + 1) % order.count]
+                }
+                unlockedBannerAcc = target
+                unlockedBannerShownAt = Date()
+                if !visible && config.Enabled { setPetVisible(true) }
+                canvasView.needsDisplay = true
+                syncWindowSizeForBubbles()
             case "autowalk":
                 config.AutoWalk = (val.lowercased() == "true" || val == "1"); saveConfig()
             case "eyefollow":

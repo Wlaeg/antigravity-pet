@@ -5525,6 +5525,21 @@ namespace AntigravityPet
                                 RebuildContextMenu();
                             }
                         }
+                        else if (action == "testunlock")
+                        {
+                            string[] order = new string[] { "glasses", "cap", "coffee", "crown" };
+                            string target = (val ?? "").Trim().ToLowerInvariant();
+                            if (Array.IndexOf(order, target) < 0)
+                            {
+                                int curIdx = Array.IndexOf(order, _unlockedBannerAcc ?? "");
+                                target = order[(curIdx + 1) % order.Length];
+                            }
+                            _unlockedBannerAcc = target;
+                            _unlockedBannerShownAt = DateTime.Now;
+                            if (!IsVisible && _config.Enabled) Show();
+                            UpdateVisualState();
+                            SyncFullscreenAndEdgeState();
+                        }
                         else if (action == "autowalk")
                         {
                             _config.AutoWalk = ParseBoolStr(val, !_config.AutoWalk);

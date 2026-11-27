@@ -536,7 +536,17 @@ export async function applySetting(args = {}) {
     await httpRequest('POST', '/state', {
       conversationId: 'preview',
       state: String(args.state || 'idle'),
-      message: String(args.message || '')
+      message: String(args.message || ''),
+      isBackground: !!args.isBackground
+    });
+  } else if (action === 'testUnlock') {
+    if (!isRunning) {
+      await launchPetOnRealDesktop();
+      await waitForHealth(3000);
+    }
+    await httpRequest('POST', '/control', {
+      action: 'testunlock',
+      value: String(value || args.accessory || '')
     });
   }
 
