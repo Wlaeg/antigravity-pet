@@ -2795,7 +2795,7 @@ namespace AntigravityPet
 
         private static string GetNewlyUnlockedAccessory(int prevDone, int newDone)
         {
-            if (prevDone < 200 && newDone >= 200) return "crown";
+            if (prevDone < 150 && newDone >= 150) return "crown";
             if (prevDone < 100 && newDone >= 100) return "coffee";
             if (prevDone < 50 && newDone >= 50) return "cap";
             if (prevDone < 20 && newDone >= 20) return "glasses";
@@ -2944,7 +2944,7 @@ namespace AntigravityPet
                 case "glasses": return 20;
                 case "cap": return 50;
                 case "coffee": return 100;
-                case "crown": return 200;
+                case "crown": return 150;
                 default: return 0;
             }
         }
@@ -2970,7 +2970,7 @@ namespace AntigravityPet
             int done = _config.CompletedTasksCount;
             if (pref == "auto")
             {
-                if (done >= 200) return "crown";
+                if (done >= 150) return "crown";
                 if (done >= 100) return "coffee";
                 if (done >= 50) return "cap";
                 if (done >= 20) return "glasses";

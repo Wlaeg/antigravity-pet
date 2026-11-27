@@ -1315,7 +1315,7 @@ final class PetController: NSObject, NSApplicationDelegate {
         case "glasses": return 20
         case "cap": return 50
         case "coffee": return 100
-        case "crown": return 200
+        case "crown": return 150
         default: return 0
         }
     }
@@ -1328,7 +1328,7 @@ final class PetController: NSObject, NSApplicationDelegate {
     }
 
     func newlyUnlockedAccessory(prevDone: Int, newDone: Int) -> String {
-        if prevDone < 200 && newDone >= 200 { return "crown" }
+        if prevDone < 150 && newDone >= 150 { return "crown" }
         if prevDone < 100 && newDone >= 100 { return "coffee" }
         if prevDone < 50 && newDone >= 50 { return "cap" }
         if prevDone < 20 && newDone >= 20 { return "glasses" }
@@ -1358,7 +1358,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             return isAccessoryUnlocked(mode) ? mode : "none"
         }
         let c = config.CompletedTasksCount
-        if c >= 200 { return "crown" }
+        if c >= 150 { return "crown" }
         if c >= 100 { return "coffee" }
         if c >= 50 { return "cap" }
         if c >= 20 { return "glasses" }

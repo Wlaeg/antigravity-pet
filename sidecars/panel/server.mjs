@@ -296,7 +296,7 @@ async function waitForHealth(maxWaitMs = 2800) {
   return null;
 }
 
-const ACCESSORY_MILESTONES = { glasses: 20, cap: 50, coffee: 100, crown: 200 };
+const ACCESSORY_MILESTONES = { glasses: 20, cap: 50, coffee: 100, crown: 150 };
 
 function isAccessoryUnlocked(acc, done) {
   const norm = String(acc || 'auto').toLowerCase();
@@ -310,7 +310,7 @@ function resolveEffectiveAccessory(pref, done) {
   const c = Number(done || 0);
   if (norm === 'none') return 'none';
   if (norm !== 'auto') return isAccessoryUnlocked(norm, c) ? norm : 'none';
-  if (c >= 200) return 'crown';
+  if (c >= 150) return 'crown';
   if (c >= 100) return 'coffee';
   if (c >= 50) return 'cap';
   if (c >= 20) return 'glasses';
