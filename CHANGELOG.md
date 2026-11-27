@@ -5,6 +5,28 @@ All notable changes to **Antigravity Pet** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.2] - 2026-11-27
+
+### Added
+- **Accessory Unlock Bubble Notifications (`app/AntigravityPet.cs`, `app/AntigravityPet.swift`)**:
+  - Automatically displays a gold-accented notification bubble with the exact in-app pixel accessory icon (`20×20` nearest-neighbor) and unlock text whenever a task milestone is crossed.
+  - Auto-dismiss timeout follows the **Notice Bubble Auto-Hide** (`ReadyTimeoutSec`) setting and can be dismissed early by clicking the bubble.
+- **Expanded Developer Diagnostics (`sidecars/panel/index.html`, `ui/settings.html`, `sidecars/panel/server.mjs`)**:
+  - Added **Background** (`background_running`) and **Unlock Bubble** (cycles through `glasses`, `cap`, `coffee`, and `crown`) preview triggers in Developer Diagnostics across all 11 locales.
+
+### Changed
+- **Growth Accessory Progression, Locking & Redrawn Icons (`app/AntigravityPet.cs`, `app/AntigravityPet.swift`, `sidecars/panel/server.mjs`, `sidecars/panel/index.html`, `ui/settings.html`)**:
+  - Unified accessory unlock milestones to **20 / 50 / 100 / 150** completed tasks (`glasses` / `cap` / `coffee` / `crown`).
+  - Locked unachieved accessories across UI cards, API controls, and overlay rendering with lock badges and task progress tooltips.
+  - Redrew all 4 pixel accessories on both Windows and macOS sprites and redesigned the Settings selector as a 3×2 icon grid.
+  - Disabled growth accessories when using community/custom pets and displayed a compatibility notice so sprites remain clean and aligned.
+  - Clarified **Notice Bubble Auto-Hide** (`readyLabel` / `readySub`) across all 11 locales to reflect completion, accessory unlock, and update bubbles.
+
+### Fixed
+- **Cursor Facing & Eye-Tracking Conflict (`app/AntigravityPet.cs`, `sidecars/panel/index.html`, `ui/settings.html`)**:
+  - Merged cursor facing (`_mouseFlipX`) into **Cursor Gaze & Facing** (`EyeFollow`), separating **Typing Rhythm Sync** (`KeyMouseInteract`) into a dedicated keyboard-only toggle.
+  - Compensated horizontal sprite flip (`if (_flipX) dx = -dx;`) in `TryGetMouseLookFrame` so 16-direction pupils look accurately toward the cursor even when facing left.
+
 ## [4.6.1] - 2026-11-27
 
 ### Fixed
