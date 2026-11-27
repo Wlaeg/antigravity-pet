@@ -53,7 +53,7 @@ namespace AntigravityPet
         public int ReadyTimeoutSec { get; set; } // 0 = never auto-hide, default 30s
         public bool SnapToAgy { get; set; }
         public bool HideOnFullscreen { get; set; }
-        public string Accessory { get; set; }    // auto | none | glasses | cap | coffee | crown
+        public string Accessory { get; set; }    // none | glasses | cap | coffee | crown
         public bool AccessoriesStarUnlocked { get; set; }
         public double Scale { get; set; }       // 0.33 ~ 3.0 (default 1.0)
         public bool AutoWalk { get; set; }
@@ -81,7 +81,7 @@ namespace AntigravityPet
             ReadyTimeoutSec = 30;
             SnapToAgy = false;
             HideOnFullscreen = true;
-            Accessory = "auto";
+            Accessory = "none";
             AccessoriesStarUnlocked = false;
             Scale = 1.0;
             AutoWalk = true;
@@ -2954,7 +2954,7 @@ namespace AntigravityPet
         private static bool IsAccessoryUnlocked(string acc, int done, bool starUnlocked = false)
         {
             string norm = (acc ?? "").Trim().ToLowerInvariant();
-            if (norm == "auto" || norm == "none" || string.IsNullOrEmpty(norm)) return true;
+            if (norm == "none" || string.IsNullOrEmpty(norm)) return true;
             if (starUnlocked) return true;
             int req = GetAccessoryUnlockMilestone(norm);
             return req > 0 && done >= req;
@@ -2968,19 +2968,9 @@ namespace AntigravityPet
         private string GetEffectiveAccessoryId()
         {
             if (!IsAccessorySupportedForCurrentSkin()) return "none";
-            string pref = (_config.Accessory ?? "auto").Trim().ToLowerInvariant();
-            if (pref == "none") return "none";
-            int done = _config.CompletedTasksCount;
-            bool star = _config.AccessoriesStarUnlocked;
-            if (pref == "auto")
-            {
-                if (star || done >= 150) return "crown";
-                if (done >= 100) return "coffee";
-                if (done >= 50) return "cap";
-                if (done >= 20) return "glasses";
-                return "none";
-            }
-            return IsAccessoryUnlocked(pref, done, star) ? pref : "none";
+            string pref = (_config.Accessory ?? "none").Trim().ToLowerInvariant();
+            if (pref == "none" || pref == "auto" || string.IsNullOrEmpty(pref)) return "none";
+            return IsAccessoryUnlocked(pref, _config.CompletedTasksCount, _config.AccessoriesStarUnlocked) ? pref : "none";
         }
 
         private void UpdateAccessoryVisual()
@@ -5316,7 +5306,7 @@ namespace AntigravityPet
                             readyTimeoutSec = _config.ReadyTimeoutSec,
                             snapToAgy = _config.SnapToAgy,
                             hideOnFullscreen = _config.HideOnFullscreen,
-                            accessory = _config.Accessory ?? "auto",
+                            accessory = (string.IsNullOrWhiteSpace(_config.Accessory) || _config.Accessory.Equals("auto", StringComparison.OrdinalIgnoreCase)) ? "none" : _config.Accessory,
                             effectiveAccessory = GetEffectiveAccessoryId(),
                             accessorySupported = IsAccessorySupportedForCurrentSkin(),
                             accessoriesStarUnlocked = _config.AccessoriesStarUnlocked,
@@ -5627,7 +5617,8 @@ namespace AntigravityPet
                         }
                         else if (action == "accessory")
                         {
-                            string reqAcc = string.IsNullOrWhiteSpace(val) ? "auto" : val.Trim().ToLowerInvariant();
+                            string reqAcc = string.IsNullOrWhiteSpace(val) ? "none" : val.Trim().ToLowerInvariant();
+                            if (reqAcc == "auto") reqAcc = "none";
                             if (IsAccessorySupportedForCurrentSkin() && IsAccessoryUnlocked(reqAcc, _config.CompletedTasksCount, _config.AccessoriesStarUnlocked))
                             {
                                 _config.Accessory = reqAcc;
@@ -5751,6 +5742,7 @@ namespace AntigravityPet
             if (data.ContainsKey("accessory") && data["accessory"] != null)
             {
                 string reqAcc = data["accessory"].ToString().Trim().ToLowerInvariant();
+                if (reqAcc == "auto" || string.IsNullOrEmpty(reqAcc)) reqAcc = "none";
                 if (IsAccessorySupportedForCurrentSkin() && IsAccessoryUnlocked(reqAcc, _config.CompletedTasksCount, _config.AccessoriesStarUnlocked)) { _config.Accessory = reqAcc; UpdateAccessoryVisual(); }
             }
 

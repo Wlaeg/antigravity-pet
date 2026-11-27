@@ -424,7 +424,7 @@
   .seg-btns.acc-grid {
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 4px;
     padding: 4px;
   }
@@ -1300,10 +1300,6 @@
           <div class="seg-sub" data-i18n="accSub">Auto-unlocks pixel gear by completed task milestones (20/50/100/150)</div>
         </div>
         <div class="seg-btns acc-grid" id="accBtns">
-          <button data-acc="auto" onclick="setOpt('accessory', 'auto')">
-            <span class="acc-ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z"/></svg></span>
-            <span class="acc-name" data-i18n="accAuto">Auto</span>
-          </button>
           <button data-acc="none" onclick="setOpt('accessory', 'none')">
             <span class="acc-ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><line x1="6.4" y1="6.4" x2="17.6" y2="17.6"/></svg></span>
             <span class="acc-name" data-i18n="accNone">None</span>
@@ -2184,7 +2180,7 @@
     var rtInput = document.getElementById('rtCustom');
     if (rtInput && document.activeElement !== rtInput) rtInput.value = String(rt);
 
-    var acc = data.accessory || 'auto';
+    var acc = (data.accessory && data.accessory !== 'auto') ? data.accessory : 'none';
     var doneTasks = Number(data.completedTasksCount || 0);
     var starUnlocked = !!data.accessoriesStarUnlocked;
     var accMilestones = data.accessoryMilestones || { glasses: 20, cap: 50, coffee: 100, crown: 150 };

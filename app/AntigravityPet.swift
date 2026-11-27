@@ -27,7 +27,7 @@ struct PetConfig: Codable {
     var SnapToAgy: Bool = false
     var HideOnFullscreen: Bool = true
     var CheckUpdatesOnStartup: Bool = true
-    var Accessory: String = "auto"
+    var Accessory: String = "none"
     var AccessoriesStarUnlocked: Bool = false
 
     init() {}
@@ -63,7 +63,8 @@ struct PetConfig: Codable {
         SnapToAgy = (try? c.decodeIfPresent(Bool.self, forKey: .SnapToAgy)) ?? false
         HideOnFullscreen = (try? c.decodeIfPresent(Bool.self, forKey: .HideOnFullscreen)) ?? true
         CheckUpdatesOnStartup = (try? c.decodeIfPresent(Bool.self, forKey: .CheckUpdatesOnStartup)) ?? true
-        Accessory = (try? c.decodeIfPresent(String.self, forKey: .Accessory)) ?? "auto"
+        let rawAcc = (try? c.decodeIfPresent(String.self, forKey: .Accessory)) ?? "none"
+        Accessory = (rawAcc.lowercased() == "auto" || rawAcc.isEmpty) ? "none" : rawAcc
         AccessoriesStarUnlocked = (try? c.decodeIfPresent(Bool.self, forKey: .AccessoriesStarUnlocked)) ?? false
     }
 }
@@ -1318,7 +1319,7 @@ final class PetController: NSObject, NSApplicationDelegate {
 
     func isAccessoryUnlocked(_ acc: String) -> Bool {
         let mode = acc.lowercased()
-        if mode == "auto" || mode == "none" || mode.isEmpty { return true }
+        if mode == "none" || mode.isEmpty { return true }
         if config.AccessoriesStarUnlocked { return true }
         let req = accessoryUnlockMilestone(mode)
         return req > 0 && config.CompletedTasksCount >= req
@@ -1350,15 +1351,9 @@ final class PetController: NSObject, NSApplicationDelegate {
     func effectiveAccessory() -> String {
         if !isAccessorySupportedForCurrentSkin() { return "none" }
         let mode = config.Accessory.lowercased()
-        if mode == "none" { return "none" }
         if mode == "glasses" || mode == "cap" || mode == "coffee" || mode == "crown" {
             return isAccessoryUnlocked(mode) ? mode : "none"
         }
-        let c = config.CompletedTasksCount
-        if config.AccessoriesStarUnlocked || c >= 150 { return "crown" }
-        if c >= 100 { return "coffee" }
-        if c >= 50 { return "cap" }
-        if c >= 20 { return "glasses" }
         return "none"
     }
 
@@ -2123,7 +2118,8 @@ final class PetController: NSObject, NSApplicationDelegate {
             case "hideonfullscreen":
                 config.HideOnFullscreen = (val.lowercased() == "true" || val == "1"); saveConfig()
             case "accessory":
-                let reqAcc = val.isEmpty ? "auto" : val.lowercased()
+                var reqAcc = val.isEmpty ? "none" : val.lowercased()
+                if reqAcc == "auto" { reqAcc = "none" }
                 if isAccessorySupportedForCurrentSkin() && isAccessoryUnlocked(reqAcc) { config.Accessory = reqAcc; saveConfig() }
             case "checkupdatesonstartup":
                 config.CheckUpdatesOnStartup = (val.lowercased() == "true" || val == "1"); saveConfig()
@@ -2192,7 +2188,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             "readyTimeoutSec": config.ReadyTimeoutSec,
             "snapToAgy": config.SnapToAgy,
             "hideOnFullscreen": config.HideOnFullscreen,
-            "accessory": config.Accessory,
+            "accessory": (config.Accessory.lowercased() == "auto" || config.Accessory.isEmpty) ? "none" : config.Accessory,
             "effectiveAccessory": effectiveAccessory(),
             "accessorySupported": isAccessorySupportedForCurrentSkin(),
             "accessoriesStarUnlocked": config.AccessoriesStarUnlocked,

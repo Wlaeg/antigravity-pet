@@ -66,7 +66,7 @@ function readOfflineConfig() {
     ToolCallsCount: 0,
     SnapToAgy: false,
     HideOnFullscreen: true,
-    Accessory: 'auto'
+    Accessory: 'none'
   };
   try {
     const p = getConfigPath();
@@ -299,23 +299,18 @@ async function waitForHealth(maxWaitMs = 2800) {
 const ACCESSORY_MILESTONES = { glasses: 20, cap: 50, coffee: 100, crown: 150 };
 
 function isAccessoryUnlocked(acc, done, starUnlocked = false) {
-  const norm = String(acc || 'auto').toLowerCase();
-  if (norm === 'auto' || norm === 'none') return true;
+  const norm = String(acc || 'none').toLowerCase();
+  if (norm === 'none' || !norm) return true;
   if (starUnlocked) return true;
   const req = ACCESSORY_MILESTONES[norm];
   return typeof req === 'number' && Number(done || 0) >= req;
 }
 
 function resolveEffectiveAccessory(pref, done, starUnlocked = false) {
-  const norm = String(pref || 'auto').toLowerCase();
+  const norm = String(pref || 'none').toLowerCase();
   const c = Number(done || 0);
-  if (norm === 'none') return 'none';
-  if (norm !== 'auto') return isAccessoryUnlocked(norm, c, starUnlocked) ? norm : 'none';
-  if (starUnlocked || c >= 150) return 'crown';
-  if (c >= 100) return 'coffee';
-  if (c >= 50) return 'cap';
-  if (c >= 20) return 'glasses';
-  return 'none';
+  if (norm === 'none' || norm === 'auto' || !norm) return 'none';
+  return isAccessoryUnlocked(norm, c, starUnlocked) ? norm : 'none';
 }
 
 function buildOfflineStatus(cfg) {
@@ -339,7 +334,7 @@ function buildOfflineStatus(cfg) {
     readyTimeoutSec: typeof cfg.ReadyTimeoutSec === 'number' ? cfg.ReadyTimeoutSec : 30,
     snapToAgy: !!cfg.SnapToAgy,
     hideOnFullscreen: cfg.HideOnFullscreen !== false,
-    accessory: cfg.Accessory || 'auto',
+    accessory: (cfg.Accessory && String(cfg.Accessory).toLowerCase() !== 'auto') ? cfg.Accessory : 'none',
     effectiveAccessory: accessorySupported ? resolveEffectiveAccessory(cfg.Accessory, cfg.CompletedTasksCount, !!cfg.AccessoriesStarUnlocked) : 'none',
     accessorySupported,
     accessoriesStarUnlocked: !!cfg.AccessoriesStarUnlocked,
@@ -638,7 +633,8 @@ export async function applySetting(args = {}) {
     writeOfflineConfig({ HideOnFullscreen: b });
     if (isRunning) await httpRequest('POST', '/control', { action: 'hideOnFullscreen', value: String(b) });
   } else if (action === 'accessory') {
-    const acc = String(value || args.accessory || 'auto').toLowerCase();
+    let acc = String(value || args.accessory || 'none').toLowerCase();
+    if (acc === 'auto' || !acc) acc = 'none';
     const cfg = readOfflineConfig();
     const effLang = detectEffectiveLang(cfg);
     const pets = scanPetPacks(effLang);
