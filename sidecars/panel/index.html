@@ -2190,13 +2190,15 @@
     var compatNote = document.getElementById('accCompatNote');
     if (compatNote) compatNote.style.display = accSupported ? 'none' : 'block';
     var hasLockedAcc = false;
+    var effLang = (data && data.effectiveLanguage) ? data.effectiveLanguage : 'en';
+    var isZhLang = (effLang === 'zh' || effLang === 'zh-tw');
     document.querySelectorAll('#accBtns button').forEach(function (b) {
       var k = b.getAttribute('data-acc');
       if (!accSupported) {
         b.classList.add('locked');
         b.classList.remove('active');
         b.disabled = true;
-        b.title = (currentLang === 'zh' || currentLang === 'zh-tw')
+        b.title = isZhLang
           ? '社区宠物暂禁用成长配饰功能'
           : 'Disabled for community pets';
         return;
@@ -2208,7 +2210,7 @@
       b.disabled = locked;
       b.classList.toggle('active', !locked && k === acc);
       if (locked) {
-        b.title = (currentLang === 'zh' || currentLang === 'zh-tw')
+        b.title = isZhLang
           ? ('未解锁：完成 ' + req + ' 个任务解锁（当前 ' + doneTasks + '/' + req + '）')
           : ('Locked: complete ' + req + ' tasks (' + doneTasks + '/' + req + ')');
       } else {
@@ -2222,7 +2224,6 @@
     var starBtnLabel = starBtnEl ? starBtnEl.querySelector('span') : null;
     var verifyState = data.starVerifyState || (starUnlocked ? 'unlocked' : 'idle');
     var remainSec = Number(data.starVerifyRemainingSec || 0);
-    var isZhLang = (currentLang === 'zh' || currentLang === 'zh-tw');
     if (starBar) {
       starBar.style.display = (accSupported && !starUnlocked && hasLockedAcc) ? 'flex' : 'none';
       if (verifyState === 'verifying') {
