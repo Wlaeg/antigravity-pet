@@ -1874,8 +1874,47 @@
     });
     var starBar = document.getElementById('accStarBar');
     var starDoneEl = document.getElementById('accStarDone');
-    if (starBar) starBar.style.display = (accSupported && !starUnlocked && hasLockedAcc) ? 'flex' : 'none';
+    var starTextEl = document.getElementById('accStarText');
+    var starBtnEl = document.getElementById('accStarBtn');
+    var starBtnLabel = starBtnEl ? starBtnEl.querySelector('span') : null;
+    var verifyState = data.starVerifyState || (starUnlocked ? 'unlocked' : 'idle');
+    var remainSec = Number(data.starVerifyRemainingSec || 0);
+    var isZhLang = (currentLang === 'zh' || currentLang === 'zh-tw');
+    if (starBar) {
+      starBar.style.display = (accSupported && !starUnlocked && hasLockedAcc) ? 'flex' : 'none';
+      if (verifyState === 'verifying') {
+        if (starTextEl) {
+          starTextEl.textContent = isZhLang
+            ? ('正在自动检测 GitHub Star 状态，点亮后无需操作即可自动解锁（剩余 ' + remainSec + 's）')
+            : ('Checking GitHub Star status... Star the repo and wait for auto-unlock (' + remainSec + 's)');
+        }
+        if (starBtnLabel) starBtnLabel.textContent = isZhLang ? '立即复检' : 'Check Now';
+        if (starBtnEl) starBtnEl.onclick = function () { window.setOpt('checkStarVerify', 'true'); };
+      } else if (verifyState === 'timeout') {
+        if (starTextEl) {
+          starTextEl.textContent = isZhLang
+            ? '暂未检测到新 Star，请确认已在 GitHub 点亮后重试。'
+            : 'No new star detected yet. Make sure you starred the repo and retry.';
+        }
+        if (starBtnLabel) starBtnLabel.textContent = isZhLang ? '重试解锁' : 'Retry';
+        if (starBtnEl) starBtnEl.onclick = window.starUnlockAll;
+      } else {
+        if (starTextEl) starTextEl.textContent = L.accStarHint || 'Want them right away? Star the repo on GitHub to unlock all accessories instantly.';
+        if (starBtnLabel) starBtnLabel.textContent = L.accStarBtn || 'Star & Unlock';
+        if (starBtnEl) starBtnEl.onclick = window.starUnlockAll;
+      }
+    }
     if (starDoneEl) starDoneEl.style.display = (accSupported && starUnlocked) ? 'flex' : 'none';
+    if (verifyState === 'verifying' && !starUnlocked) {
+      if (!window._starPollTimer) {
+        window._starPollTimer = setInterval(function () {
+          callPetTool({ action: 'status' }, true);
+        }, 4000);
+      }
+    } else if (window._starPollTimer) {
+      clearInterval(window._starPollTimer);
+      window._starPollTimer = null;
+    }
 
     setSw('swAutoStart', data.autoStartOnBoot !== false);
     setSw('swAutoWalk', data.autoWalk !== false);
@@ -1986,7 +2025,7 @@
     try {
       window.open('https://github.com/Wlaeg/antigravity-pet', '_blank', 'noopener,noreferrer');
     } catch (_) {}
-    window.setOpt('starUnlock', 'true');
+    window.setOpt('startStarVerify', 'true');
   };
 
   window.handleImportZip = function (input) {

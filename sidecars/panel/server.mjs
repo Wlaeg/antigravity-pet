@@ -365,6 +365,151 @@ function buildOfflineStatus(cfg) {
   };
 }
 
+function ghApiGetJson(urlPath, timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    const req = https.request(
+      {
+        hostname: 'api.github.com',
+        path: urlPath,
+        method: 'GET',
+        headers: {
+          'User-Agent': 'antigravity-pet',
+          'Accept': 'application/vnd.github+json',
+          'Cache-Control': 'no-cache'
+        }
+      },
+      (res) => {
+        let buf = '';
+        res.on('data', (c) => { buf += c; });
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            try { resolve(JSON.parse(buf)); return; } catch {}
+          }
+          resolve(null);
+        });
+      }
+    );
+    req.setTimeout(timeoutMs, () => { req.destroy(); resolve(null); });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
+
+function checkGhCliStarred() {
+  return new Promise((resolve) => {
+    execFile('gh', ['api', 'user/starred/Wlaeg/antigravity-pet'], { timeout: 2500 }, (err) => {
+      resolve(!err);
+    });
+  });
+}
+
+async function fetchRepoStarSnapshot() {
+  const repo = await ghApiGetJson('/repos/Wlaeg/antigravity-pet');
+  if (!repo || typeof repo.stargazers_count !== 'number') return null;
+  const count = repo.stargazers_count;
+  let tailLogins = [];
+  if (count > 0) {
+    const lastPage = Math.max(1, Math.ceil(count / 100));
+    const list = await ghApiGetJson(`/repos/Wlaeg/antigravity-pet/stargazers?per_page=100&page=${lastPage}`);
+    if (Array.isArray(list)) {
+      tailLogins = list.map((u) => String(u && u.login ? u.login : '').toLowerCase()).filter(Boolean);
+    }
+  }
+  return { count, tailLogins };
+}
+
+const starVerifySession = {
+  state: 'idle', // idle | verifying | timeout
+  deadline: 0,
+  baseCount: -1,
+  baseTail: new Set(),
+  timer: null,
+  checking: false
+};
+
+function stopStarVerifyTimer() {
+  if (starVerifySession.timer) {
+    clearInterval(starVerifySession.timer);
+    starVerifySession.timer = null;
+  }
+}
+
+async function completeStarUnlock() {
+  stopStarVerifyTimer();
+  starVerifySession.state = 'idle';
+  starVerifySession.deadline = 0;
+  writeOfflineConfig({ AccessoriesStarUnlocked: true });
+  const health = await httpRequest('GET', '/health', null, 600);
+  if (health.ok && health.data && health.data.running) {
+    await httpRequest('POST', '/control', { action: 'starunlock', value: 'true' });
+  }
+}
+
+async function runStarVerifyCheck() {
+  if (starVerifySession.checking) return false;
+  starVerifySession.checking = true;
+  try {
+    const cfg = readOfflineConfig();
+    if (cfg.AccessoriesStarUnlocked) {
+      await completeStarUnlock();
+      return true;
+    }
+    if (await checkGhCliStarred()) {
+      await completeStarUnlock();
+      return true;
+    }
+    const snap = await fetchRepoStarSnapshot();
+    if (snap && starVerifySession.baseCount >= 0) {
+      const hasNewCount = snap.count > starVerifySession.baseCount;
+      const hasNewLogin = snap.tailLogins.some((u) => !starVerifySession.baseTail.has(u));
+      if (hasNewCount || hasNewLogin) {
+        await completeStarUnlock();
+        return true;
+      }
+    }
+    if (starVerifySession.state === 'verifying' && Date.now() >= starVerifySession.deadline) {
+      stopStarVerifyTimer();
+      starVerifySession.state = 'timeout';
+    }
+    return false;
+  } finally {
+    starVerifySession.checking = false;
+  }
+}
+
+async function startStarVerify() {
+  stopStarVerifyTimer();
+  const cfg = readOfflineConfig();
+  if (cfg.AccessoriesStarUnlocked) {
+    starVerifySession.state = 'idle';
+    return;
+  }
+  if (await checkGhCliStarred()) {
+    await completeStarUnlock();
+    return;
+  }
+  const snap = await fetchRepoStarSnapshot();
+  starVerifySession.baseCount = snap ? snap.count : -1;
+  starVerifySession.baseTail = new Set(snap ? snap.tailLogins : []);
+  starVerifySession.state = 'verifying';
+  starVerifySession.deadline = Date.now() + 90_000;
+  starVerifySession.timer = setInterval(() => {
+    runStarVerifyCheck().catch(() => {});
+  }, 4000);
+}
+
+function attachStarVerifyMeta(status) {
+  const unlocked = !!status.accessoriesStarUnlocked;
+  const isVerifying = !unlocked && starVerifySession.state === 'verifying' && Date.now() < starVerifySession.deadline;
+  if (!unlocked && starVerifySession.state === 'verifying' && Date.now() >= starVerifySession.deadline) {
+    stopStarVerifyTimer();
+    starVerifySession.state = 'timeout';
+  }
+  status.starVerifyState = unlocked ? 'unlocked' : starVerifySession.state;
+  status.starVerifyRemainingSec = isVerifying ? Math.max(0, Math.ceil((starVerifySession.deadline - Date.now()) / 1000)) : 0;
+  return status;
+}
+
 export async function getSnapshot() {
   const res = await httpRequest('GET', '/health', null, 600);
   if (res.ok && res.data) {
@@ -375,9 +520,9 @@ export async function getSnapshot() {
       res.data.accessorySupported = !(activePet && activePet.isCustom);
     }
     res.data.accessoryMilestones = ACCESSORY_MILESTONES;
-    return res.data;
+    return attachStarVerifyMeta(res.data);
   }
-  return buildOfflineStatus(readOfflineConfig());
+  return attachStarVerifyMeta(buildOfflineStatus(readOfflineConfig()));
 }
 
 function parseBool(v, fallback = true) {
@@ -520,9 +665,12 @@ export async function applySetting(args = {}) {
     }
     writeOfflineConfig({ Accessory: acc });
     if (isRunning) await httpRequest('POST', '/control', { action: 'accessory', value: acc });
+  } else if (action === 'startStarVerify') {
+    await startStarVerify();
+  } else if (action === 'checkStarVerify') {
+    await runStarVerifyCheck();
   } else if (action === 'starUnlock') {
-    writeOfflineConfig({ AccessoriesStarUnlocked: true });
-    if (isRunning) await httpRequest('POST', '/control', { action: 'starunlock', value: 'true' });
+    await completeStarUnlock();
   } else if (action === 'quickDispatch') {
     if (isRunning) await httpRequest('POST', '/control', { action: 'quickDispatch' });
   } else if (action === 'resetPos') {
