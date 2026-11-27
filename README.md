@@ -1,22 +1,38 @@
-# Antigravity Pet — a native pixel-art desktop companion for Antigravity
+# Antigravity Pet — Native Pixel-Art Desktop Companion for Antigravity
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Release](https://img.shields.io/badge/Release-v4.6.1-0EA5E9?style=flat-square)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
+[![Release](https://img.shields.io/github/v/release/Wlaeg/antigravity-pet?style=flat-square&color=0EA5E9)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20%7C%20macOS%2012%2B-0078D6?style=flat-square)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
 [![Runtime](https://img.shields.io/badge/Runtime-Zero%20External%20Dependencies-10B981?style=flat-square)](#install--download)
 
 ![Antigravity Pet Showcase](assets/hero-showcase.gif)
 
-An open-source native pixel-art desktop companion for **Google Antigravity** on **Windows** and **macOS** — built with zero external runtime dependencies. It reflects what your AI agent is doing in real time, tracks background tasks without stealing focus, and reacts playfully while you type.
+An open-source, zero-dependency native pixel-art desktop companion for **Google Antigravity** on **Windows** and **macOS**. It lives quietly on your desktop, mirrors what your AI agent is doing in real time without stealing window focus, and turns long coding sessions into a lively, tactile experience.
 
-- **Live tool status & calm `BackgroundRunning` (`🌙`):** Shows single-line live action bubbles (`Reading server.mjs`, `Editing App.tsx`, `Tests passed`) directly above your pet. When the foreground chat is idle while background tasks run, the pet switches to a calm lavender-blue resting pose with a `🌙` badge — click stacked task bubbles to expand the list and jump straight to any session.
-- **8 built-in mascots + Community Workshop:** Switch between 8 built-in pixel companions (`cyber-fox`, `astro-bot`, `shadow-cat`, `byte-ghost`, `shiba-dog`, `pixel-dragon`, `android-bugdroid`, `flutter-dash`) or install community packs (`gemini-chan`, `cyber-panda`, `pixel-octopus`, `coffee-slime`, `star-hamster`) in one click inside the Settings panel.
-- **1 static PNG comes alive:** Drop a single static PNG into the built-in **Pack Studio** (or use the `hatch-pet` skill), and the procedural animation engine brings it to life with breathing, parabolic hops, and squash-and-stretch bounces — or supply a full `1536×2288` (`8×11`) v3 multi-frame sprite sheet.
-- **Playful typing sync & tiered boredom:** Bounces with your typing cadence (frequency-only sliding window — **zero keylogging**); type faster than 5 keys/s and watch dizzy stars orbit its head. Leave it idle and it wanders with `?` / `♪` cues before curling up for a `Zzz` nap — one keystroke wakes it in 0.3s.
-- **Standalone Settings window & edge peeking:** Right-click the pet for a clean `460×800` standalone Settings window (**Characters / Behavior / Bubbles / System / Updates**), smooth `0.33x–3.00x` scaling, half-body screen-edge peeking, fullscreen auto-hide, and one-click in-app self-updates.
-- **11-locale full-stack localization:** Automatically follows your Antigravity locale (or switch anytime) across the Settings UI, live tool bubbles, background counters, approval prompts, and context menu: `English`, `简体中文`, `繁體中文 (TW)`, `Français`, `Deutsch`, `日本語`, `한국어`, `हिन्दी`, `ไทย`, `Español (ES)`, and `Español (MX)`.
+## Why Antigravity Pet?
 
-## How it works
+### 1. Live Agent Awareness Without Stealing Focus
+- **Single-line live tool bubbles:** See what your agent is doing at a glance (`Reading server.mjs`, `Editing App.tsx`, `Tests passed`) right above your pet without switching windows.
+- **Calm background monitoring (`🌙`):** When your foreground chat is idle while background tasks run, your pet switches to a calm resting pose with a `🌙` badge — click the stacked task bubbles to expand and jump straight to any session.
+- **Non-intrusive alerts & inline approvals:** Prompts you gently when tool approval or user input is needed (with quick inline Approve / Deny actions), celebrates clean completions, and flags blocked turns.
+
+### 2. Rich Character Ecosystem & 1-PNG Creation
+- **8 built-in mascots:** Switch anytime between `cyber-fox`, `astro-bot`, `shadow-cat`, `byte-ghost`, `shiba-dog`, `pixel-dragon`, `android-bugdroid`, and `flutter-dash`.
+- **Built-in Community Workshop:** Browse, search, star, and 1-click install or remove community-created pets directly inside **Settings → Community**.
+- **Bring any static PNG to life:** Drop a single static PNG into **Pack Studio** (or use the `hatch-pet` skill) and the procedural animation engine generates breathing, parabolic hops, and squash-and-stretch motion automatically — or supply a full `8×11` multi-frame sprite sheet.
+- **Unlockable accessories:** Earn frame-synced wearables (**Glasses**, **Dev Cap**, **Coffee Cup**, **Gold Crown**) as your completed task count grows.
+
+### 3. Playful Desktop Interactions
+- **Typing rhythm sync & dizzy easter egg:** Bounces along with your typing cadence using a frequency-only sliding window (**zero keylogging**); type faster than 5 keys/s to trigger orbiting pixel stars.
+- **Autonomous wandering & naps:** Patrols your taskbar or dock, emits `?` / `♪` curiosity cues when idle, and curls up for a `Zzz` nap — any keystroke wakes it up smoothly.
+- **Edge peeking & fullscreen auto-hide:** Drag it to either monitor border to peek with half its body, scale cleanly from `0.33x` to `3.00x`, and hide automatically during fullscreen apps or games.
+
+### 4. Native Performance, Clean Controls & 11 Locales
+- **Zero external runtime dependencies:** Compiled directly with built-in OS toolchains (`csc.exe` / `.NET Framework 4.x` on Windows; `swiftc` on macOS) — no Electron, no Python runtime, and no taskbar/Dock clutter.
+- **Standalone Settings window:** Right-click the pet for a dedicated `460×800` Settings panel (**Characters / Behavior / Bubbles / System / Updates**) with one-click in-app self-updates.
+- **11-locale full-stack localization:** Automatically matches your Antigravity language (or switch anytime) across Settings, live bubbles, counters, prompts, and context menus: `English`, `简体中文`, `繁體中文 (TW)`, `Français`, `Deutsch`, `日本語`, `한국어`, `हिन्दी`, `ไทย`, `Español (ES)`, and `Español (MX)`.
+
+## How It Works
 
 ```text
 Antigravity agent ──hooks.json──▶ scripts/hook-bridge.mjs ──▶ HTTP 127.0.0.1:47821
@@ -25,8 +41,8 @@ Native Overlay (app/AntigravityPet.cs | app/AntigravityPet.swift) ◀──┘
       └── Right-click Settings ──▶ Standalone Panel (sidecars/panel/server.mjs :47822)
 ```
 
-- **Lifecycle hooks (`plugin.json` + `hooks.json`):** Triggers `node ./scripts/hook-bridge.mjs` across `SessionStart`, `PreInvocation`, `PreToolUse`, `PostToolUse`, `PostInvocation`, and `Stop`, mapping tool calls via `scripts/tool-label-mapper.mjs` and pushing compact state updates to `127.0.0.1:47821`.
-- **Native transparent overlay:** Compiled directly with built-in OS toolchains (`csc.exe` / `.NET Framework 4.x` on Windows; `swiftc` on macOS) — no Electron, no Python runtime, and no extra SDK required.
+- **Lifecycle hooks (`plugin.json` + `hooks.json`):** Triggers `node ./scripts/hook-bridge.mjs` across `SessionStart`, `PreInvocation`, `PreToolUse`, `PostToolUse`, `PostInvocation`, and `Stop`, mapping tool calls via `scripts/tool-label-mapper.mjs` to compact state updates on `127.0.0.1:47821`.
+- **Native transparent overlay:** Lightweight OS-native window that stays always-on-top without appearing in `Alt+Tab` or your Dock/taskbar.
 
 ## Install & Download
 
@@ -106,16 +122,9 @@ chmod +x build.sh && ./build.sh --launch
 | `bored / nap` | Extended inactivity | Wanders with `?` / `♪` cues, then curls into `Zzz` nap |
 | `edge_peek` | Dragged to screen edge | Half-body peeking from left/right monitor border |
 
-## Built-in Pets & Community Workshop
-
-- **8 Built-in Pets:** `cyber-fox`, `astro-bot`, `shadow-cat`, `byte-ghost`, `shiba-dog`, `pixel-dragon`, `android-bugdroid`, `flutter-dash`
-- **Community Workshop:** Browse, star, and 1-click install community packs directly inside **Settings → Community** (including `gemini-chan`, `cyber-panda`, `pixel-octopus`, `coffee-slime`, `star-hamster`).
-- **Unlockable Accessories:** Earn frame-synced accessories as your completed task count grows (**Glasses**, **Dev Cap**, **Coffee Cup**, **Gold Crown**).
-- **Create & Submit Your Own:** Drop a single PNG into **Pack Studio** or build a full `1536×2288` (`8×11`) v3 pack following [CUSTOM_PET_SPEC.md](CUSTOM_PET_SPEC.md), then submit via the [Community Pet Submission](https://github.com/Wlaeg/antigravity-pet/issues/new?template=pet_submission.yml) form.
-
 ## Security & Privacy
 
-- **Zero telemetry:** Antigravity Pet never collects analytics or phones home. Outbound HTTPS requests occur only when you explicitly browse the Community Workshop, star a pack, or check for updates on GitHub.
+- **Zero telemetry:** Antigravity Pet never collects analytics or phones home. Outbound HTTPS requests occur only when you explicitly browse the Community Workshop, star/download a pack, or check for updates on GitHub.
 - **Zero keylogging:** Typing sync measures only a 1.5-second rolling keystroke frequency count — key codes, characters, and prompt contents are never recorded or stored.
 - **Loopback-only local IPC:** The overlay (`127.0.0.1:47821`) and Settings panel (`127.0.0.1:47822`) bind strictly to localhost loopback.
 - **No hidden startup entries:** By default, the pet launches and exits with Antigravity without modifying OS startup registries.
@@ -125,7 +134,7 @@ chmod +x build.sh && ./build.sh --launch
 
 Contributions, bug reports, new pixel mascots, and community packs are welcome:
 
-- Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) before opening a pull request.
+- Read [CONTRIBUTING.md](CONTRIBUTING.md), [CUSTOM_PET_SPEC.md](CUSTOM_PET_SPEC.md), and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) before opening a pull request.
 - Open a [Bug Report](https://github.com/Wlaeg/antigravity-pet/issues/new?template=bug_report.yml), [Feature Request](https://github.com/Wlaeg/antigravity-pet/issues/new?template=feature_request.yml), or [Community Pet Submission](https://github.com/Wlaeg/antigravity-pet/issues/new?template=pet_submission.yml).
 - Participation is governed by our [Code of Conduct](CODE_OF_CONDUCT.md).
 
@@ -141,9 +150,9 @@ community/                      Approved community pet packs & full-body preview
 assets/                         Hero showcase GIF, logo & UI icons
 skills/                         Built-in `pet` and `hatch-pet` Antigravity skills
 docs/DEVELOPMENT.md             Architecture, state machine & local HTTP API reference
-CUSTOM_PET_SPEC.md              v3 sprite sheet & community submission specification
+CUSTOM_PET_SPEC.md              Sprite sheet & community submission specification
 build.ps1, build.sh             Zero-dependency Windows & macOS build/launch scripts
-CHANGELOG.md                    Full release history (v3.0.0 – v4.6.1)
+CHANGELOG.md                    Full release history and version notes
 LICENSE                         MIT License
 ```
 
