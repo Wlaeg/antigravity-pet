@@ -110,6 +110,7 @@ namespace AntigravityPet
         public string IdleImagePath;
         public bool HasFolderFrames;
         public bool AssetsLoaded;
+        public bool IsCustom;
 
         public List<BitmapSource>[] Rows = new List<BitmapSource>[9];
         public List<BitmapSource> LookFrames = new List<BitmapSource>();
@@ -1210,8 +1211,8 @@ namespace AntigravityPet
             }
             _packs.Clear();
 
-            LoadPacksFromDir(_pluginPetsDir);
-            LoadPacksFromDir(_userPetsDir);
+            LoadPacksFromDir(_pluginPetsDir, false);
+            LoadPacksFromDir(_userPetsDir, true);
 
             string desired = ResolveSkinAlias(_config.Skin);
             if (_packs.ContainsKey(desired) && EnsurePackLoaded(_packs[desired]))
@@ -1243,7 +1244,7 @@ namespace AntigravityPet
             }
         }
 
-        private void LoadPacksFromDir(string rootDir)
+        private void LoadPacksFromDir(string rootDir, bool isCustom = false)
         {
             try
             {
@@ -1253,6 +1254,7 @@ namespace AntigravityPet
                     var pack = TryLoadPack(dir);
                     if (pack != null)
                     {
+                        pack.IsCustom = isCustom;
                         _packs[pack.Id] = pack;
                     }
                 }
@@ -2763,8 +2765,14 @@ namespace AntigravityPet
             return req > 0 && done >= req;
         }
 
+        private bool IsAccessorySupportedForCurrentSkin()
+        {
+            return _currentPack == null || !_currentPack.IsCustom;
+        }
+
         private string GetEffectiveAccessoryId()
         {
+            if (!IsAccessorySupportedForCurrentSkin()) return "none";
             string pref = (_config.Accessory ?? "auto").Trim().ToLowerInvariant();
             if (pref == "none") return "none";
             int done = _config.CompletedTasksCount;
@@ -5164,6 +5172,7 @@ namespace AntigravityPet
                             hideOnFullscreen = _config.HideOnFullscreen,
                             accessory = _config.Accessory ?? "auto",
                             effectiveAccessory = GetEffectiveAccessoryId(),
+                            accessorySupported = IsAccessorySupportedForCurrentSkin(),
                             autoWalk = _config.AutoWalk,
                             eyeFollow = _config.EyeFollow,
                             boredomIdle = _config.BoredomIdle,
@@ -5442,7 +5451,7 @@ namespace AntigravityPet
                         else if (action == "accessory")
                         {
                             string reqAcc = string.IsNullOrWhiteSpace(val) ? "auto" : val.Trim().ToLowerInvariant();
-                            if (IsAccessoryUnlocked(reqAcc, _config.CompletedTasksCount))
+                            if (IsAccessorySupportedForCurrentSkin() && IsAccessoryUnlocked(reqAcc, _config.CompletedTasksCount))
                             {
                                 _config.Accessory = reqAcc;
                                 UpdateAccessoryVisual();
@@ -5564,7 +5573,7 @@ namespace AntigravityPet
             if (data.ContainsKey("accessory") && data["accessory"] != null)
             {
                 string reqAcc = data["accessory"].ToString().Trim().ToLowerInvariant();
-                if (IsAccessoryUnlocked(reqAcc, _config.CompletedTasksCount)) { _config.Accessory = reqAcc; UpdateAccessoryVisual(); }
+                if (IsAccessorySupportedForCurrentSkin() && IsAccessoryUnlocked(reqAcc, _config.CompletedTasksCount)) { _config.Accessory = reqAcc; UpdateAccessoryVisual(); }
             }
 
             UpdateVisualState();

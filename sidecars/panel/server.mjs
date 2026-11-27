@@ -319,13 +319,17 @@ function resolveEffectiveAccessory(pref, done) {
 
 function buildOfflineStatus(cfg) {
   const effLang = detectEffectiveLang(cfg);
+  const availablePets = scanPetPacks(effLang);
+  const skinId = cfg.Skin || 'cyber-fox';
+  const activePet = availablePets.find((p) => p.id === skinId);
+  const accessorySupported = !(activePet && activePet.isCustom);
   return {
     ok: true,
     running: false,
     enabled: cfg.Enabled !== false,
     state: 'idle',
-    skin: cfg.Skin || 'cyber-fox',
-    displayName: cfg.Skin || 'cyber-fox',
+    skin: skinId,
+    displayName: skinId,
     visible: false,
     scale: cfg.Scale || 1.0,
     bubbleMode: cfg.BubbleMode || 'always',
@@ -335,7 +339,8 @@ function buildOfflineStatus(cfg) {
     snapToAgy: !!cfg.SnapToAgy,
     hideOnFullscreen: cfg.HideOnFullscreen !== false,
     accessory: cfg.Accessory || 'auto',
-    effectiveAccessory: resolveEffectiveAccessory(cfg.Accessory, cfg.CompletedTasksCount),
+    effectiveAccessory: accessorySupported ? resolveEffectiveAccessory(cfg.Accessory, cfg.CompletedTasksCount) : 'none',
+    accessorySupported,
     accessoryMilestones: ACCESSORY_MILESTONES,
     autoWalk: cfg.AutoWalk !== false,
     eyeFollow: cfg.EyeFollow !== false,
@@ -363,6 +368,10 @@ export async function getSnapshot() {
   if (res.ok && res.data) {
     const effLang = res.data.effectiveLanguage || 'zh';
     res.data.availablePets = scanPetPacks(effLang);
+    if (typeof res.data.accessorySupported !== 'boolean') {
+      const activePet = res.data.availablePets.find((p) => p.id === res.data.skin);
+      res.data.accessorySupported = !(activePet && activePet.isCustom);
+    }
     res.data.accessoryMilestones = ACCESSORY_MILESTONES;
     return res.data;
   }
@@ -484,6 +493,17 @@ export async function applySetting(args = {}) {
   } else if (action === 'accessory') {
     const acc = String(value || args.accessory || 'auto').toLowerCase();
     const cfg = readOfflineConfig();
+    const effLang = detectEffectiveLang(cfg);
+    const pets = scanPetPacks(effLang);
+    const activePet = pets.find((p) => p.id === (cfg.Skin || 'cyber-fox'));
+    if (activePet && activePet.isCustom) {
+      return {
+        ok: false,
+        unsupported: true,
+        accessory: acc,
+        status: isRunning ? (await httpRequest('GET', '/status', null, 600)).data || buildOfflineStatus(cfg) : buildOfflineStatus(cfg)
+      };
+    }
     const done = Number(cfg.CompletedTasksCount || 0);
     if (!isAccessoryUnlocked(acc, done)) {
       return {

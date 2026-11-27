@@ -76,6 +76,7 @@ struct PetPack {
     var themeColorHex: String = "#38BDF8"
     var sounds: [String: String] = [:]
     var frameMap: [Int: [CGImage]] = [:]
+    var isCustom: Bool = false
 }
 
 final class PendingApproval {
@@ -871,6 +872,7 @@ final class PetController: NSObject, NSApplicationDelegate {
         packs.removeAll()
         let builtIn = pluginRoot.appendingPathComponent("pets")
         for dir in [builtIn, userPetsDir] {
+            let isCustomDir = (dir == userPetsDir)
             guard let items = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { continue }
             for item in items {
                 let manifest = item.appendingPathComponent("pet.json")
@@ -912,7 +914,7 @@ final class PetController: NSObject, NSApplicationDelegate {
                     }
                 }
                 if img != nil || !frameMap.isEmpty {
-                    packs[id] = PetPack(id: id, displayName: dn, description: desc, version: ver, spritesheetPath: sheetPath, image: img, themeColorHex: themeHex, sounds: soundMap, frameMap: frameMap)
+                    packs[id] = PetPack(id: id, displayName: dn, description: desc, version: ver, spritesheetPath: sheetPath, image: img, themeColorHex: themeHex, sounds: soundMap, frameMap: frameMap, isCustom: isCustomDir)
                 }
             }
         }
@@ -1252,7 +1254,12 @@ final class PetController: NSObject, NSApplicationDelegate {
         return req > 0 && config.CompletedTasksCount >= req
     }
 
+    func isAccessorySupportedForCurrentSkin() -> Bool {
+        return !(activePack()?.isCustom ?? false)
+    }
+
     func effectiveAccessory() -> String {
+        if !isAccessorySupportedForCurrentSkin() { return "none" }
         let mode = config.Accessory.lowercased()
         if mode == "none" { return "none" }
         if mode == "glasses" || mode == "cap" || mode == "coffee" || mode == "crown" {
@@ -1659,7 +1666,7 @@ final class PetController: NSObject, NSApplicationDelegate {
     }
 
     @objc func menuSelectAccessory(_ sender: NSMenuItem) {
-        if let k = sender.representedObject as? String, isAccessoryUnlocked(k) {
+        if let k = sender.representedObject as? String, isAccessorySupportedForCurrentSkin(), isAccessoryUnlocked(k) {
             config.Accessory = k
             saveConfig()
             canvasView.needsDisplay = true
@@ -1989,7 +1996,7 @@ final class PetController: NSObject, NSApplicationDelegate {
                 config.HideOnFullscreen = (val.lowercased() == "true" || val == "1"); saveConfig()
             case "accessory":
                 let reqAcc = val.isEmpty ? "auto" : val.lowercased()
-                if isAccessoryUnlocked(reqAcc) { config.Accessory = reqAcc; saveConfig() }
+                if isAccessorySupportedForCurrentSkin() && isAccessoryUnlocked(reqAcc) { config.Accessory = reqAcc; saveConfig() }
             case "checkupdatesonstartup":
                 config.CheckUpdatesOnStartup = (val.lowercased() == "true" || val == "1"); saveConfig()
             case "dockleft":
@@ -2059,6 +2066,7 @@ final class PetController: NSObject, NSApplicationDelegate {
             "hideOnFullscreen": config.HideOnFullscreen,
             "accessory": config.Accessory,
             "effectiveAccessory": effectiveAccessory(),
+            "accessorySupported": isAccessorySupportedForCurrentSkin(),
             "autoWalk": config.AutoWalk,
             "eyeFollow": config.EyeFollow,
             "topmost": config.Topmost,
