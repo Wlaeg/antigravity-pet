@@ -1,0 +1,28 @@
+# Antigravity Pet
+
+> Antigravity Pet is a free, open-source pixel desktop pet for Google Antigravity on Windows and macOS. It sits on your desktop and shows what your agent is doing, live — no window switching, no runtime to install.
+
+## Install
+
+- [Latest release](https://github.com/Wlaeg/antigravity-pet/releases/latest)
+- [GitHub repository](https://github.com/Wlaeg/antigravity-pet)
+- [Landing page](https://wlaeg.github.io/antigravity-pet/)
+
+Install with: `agy plugin install https://github.com/Wlaeg/antigravity-pet`
+
+## Features
+
+- Live tool-call bubbles: the bubble above the pet shows the agent's current tool call.
+- Double-click the pet to dispatch a task; approve or deny tool calls right in the bubble.
+- Background tasks get their own calm moon state with a task switcher.
+- Community workshop: browse and install community pet packs in Settings; one static PNG is enough to make your own pet.
+- Surprise Mode: 200 tasks (or starring the repo) unlocks 150 locally generated pixel accessories across 4 gear slots.
+- 8 built-in mascots: cyber-fox, astro-bot, shadow-cat, byte-ghost, shiba-dog, pixel-dragon, android-bugdroid, flutter-dash.
+- Edge peeking, fullscreen auto-hide, typing sync, boredom and naps. Zero telemetry.
+
+## Docs
+
+- [README](https://github.com/Wlaeg/antigravity-pet/blob/main/README.md)
+- [Custom pet spec](https://github.com/Wlaeg/antigravity-pet/blob/main/CUSTOM_PET_SPEC.md)
+- [Development docs](https://github.com/Wlaeg/antigravity-pet/blob/main/docs/DEVELOPMENT.md)
+- [Changelog](https://github.com/Wlaeg/antigravity-pet/blob/main/CHANGELOG.md)
