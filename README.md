@@ -52,16 +52,32 @@ Native Overlay (app/AntigravityPet.cs | app/AntigravityPet.swift) ◀──┘
 - **Desktop overlay:** Built-in `.NET Framework 4.x` on Windows 10/11 and `swiftc` (Xcode Command Line Tools) on macOS 12+.
 - **Node.js 18+ (`node` in `PATH`):** **Required** for the Antigravity MCP server, Settings panel (both sidecar & standalone window), Community Workshop, GitHub Star unlock verification, and Surprise Mode accessory generation.
 
+### Option 1: One-Command Install (Recommended)
+
+```bash
+agy plugin install https://github.com/Wlaeg/antigravity-pet
+```
+
+Then open Antigravity — the pet appears on your desktop. Press `Win + Alt + P` (`⌥ + ⌘ + P` on macOS) to show or hide it.
+
 ### For AI Agents (Quick Install)
 
-If you are an AI coding agent installing Antigravity Pet into a user's workspace, pick the row matching the host OS, run the build/launch script once, and inform the user of the toggle shortcut:
+If you are an AI coding agent installing Antigravity Pet into a user's workspace, follow these steps exactly:
 
-| Platform | Plugin Path | Build & Launch Command | Toggle Shortcut |
-| -------- | ----------- | ---------------------- | --------------- |
-| **Windows 10/11** | `%USERPROFILE%\.gemini\config\plugins\antigravity-pet` | `.\build.ps1 -Launch` | `Win + Alt + P` |
-| **macOS 12+** | `~/.gemini/config/plugins/antigravity-pet` | `chmod +x build.sh && ./build.sh --launch` | `⌥ + ⌘ + P` |
+1. Install the plugin with one command and wait for it to finish:
+   ```bash
+   agy plugin install https://github.com/Wlaeg/antigravity-pet
+   ```
+2. Confirm the plugin folder exists:
+   - Windows: `%USERPROFILE%\.gemini\config\plugins\antigravity-pet`
+   - macOS: `~/.gemini/config/plugins/antigravity-pet`
+3. Build and launch it once from that folder:
+   - Windows (PowerShell): `.\build.ps1 -Launch`
+   - macOS: `chmod +x build.sh && ./build.sh --launch`
+4. Tell the user the toggle shortcut: `Win + Alt + P` on Windows, `⌥ + ⌘ + P` on macOS.
+5. If `agy plugin install` fails, fall back to Option 2 (download the release zip) or Option 3 (clone and build). Do not ask the user to install anything by hand unless both fallbacks fail.
 
-### Option 1: Download Prebuilt Release (Recommended)
+### Option 2: Download Prebuilt Release
 
 #### Windows 10 / 11
 
@@ -89,7 +105,7 @@ If you are an AI coding agent installing Antigravity Pet into a user's workspace
    ```
 3. Press **`⌥ + ⌘ + P`** (`Option + Command + P`) to toggle visibility, or open **Desktop Pet Settings** from Antigravity's `...` menu.
 
-### Option 2: Git Clone & Build from Source
+### Option 3: Git Clone & Build from Source
 
 ```powershell
 # Windows PowerShell
