@@ -126,8 +126,11 @@
   .state code { color:var(--muted); font-size:13px; }
 
   /* pets */
-  .pets { display:flex; flex-wrap:wrap; gap:9px; }
-  .pets span { background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:8px 16px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:14px; }
+  .petgrid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+  @media (max-width:720px){ .petgrid { grid-template-columns:repeat(2,1fr); } }
+  .pet { background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--line); border-radius:14px; padding:18px 14px 14px; text-align:center; }
+  .petimg { width:100%; aspect-ratio:192/208; background-size:800% 1100%; background-position:0 0; background-repeat:no-repeat; image-rendering:pixelated; }
+  .pet span { display:block; margin-top:10px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13.5px; color:var(--muted); }
 
   /* install */
   ol.steps li { margin:0 0 12px 22px; font-size:16px; }
@@ -236,8 +239,15 @@
   <p class="eyebrow">The crew</p>
   <h2>8 built-in mascots.</h2>
   <p class="lede">Including Android's Bugdroid and Flutter's Dash. Switch anytime, or bring your own.</p>
-  <div class="pets">
-    <span>cyber-fox</span><span>astro-bot</span><span>shadow-cat</span><span>byte-ghost</span><span>shiba-dog</span><span>pixel-dragon</span><span>android-bugdroid</span><span>flutter-dash</span>
+  <div class="petgrid">
+    <div class="pet"><div class="petimg" style="background-image:url(https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/pets/cyber-fox/spritesheet.png)"></div><span>cyber-fox</span></div>
+    <div class="pet"><div class="petimg" style="background-image:url(https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/pets/astro-bot/spritesheet.png)"></div><span>astro-bot</span></div>
+    <div class="pet"><div class="petimg" style="background-image:url(https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/pets/shadow-cat/spritesheet.png)"></div><span>shadow-cat</span></div>
+    <div class="pet"><div class="petimg" style="background-image:url(https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/pets/byte-ghost/spritesheet.png)"></div><span>byte-ghost</span></div>
+    <div class="pet"><div class="petimg" style="background-image:url(https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/pets/shiba-dog/spritesheet.png)"></div><span>shiba-dog</span></div>
+    <div class="pet"><div class="petimg" style="background-image:url(https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/pets/pixel-dragon/spritesheet.png)"></div><span>pixel-dragon</span></div>
+    <div class="pet"><div class="petimg" style="background-image:url(https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/pets/android-bugdroid/spritesheet.png)"></div><span>android-bugdroid</span></div>
+    <div class="pet"><div class="petimg" style="background-image:url(https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/pets/flutter-dash/spritesheet.png)"></div><span>flutter-dash</span></div>
   </div>
 </section>
 
