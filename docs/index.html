@@ -121,9 +121,12 @@
   .pill { display:inline-block; font-size:12.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#052830; background:var(--cyan); border-radius:999px; padding:4px 12px; }
 
   /* states strip */
-  .states { display:flex; flex-wrap:wrap; gap:10px; }
-  .state { display:flex; align-items:center; gap:9px; background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:9px 16px; font-size:14.5px; }
-  .state code { color:var(--muted); font-size:13px; }
+  .stategrid { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; }
+  @media (max-width:720px){ .stategrid { grid-template-columns:repeat(2,1fr); } }
+  .statecard { background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--line); border-radius:14px; padding:18px 14px 16px; text-align:center; }
+  .statecard img { width:150px; height:auto; image-rendering:pixelated; }
+  .statecard b { display:block; margin-top:8px; font-size:15.5px; }
+  .statecard code { color:var(--muted); font-size:13px; }
 
   /* pets */
   .petgrid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
@@ -226,12 +229,12 @@
 <section>
   <p class="eyebrow">Always in sync</p>
   <h2>One glance tells you the whole story.</h2>
-  <div class="states">
-    <span class="state"><span class="dot cyan"></span>Running <code>working…</code></span>
-    <span class="state"><span class="dot amber"></span>Needs input <code>waiting on you</code></span>
-    <span class="state"><span class="dot green"></span>Ready <code>done ✓</code></span>
-    <span class="state"><span class="dot red"></span>Blocked <code>something failed</code></span>
-    <span class="state"><span class="dot violet"></span>Background <code>🌙 resting</code></span>
+  <div class="stategrid">
+    <div class="statecard"><img src="images/states/running.gif" alt="Pet working — typing away" width="384" height="416" loading="lazy"><b>Running</b><code>working…</code></div>
+    <div class="statecard"><img src="images/states/needs-input.gif" alt="Pet waiting for your input" width="384" height="416" loading="lazy"><b>Needs input</b><code>waiting on you</code></div>
+    <div class="statecard"><img src="images/states/ready.gif" alt="Pet celebrating a finished task" width="384" height="416" loading="lazy"><b>Ready</b><code>done ✓</code></div>
+    <div class="statecard"><img src="images/states/blocked.gif" alt="Pet dizzy — something failed" width="384" height="416" loading="lazy"><b>Blocked</b><code>something failed</code></div>
+    <div class="statecard"><img src="images/states/background.gif" alt="Pet resting in background moon state" width="384" height="416" loading="lazy"><b>Background</b><code>🌙 resting</code></div>
   </div>
 </section>
 
