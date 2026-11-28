@@ -77,6 +77,14 @@ If you are an AI coding agent installing Antigravity Pet into a user's workspace
 4. Tell the user the toggle shortcut: `Win + Alt + P` on Windows, `⌥ + ⌘ + P` on macOS.
 5. If `agy plugin install` fails, fall back to Option 2 (download the release zip) or Option 3 (clone and build). Do not ask the user to install anything by hand unless both fallbacks fail.
 
+### Ask Your AI Agent to Install It
+
+Copy the prompt below and paste it into your agent's chat — it installs the pet for you:
+
+```
+Install Antigravity Pet for me: run agy plugin install https://github.com/Wlaeg/antigravity-pet, confirm the plugin folder exists, build and launch it once, and tell me the toggle shortcut. Windows: %USERPROFILE%\.gemini\config\plugins\antigravity-pet, .\build.ps1 -Launch, Win + Alt + P. macOS: ~/.gemini/config/plugins/antigravity-pet, chmod +x build.sh && ./build.sh --launch, Option + Command + P. If the install fails, download the latest release or clone the repo and build from source instead.
+```
+
 ### Option 2: Download Prebuilt Release
 
 #### Windows 10 / 11
