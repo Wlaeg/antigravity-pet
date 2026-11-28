@@ -1,4 +1,4 @@
-# Antigravity Pet — Native Pixel-Art Desktop Companion for Antigravity
+# Antigravity Pet — Native Pixel-Art Desktop Pet for Google Antigravity
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/Wlaeg/antigravity-pet?style=flat-square&color=0EA5E9)](https://github.com/Wlaeg/antigravity-pet/releases/latest)
@@ -7,7 +7,7 @@
 
 ![Antigravity Pet Showcase](assets/hero-showcase.gif)
 
-An open-source, native pixel-art desktop companion for **Google Antigravity** on **Windows** and **macOS**. It lives quietly on your desktop, mirrors what your AI agent is doing in real time without stealing window focus, and turns long coding sessions into a lively, tactile experience.
+An open-source, native pixel-art desktop pet for **Google Antigravity** on **Windows** and **macOS**. It lives quietly on your desktop, mirrors what your AI agent is doing in real time without stealing window focus, and turns long coding sessions into a lively, tactile experience.
 
 ## Why Antigravity Pet?
 
@@ -160,6 +160,13 @@ build.ps1, build.sh             Zero-dependency Windows & macOS build/launch scr
 CHANGELOG.md                    Full release history and version notes
 LICENSE                         MIT License
 ```
+
+## FAQ
+
+- **What is Antigravity Pet?** A free, open-source pixel desktop pet for Google Antigravity on Windows and macOS. It sits on your desktop and shows what your agent is doing, live.
+- **How do I install it?** Download the latest release and run the one-click launcher, or install with `agy plugin install https://github.com/Wlaeg/antigravity-pet`.
+- **Does it work on macOS?** Yes — macOS 12+ on Apple Silicon and Intel, built with the native Swift overlay.
+- **Is it free?** Yes, MIT licensed. No account, no subscription, no telemetry.
 
 ## Notes
 
