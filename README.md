@@ -141,7 +141,7 @@ Contributions, bug reports, new pixel mascots, and community packs are welcome:
 - Read [CONTRIBUTING.md](CONTRIBUTING.md), [CUSTOM_PET_SPEC.md](CUSTOM_PET_SPEC.md), and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) before opening a pull request.
 - Open a [Bug Report](https://github.com/Wlaeg/antigravity-pet/issues/new?template=bug_report.yml), [Feature Request](https://github.com/Wlaeg/antigravity-pet/issues/new?template=feature_request.yml), or [Community Pet Submission](https://github.com/Wlaeg/antigravity-pet/issues/new?template=pet_submission.yml).
 - Participation is governed by our [Code of Conduct](CODE_OF_CONDUCT.md).
-- **Community Tools:** [Pet Converter from Codex to Antigravity](https://github.com/880032/pet-converter-from-codex-to-antigravity) by [@880032](https://github.com/880032) — convert Codex Pets into Antigravity Pet packs on Windows.
+- **Community Tools:** [Pet Converter from Codex to Antigravity](https://github.com/880032/pet-converter-from-codex-to-antigravity) by [@880032](https://github.com/880032) — a free Windows app that converts pets made for OpenAI's Codex into Antigravity Pet packs, so the whole Codex pet library can run here too. It auto-detects your installed Codex pets (or takes a pet ZIP), converts the sprite sheet and metadata (WebP → transparent PNG), and installs with one click — no Python or Git needed.
 
 ## Project Layout
 
