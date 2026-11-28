@@ -40,101 +40,230 @@
 }
 </script>
 <style>
-  :root { --bg:#0d1117; --panel:#161b22; --line:#30363d; --text:#e6edf3; --muted:#8b949e; --cyan:#22d3ee; --green:#3fb950; --amber:#d29922; --red:#f85149; }
+  :root {
+    --bg:#0a0e14; --bg2:#0d1117; --panel:#131a24; --panel2:#161e2a;
+    --line:#26303d; --line2:#30363d;
+    --text:#e6edf3; --muted:#9aa7b4; --dim:#6e7c8a;
+    --cyan:#22d3ee; --green:#3fb950; --amber:#d29922; --red:#f85149; --violet:#bc8cff;
+  }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; line-height:1.6; }
+  html { scroll-behavior:smooth; }
+  body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; line-height:1.6; -webkit-font-smoothing:antialiased; }
   a { color:var(--cyan); text-decoration:none; }
   a:hover { text-decoration:underline; }
-  .wrap { max-width:880px; margin:0 auto; padding:0 20px; }
-  header { padding:56px 0 8px; }
-  header .kicker { color:var(--muted); font-size:14px; letter-spacing:.08em; text-transform:uppercase; }
-  h1 { font-size:40px; line-height:1.2; margin:12px 0 16px; letter-spacing:-.01em; }
-  h1 .dot { color:var(--cyan); }
-  .sub { font-size:18px; color:var(--muted); max-width:640px; }
-  .hero { margin:32px 0 8px; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--panel); }
-  .hero img { display:block; width:100%; height:auto; image-rendering:pixelated; }
-  .cta { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:28px 0 8px; }
-  .btn { display:inline-block; padding:12px 22px; border-radius:8px; font-weight:600; font-size:16px; border:1px solid var(--line); color:var(--text); background:var(--panel); }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.92em; }
+  .wrap { max-width:960px; margin:0 auto; padding:0 22px; }
+
+  /* nav */
+  nav { position:sticky; top:0; z-index:50; background:rgba(10,14,20,.86); backdrop-filter:blur(10px); border-bottom:1px solid var(--line); }
+  nav .wrap { display:flex; align-items:center; gap:26px; height:58px; }
+  nav .brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:17px; color:var(--text); letter-spacing:-.01em; }
+  nav .brand:hover { text-decoration:none; }
+  nav .brand .px { width:22px; height:22px; border-radius:6px; background:linear-gradient(135deg,var(--cyan),var(--violet)); box-shadow:0 0 0 2px rgba(34,211,238,.18); }
+  nav .links { display:flex; gap:22px; margin-left:auto; font-size:14.5px; }
+  nav .links a { color:var(--muted); }
+  nav .links a:hover { color:var(--text); text-decoration:none; }
+  nav .ver { font-size:12.5px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--cyan); border:1px solid rgba(34,211,238,.35); border-radius:999px; padding:3px 10px; white-space:nowrap; }
+  nav .gh { font-size:14.5px; font-weight:600; color:var(--text); border:1px solid var(--line2); border-radius:8px; padding:6px 12px; white-space:nowrap; }
+  nav .gh:hover { border-color:var(--cyan); text-decoration:none; }
+  @media (max-width:720px){ nav .links { display:none; } }
+
+  /* hero */
+  .hero { padding:72px 0 10px; background:radial-gradient(720px 320px at 18% -40px, rgba(34,211,238,.14), transparent 60%), radial-gradient(560px 300px at 88% 0px, rgba(188,140,255,.12), transparent 60%); }
+  .kicker { font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--cyan); font-weight:700; }
+  h1 { font-size:52px; line-height:1.08; letter-spacing:-.02em; margin:16px 0 18px; max-width:760px; }
+  h1 .hl { color:var(--cyan); }
+  .sub { font-size:19px; color:var(--muted); max-width:640px; }
+  .cta { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:30px 0 18px; }
+  .btn { display:inline-block; padding:13px 24px; border-radius:10px; font-weight:650; font-size:16px; border:1px solid var(--line2); color:var(--text); background:var(--panel); }
   .btn:hover { text-decoration:none; border-color:var(--cyan); }
-  .btn.primary { background:var(--cyan); color:#062a30; border-color:var(--cyan); }
-  code.cmd { display:block; background:#010409; border:1px solid var(--line); border-radius:8px; padding:14px 16px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:14px; overflow-x:auto; white-space:nowrap; }
+  .btn.primary { background:var(--cyan); color:#052830; border-color:var(--cyan); }
+  .btn.primary:hover { filter:brightness(1.08); }
+  .fineprint { font-size:13.5px; color:var(--dim); }
+  code.cmd { display:block; background:#010409; border:1px solid var(--line); border-radius:10px; padding:15px 17px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:14.5px; overflow-x:auto; white-space:nowrap; margin-top:18px; }
   code.cmd button { float:right; background:none; border:1px solid var(--line); color:var(--muted); border-radius:6px; padding:2px 10px; cursor:pointer; font-size:13px; }
-  .promptbox { background:#010409; border:1px solid var(--line); border-radius:8px; padding:14px 16px; font-size:15px; }
-  .promptbox button { float:right; background:none; border:1px solid var(--line); color:var(--muted); border-radius:6px; padding:2px 10px; cursor:pointer; font-size:13px; margin-left:10px; }
-  section { padding:44px 0 8px; }
-  h2 { font-size:26px; margin-bottom:18px; letter-spacing:-.01em; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px; }
-  .card h3 { font-size:17px; margin-bottom:8px; }
+  .desktop { margin:34px 0 6px; border:1px solid var(--line); border-radius:14px; overflow:hidden; background:var(--panel); box-shadow:0 24px 60px rgba(0,0,0,.45); }
+  .desktop .bar { display:flex; gap:7px; align-items:center; padding:11px 14px; background:var(--bg2); border-bottom:1px solid var(--line); }
+  .desktop .bar i { width:11px; height:11px; border-radius:50%; background:#2d3742; display:block; }
+  .desktop .bar i:first-child { background:#f85149; } .desktop .bar i:nth-child(2) { background:#d29922; } .desktop .bar i:nth-child(3) { background:#3fb950; }
+  .desktop .bar span { margin-left:8px; font-size:12.5px; color:var(--dim); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  .desktop img { display:block; width:100%; height:auto; image-rendering:pixelated; }
+  .stats { display:flex; flex-wrap:wrap; gap:10px 28px; margin:26px 0 4px; padding:18px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .stats b { font-size:19px; display:block; line-height:1.25; }
+  .stats span { font-size:13px; color:var(--muted); }
+
+  /* sections */
+  section { padding:64px 0 8px; }
+  .eyebrow { font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--cyan); font-weight:700; margin-bottom:10px; }
+  h2 { font-size:32px; letter-spacing:-.015em; line-height:1.2; margin-bottom:14px; }
+  .lede { font-size:17px; color:var(--muted); max-width:640px; margin-bottom:28px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
+  .card { background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--line); border-radius:14px; padding:22px; transition:border-color .15s; }
+  .card:hover { border-color:rgba(34,211,238,.45); }
+  .card h3 { font-size:17.5px; margin:12px 0 8px; }
   .card p { color:var(--muted); font-size:15px; }
-  .card .tag { font-size:22px; }
-  .pets { display:flex; flex-wrap:wrap; gap:8px; }
-  .pets span { background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:6px 14px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:14px; }
-  ol.steps li { margin:0 0 10px 20px; }
+  .dot { width:12px; height:12px; border-radius:50%; display:inline-block; }
+  .dot.cyan { background:var(--cyan); box-shadow:0 0 10px rgba(34,211,238,.7); }
+  .dot.green { background:var(--green); box-shadow:0 0 10px rgba(63,185,80,.7); }
+  .dot.amber { background:var(--amber); box-shadow:0 0 10px rgba(210,153,34,.7); }
+  .dot.red { background:var(--red); box-shadow:0 0 10px rgba(248,81,73,.7); }
+  .dot.violet { background:var(--violet); box-shadow:0 0 10px rgba(188,140,255,.7); }
+
+  /* spotlight */
+  .spot { display:grid; grid-template-columns:1.05fr .95fr; gap:28px; align-items:center; background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--line); border-radius:16px; padding:28px; }
+  @media (max-width:720px){ .spot { grid-template-columns:1fr; } }
+  .spot h3 { font-size:24px; letter-spacing:-.01em; margin:10px 0 12px; }
+  .spot p { color:var(--muted); font-size:15.5px; margin-bottom:12px; }
+  .spot ul { margin:0 0 4px 20px; color:var(--muted); font-size:15.5px; }
+  .spot ul li { margin-bottom:6px; }
+  .spot ul li::marker { color:var(--cyan); }
+  .spot img { width:100%; height:auto; border-radius:10px; border:1px solid var(--line); image-rendering:pixelated; display:block; }
+  .pill { display:inline-block; font-size:12.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#052830; background:var(--cyan); border-radius:999px; padding:4px 12px; }
+
+  /* states strip */
+  .states { display:flex; flex-wrap:wrap; gap:10px; }
+  .state { display:flex; align-items:center; gap:9px; background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:9px 16px; font-size:14.5px; }
+  .state code { color:var(--muted); font-size:13px; }
+
+  /* pets */
+  .pets { display:flex; flex-wrap:wrap; gap:9px; }
+  .pets span { background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:8px 16px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:14px; }
+
+  /* install */
+  ol.steps li { margin:0 0 12px 22px; font-size:16px; }
   ol.steps li::marker { color:var(--cyan); font-weight:700; }
-  .faq details { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin-bottom:12px; }
-  .faq summary { cursor:pointer; font-weight:600; }
+  ol.steps li p { color:var(--muted); font-size:15px; margin-top:2px; }
+  .promptbox { background:#010409; border:1px solid var(--line); border-radius:10px; padding:16px 18px; font-size:15px; }
+  .promptbox button { float:right; background:none; border:1px solid var(--line); color:var(--muted); border-radius:6px; padding:2px 10px; cursor:pointer; font-size:13px; margin-left:12px; }
+
+  /* faq */
+  .faq details { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-bottom:12px; }
+  .faq summary { cursor:pointer; font-weight:600; font-size:16px; }
   .faq p { color:var(--muted); margin-top:8px; font-size:15px; }
-  footer { border-top:1px solid var(--line); margin-top:56px; padding:28px 0 48px; color:var(--muted); font-size:14px; }
-  footer .links a { margin-right:18px; }
-  @media (max-width:600px){ h1{font-size:30px;} }
+
+  footer { border-top:1px solid var(--line); margin-top:72px; padding:32px 0 52px; color:var(--muted); font-size:14px; }
+  footer .links a { margin-right:20px; }
+  @media (max-width:720px){ h1{font-size:36px;} h2{font-size:26px;} .hero{padding-top:52px;} }
 </style>
 </head>
 <body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#"><span class="px"></span>Antigravity Pet</a>
+    <div class="links">
+      <a href="#features">Features</a>
+      <a href="#new">What's new</a>
+      <a href="#pets">Pets</a>
+      <a href="#install">Install</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <span class="ver">v4.7.0</span>
+    <a class="gh" href="https://github.com/Wlaeg/antigravity-pet">GitHub ↗</a>
+  </div>
+</nav>
+
 <div class="wrap">
 
-<header>
+<header class="hero">
   <p class="kicker">Free &amp; open source · Windows &amp; macOS</p>
-  <h1>A pixel desktop pet that shows what your Antigravity agent is doing, live<span class="dot">.</span></h1>
-  <p class="sub">Antigravity Pet lives on your desktop and mirrors your agent in real time — working, waiting for input, done, or stuck — so you can tell at a glance without keeping the Antigravity window in front of you.</p>
+  <h1>A pixel desktop pet that shows what your <span class="hl">Antigravity agent</span> is doing, live.</h1>
+  <p class="sub">It lives on your desktop and mirrors your agent in real time — working, waiting for input, done, or stuck — so you can tell at a glance without keeping the Antigravity window in front of you.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/Wlaeg/antigravity-pet/releases/latest">Download — it's free</a>
+    <a class="btn" href="https://github.com/Wlaeg/antigravity-pet">View on GitHub</a>
+  </div>
+  <p class="fineprint">No account. No subscription. No telemetry. MIT licensed.</p>
+  <code class="cmd"><button onclick="navigator.clipboard.writeText('agy plugin install https://github.com/Wlaeg/antigravity-pet');this.textContent='Copied';">Copy</button>agy plugin install https://github.com/Wlaeg/antigravity-pet</code>
+  <div class="desktop">
+    <div class="bar"><i></i><i></i><i></i><span>antigravity — desktop</span></div>
+    <img src="https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/assets/hero-showcase.gif" alt="Antigravity Pet — pixel desktop pet for Google Antigravity showing live agent status" width="1080" height="608">
+  </div>
+  <div class="stats">
+    <div><b>8</b><span>built-in mascots</span></div>
+    <div><b>11</b><span>languages</span></div>
+    <div><b>150</b><span>surprise accessories</span></div>
+    <div><b>0</b><span>telemetry, ever</span></div>
+  </div>
 </header>
 
-<div class="hero">
-  <img src="https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/assets/hero-showcase.gif" alt="Antigravity Pet — pixel desktop pet for Google Antigravity showing live agent status" width="1080" height="608">
-</div>
-
-<div class="cta">
-  <a class="btn primary" href="https://github.com/Wlaeg/antigravity-pet/releases/latest">Download for Windows / macOS</a>
-  <a class="btn" href="https://github.com/Wlaeg/antigravity-pet">View on GitHub</a>
-</div>
-<code class="cmd"><button onclick="navigator.clipboard.writeText('agy plugin install https://github.com/Wlaeg/antigravity-pet');this.textContent='Copied';">Copy</button>agy plugin install https://github.com/Wlaeg/antigravity-pet</code>
-
-<section>
-  <h2>Ask your AI agent to install it</h2>
-  <p style="color:var(--muted);margin-bottom:14px;">Copy this prompt and paste it into your agent's chat — it installs the pet for you:</p>
-  <div class="promptbox"><button onclick="navigator.clipboard.writeText(document.getElementById('agent-prompt').innerText);this.textContent='Copied';">Copy</button><span id="agent-prompt">Install Antigravity Pet for me: run agy plugin install https://github.com/Wlaeg/antigravity-pet, confirm the plugin folder exists, build and launch it once, and tell me the toggle shortcut. Windows: %USERPROFILE%\.gemini\config\plugins\antigravity-pet, .\build.ps1 -Launch, Win + Alt + P. macOS: ~/.gemini/config/plugins/antigravity-pet, chmod +x build.sh &amp;&amp; ./build.sh --launch, Option + Command + P. If the install fails, download the latest release or clone the repo and build from source instead.</span></div>
+<section id="new">
+  <p class="eyebrow">New in v4.7.0</p>
+  <div class="spot">
+    <div>
+      <span class="pill">Surprise Mode</span>
+      <h3>Your pet earns gear. Then it surprises you.</h3>
+      <p>Finish tasks and your pet unlocks accessories — glasses, a dev cap, a coffee cup with animated steam, a gold crown. Reach 200 tasks and Surprise Mode kicks in: your local agent generates 150 unique pixel accessories and equips a fresh combo every few tasks.</p>
+      <ul>
+        <li>20 base accessories across 4 slots: head, face, hand, back</li>
+        <li>150 more generated locally, unique to you</li>
+        <li>Star the repo and they all unlock at once</li>
+      </ul>
+    </div>
+    <img src="https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/demo/v47-surprise.gif" alt="Antigravity Pet Surprise Mode — the pet randomly equips new pixel accessories" width="600" height="360">
+  </div>
 </section>
 
-<section>
-  <h2>Why a pet?</h2>
+<section id="features">
+  <p class="eyebrow">Features</p>
+  <h2>It doesn't just sit there. It keeps up with your agent.</h2>
+  <p class="lede">Every state your agent goes through, the pet shows — in plain words, right above its head.</p>
   <div class="grid">
-    <div class="card"><h3><span class="tag">💬</span> Live tool bubbles</h3><p>The bubble above your pet shows the agent's current tool call — <i>Reading server.mjs</i>, <i>Tests passed</i> — no window switching.</p></div>
-    <div class="card"><h3><span class="tag">👆</span> It talks back</h3><p>Double-click the pet to dispatch a task. Risky tool calls ask Approve / Deny right in the bubble.</p></div>
-    <div class="card"><h3><span class="tag">🌙</span> Background moon state</h3><p>When the foreground chat is idle but background tasks run, the pet rests with a moon badge and a task switcher.</p></div>
-    <div class="card"><h3><span class="tag">🎒</span> Community workshop</h3><p>Browse, install, and share community pet packs inside Settings. One static PNG is enough to make your own pet.</p></div>
-    <div class="card"><h3><span class="tag">✨</span> Surprise Mode</h3><p>Finish 200 tasks (or star the repo) and your local agent generates 150 unique pixel accessories across 4 gear slots.</p></div>
-    <div class="card"><h3><span class="tag">🫥</span> Stays out of the way</h3><p>Edge peeking, fullscreen auto-hide, typing sync, boredom and naps. No taskbar or Dock clutter, zero telemetry.</p></div>
+    <div class="card"><span class="dot cyan"></span><h3>Live tool bubbles</h3><p>The bubble shows the agent's actual tool call — <i>Reading server.mjs</i>, <i>Running tests</i> — not just "Running". You know what it's doing without switching windows.</p></div>
+    <div class="card"><span class="dot green"></span><h3>It talks back</h3><p>Double-click the pet to send it work. When a risky command needs approval, it asks Allow / Deny right in the bubble — no digging through menus.</p></div>
+    <div class="card"><span class="dot violet"></span><h3>Background moon state</h3><p>When the foreground chat is idle but background tasks run, the pet rests with a moon badge and a lavender halo. Click the task stack to jump to any session.</p></div>
+    <div class="card"><span class="dot amber"></span><h3>It gets bored</h3><p>Leave it alone and it wanders off, looks around, and falls asleep with Zzz. Type fast enough and stars spin over its head. Any keystroke wakes it up.</p></div>
+    <div class="card"><span class="dot cyan"></span><h3>Community workshop</h3><p>Browse, star, and one-click install community pets inside Settings. Or make your own from a single image — no spritesheet required.</p></div>
+    <div class="card"><span class="dot green"></span><h3>Growth accessories</h3><p>Your pet earns gear as you finish tasks. Surprise Mode adds 150 locally generated accessories on top of the 20 base ones.</p></div>
+    <div class="card"><span class="dot amber"></span><h3>Peeks, then hides</h3><p>Drag it to a screen edge and it peeks out with half its body. During fullscreen games or videos it disappears — and peeks back when something needs you.</p></div>
+    <div class="card"><span class="dot red"></span><h3>Click to jump back</h3><p>Click the pet or its bubble and you're straight back in the right conversation, even if Antigravity is minimized.</p></div>
   </div>
 </section>
 
 <section>
-  <h2>8 built-in mascots</h2>
+  <p class="eyebrow">Always in sync</p>
+  <h2>One glance tells you the whole story.</h2>
+  <div class="states">
+    <span class="state"><span class="dot cyan"></span>Running <code>working…</code></span>
+    <span class="state"><span class="dot amber"></span>Needs input <code>waiting on you</code></span>
+    <span class="state"><span class="dot green"></span>Ready <code>done ✓</code></span>
+    <span class="state"><span class="dot red"></span>Blocked <code>something failed</code></span>
+    <span class="state"><span class="dot violet"></span>Background <code>🌙 resting</code></span>
+  </div>
+</section>
+
+<section id="pets">
+  <p class="eyebrow">The crew</p>
+  <h2>8 built-in mascots.</h2>
+  <p class="lede">Including Android's Bugdroid and Flutter's Dash. Switch anytime, or bring your own.</p>
   <div class="pets">
     <span>cyber-fox</span><span>astro-bot</span><span>shadow-cat</span><span>byte-ghost</span><span>shiba-dog</span><span>pixel-dragon</span><span>android-bugdroid</span><span>flutter-dash</span>
   </div>
 </section>
 
-<section>
-  <h2>Install in three steps</h2>
+<section id="install">
+  <p class="eyebrow">Install</p>
+  <h2>Up and running in a minute.</h2>
   <ol class="steps">
-    <li>Download the <a href="https://github.com/Wlaeg/antigravity-pet/releases/latest">latest release</a> and extract it to your Antigravity plugins folder.</li>
-    <li>Run the one-click launcher (<code>build.ps1 -Launch</code> on Windows, <code>./build.sh --launch</code> on macOS).</li>
-    <li>Open Antigravity. The pet appears on your desktop — press <code>Win + Alt + P</code> (<code>⌥ + ⌘ + P</code> on macOS) to show or hide it.</li>
+    <li>Download the <a href="https://github.com/Wlaeg/antigravity-pet/releases/latest">latest release</a> and extract it to your Antigravity plugins folder.
+      <p>Windows: <code>%USERPROFILE%\.gemini\config\plugins\antigravity-pet</code><br>macOS: <code>~/.gemini/config/plugins/antigravity-pet</code></p>
+    </li>
+    <li>Run the one-click launcher.
+      <p>Windows (PowerShell): <code>.\build.ps1 -Launch</code><br>macOS: <code>chmod +x build.sh &amp;&amp; ./build.sh --launch</code></p>
+    </li>
+    <li>Open Antigravity. The pet appears on your desktop.
+      <p>Press <code>Win + Alt + P</code> (<code>⌥ + ⌘ + P</code> on macOS) to show or hide it anytime.</p>
+    </li>
   </ol>
+
+  <h2 style="margin-top:44px;">Ask your AI agent to install it</h2>
+  <p class="lede">Copy this prompt and paste it into your agent's chat — it installs the pet for you:</p>
+  <div class="promptbox"><button onclick="navigator.clipboard.writeText(document.getElementById('agent-prompt').innerText);this.textContent='Copied';">Copy</button><span id="agent-prompt">Install Antigravity Pet for me: run agy plugin install https://github.com/Wlaeg/antigravity-pet, confirm the plugin folder exists, build and launch it once, and tell me the toggle shortcut. Windows: %USERPROFILE%\.gemini\config\plugins\antigravity-pet, .\build.ps1 -Launch, Win + Alt + P. macOS: ~/.gemini/config/plugins/antigravity-pet, chmod +x build.sh &amp;&amp; ./build.sh --launch, Option + Command + P. If the install fails, download the latest release or clone the repo and build from source instead.</span></div>
 </section>
 
-<section class="faq">
-  <h2>FAQ</h2>
+<section id="faq" class="faq">
+  <p class="eyebrow">FAQ</p>
+  <h2>Questions, answered.</h2>
   <details><summary>What is Antigravity Pet?</summary><p>A free, open-source pixel desktop pet for Google Antigravity on Windows and macOS. It sits on your desktop and shows what your agent is doing, live.</p></details>
   <details><summary>How do I install it?</summary><p>Download the latest release and run the one-click launcher, or install with <code>agy plugin install https://github.com/Wlaeg/antigravity-pet</code>.</p></details>
   <details><summary>Does it work on macOS?</summary><p>Yes — macOS 12+ on Apple Silicon and Intel, built with the native Swift overlay.</p></details>
