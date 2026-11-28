@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Antigravity Pet — Free Pixel Desktop Pet for Google Antigravity</title>
+<meta name="description" content="Antigravity Pet is a free, open-source pixel desktop pet for Google Antigravity on Windows and macOS. It shows what your agent is doing, live — no window switching, no runtime to install.">
+<link rel="canonical" href="https://wlaeg.github.io/antigravity-pet/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Antigravity Pet — Free Pixel Desktop Pet for Google Antigravity">
+<meta property="og:description" content="A pixel desktop pet that shows what your Antigravity agent is doing, live. Free and open source for Windows and macOS.">
+<meta property="og:url" content="https://wlaeg.github.io/antigravity-pet/">
+<meta property="og:image" content="https://raw.githubusercontent.com/Wlaeg/antigravity-pet/main/assets/hero-showcase.gif">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Antigravity Pet",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": ["Windows 10", "Windows 11", "macOS 12+"],
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "license": "https://github.com/Wlaeg/antigravity-pet/blob/main/LICENSE",
+  "softwareVersion": "4.7.0",
+  "author": { "@type": "Person", "name": "Wlaeg", "url": "https://github.com/Wlaeg" },
+  "codeRepository": "https://github.com/Wlaeg/antigravity-pet",
+  "description": "A free, open-source pixel desktop pet for Google Antigravity on Windows and macOS. It shows what your agent is doing, live."
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "What is Antigravity Pet?", "acceptedAnswer": { "@type": "Answer", "text": "Antigravity Pet is a free, open-source pixel desktop pet for Google Antigravity on Windows and macOS. It sits on your desktop and shows what your agent is doing, live." } },
+    { "@type": "Question", "name": "How do I install Antigravity Pet?", "acceptedAnswer": { "@type": "Answer", "text": "Download the latest release and run the one-click launcher, or install with: agy plugin install https://github.com/Wlaeg/antigravity-pet" } },
+    { "@type": "Question", "name": "Does Antigravity Pet work on macOS?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. macOS 12+ on Apple Silicon and Intel, built with the native Swift overlay." } },
+    { "@type": "Question", "name": "Is Antigravity Pet free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, MIT licensed. No account, no subscription, no telemetry." } }
+  ]
+}
+</script>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --line:#30363d; --text:#e6edf3; --muted:#8b949e; --cyan:#22d3ee; --green:#3fb950; --amber:#d29922; --red:#f85149; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; line-height:1.6; }
+  a { color:var(--cyan); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .wrap { max-width:880px; margin:0 auto; padding:0 20px; }
+  header { padding:56px 0 8px; }
+  header .kicker { color:var(--muted); font-size:14px; letter-spacing:.08em; text-transform:uppercase; }
+  h1 { font-size:40px; line-height:1.2; margin:12px 0 16px; letter-spacing:-.01em; }
+  h1 .dot { color:var(--cyan); }
+  .sub { font-size:18px; color:var(--muted); max-width:640px; }
+  .hero { margin:32px 0 8px; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--panel); }
+  .hero img { display:block; width:100%; height:auto; image-rendering:pixelated; }
+  .cta { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:28px 0 8px; }
+  .btn { display:inline-block; padding:12px 22px; border-radius:8px; font-weight:600; font-size:16px; border:1px solid var(--line); color:var(--text); background:var(--panel); }
+  .btn:hover { text-decoration:none; border-color:var(--cyan); }
+  .btn.primary { background:var(--cyan); color:#062a30; border-color:var(--cyan); }
+  code.cmd { display:block; background:#010409; border:1px solid var(--line); border-radius:8px; padding:14px 16px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:14px; overflow-x:auto; white-space:nowrap; }
+  code.cmd button { float:right; background:none; border:1px solid var(--line); color:var(--muted); border-radius:6px; padding:2px 10px; cursor:pointer; font-size:13px; }
+  section { padding:44px 0 8px; }
+  h2 { font-size:26px; margin-bottom:18px; letter-spacing:-.01em; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px; }
+  .card h3 { font-size:17px; margin-bottom:8px; }
+  .card p { color:var(--muted); font-size:15px; }
+  .card .tag { font-size:22px; }
+  .pets { display:flex; flex-wrap:wrap; gap:8px; }
+  .pets span { background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:6px 14px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:14px; }
+  ol.steps li { margin:0 0 10px 20px; }
+  ol.steps li::marker { color:var(--cyan); font-weight:700; }
+  .faq details { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin-bottom:12px; }
+  .faq summary { cursor:pointer; font-weight:600; }
+  .faq p { color:var(--muted); margin-top:8px; font-size:15px; }
+  footer { border-top:1px solid var(--line); margin-top:56px; padding:28px 0 48px; color:var(--muted); font-size:14px; }
+  footer .links a { margin-right:18px; }
+  @media (max-width:600px){ h1{font-size:30px;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="kicker">Free &amp; open source · Windows &amp; macOS</p>
+  <h1>A pixel desktop pet that shows what your Antigravity agent is doing, live<span class="dot">.</span></h1>
+  <p class="sub">Antigravity Pet lives on your desktop and mirrors your agent in real time — working, waiting for input, done, or stuck — so you can tell at a glance without keeping the Antigravity window in front of you.</p>
+</header>
+
+<div class="hero">
+  <img src="../assets/hero-showcase.gif" alt="Antigravity Pet — pixel desktop pet for Google Antigravity showing live agent status" width="1080" height="608">
+</div>
+
+<div class="cta">
+  <a class="btn primary" href="https://github.com/Wlaeg/antigravity-pet/releases/latest">Download for Windows / macOS</a>
+  <a class="btn" href="https://github.com/Wlaeg/antigravity-pet">View on GitHub</a>
+</div>
+<code class="cmd"><button onclick="navigator.clipboard.writeText('agy plugin install https://github.com/Wlaeg/antigravity-pet');this.textContent='Copied';">Copy</button>agy plugin install https://github.com/Wlaeg/antigravity-pet</code>
+
+<section>
+  <h2>Why a pet?</h2>
+  <div class="grid">
+    <div class="card"><h3><span class="tag">💬</span> Live tool bubbles</h3><p>The bubble above your pet shows the agent's current tool call — <i>Reading server.mjs</i>, <i>Tests passed</i> — no window switching.</p></div>
+    <div class="card"><h3><span class="tag">👆</span> It talks back</h3><p>Double-click the pet to dispatch a task. Risky tool calls ask Approve / Deny right in the bubble.</p></div>
+    <div class="card"><h3><span class="tag">🌙</span> Background moon state</h3><p>When the foreground chat is idle but background tasks run, the pet rests with a moon badge and a task switcher.</p></div>
+    <div class="card"><h3><span class="tag">🎒</span> Community workshop</h3><p>Browse, install, and share community pet packs inside Settings. One static PNG is enough to make your own pet.</p></div>
+    <div class="card"><h3><span class="tag">✨</span> Surprise Mode</h3><p>Finish 200 tasks (or star the repo) and your local agent generates 150 unique pixel accessories across 4 gear slots.</p></div>
+    <div class="card"><h3><span class="tag">🫥</span> Stays out of the way</h3><p>Edge peeking, fullscreen auto-hide, typing sync, boredom and naps. No taskbar or Dock clutter, zero telemetry.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>8 built-in mascots</h2>
+  <div class="pets">
+    <span>cyber-fox</span><span>astro-bot</span><span>shadow-cat</span><span>byte-ghost</span><span>shiba-dog</span><span>pixel-dragon</span><span>android-bugdroid</span><span>flutter-dash</span>
+  </div>
+</section>
+
+<section>
+  <h2>Install in three steps</h2>
+  <ol class="steps">
+    <li>Download the <a href="https://github.com/Wlaeg/antigravity-pet/releases/latest">latest release</a> and extract it to your Antigravity plugins folder.</li>
+    <li>Run the one-click launcher (<code>build.ps1 -Launch</code> on Windows, <code>./build.sh --launch</code> on macOS).</li>
+    <li>Open Antigravity. The pet appears on your desktop — press <code>Win + Alt + P</code> (<code>⌥ + ⌘ + P</code> on macOS) to show or hide it.</li>
+  </ol>
+</section>
+
+<section class="faq">
+  <h2>FAQ</h2>
+  <details><summary>What is Antigravity Pet?</summary><p>A free, open-source pixel desktop pet for Google Antigravity on Windows and macOS. It sits on your desktop and shows what your agent is doing, live.</p></details>
+  <details><summary>How do I install it?</summary><p>Download the latest release and run the one-click launcher, or install with <code>agy plugin install https://github.com/Wlaeg/antigravity-pet</code>.</p></details>
+  <details><summary>Does it work on macOS?</summary><p>Yes — macOS 12+ on Apple Silicon and Intel, built with the native Swift overlay.</p></details>
+  <details><summary>Is it free?</summary><p>Yes, MIT licensed. No account, no subscription, no telemetry.</p></details>
+</section>
+
+<footer>
+  <p class="links"><a href="https://github.com/Wlaeg/antigravity-pet">GitHub</a><a href="https://github.com/Wlaeg/antigravity-pet/releases">Releases</a><a href="https://github.com/Wlaeg/antigravity-pet/issues">Issues</a><a href="https://github.com/Wlaeg/antigravity-pet/blob/main/CHANGELOG.md">Changelog</a></p>
+  <p style="margin-top:12px;">Antigravity Pet is an unofficial community project, not affiliated with Google. MIT License.</p>
+</footer>
+
+</div>
+</body>
+</html>
