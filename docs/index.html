@@ -59,6 +59,8 @@
   .btn.primary { background:var(--cyan); color:#062a30; border-color:var(--cyan); }
   code.cmd { display:block; background:#010409; border:1px solid var(--line); border-radius:8px; padding:14px 16px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:14px; overflow-x:auto; white-space:nowrap; }
   code.cmd button { float:right; background:none; border:1px solid var(--line); color:var(--muted); border-radius:6px; padding:2px 10px; cursor:pointer; font-size:13px; }
+  .promptbox { background:#010409; border:1px solid var(--line); border-radius:8px; padding:14px 16px; font-size:15px; }
+  .promptbox button { float:right; background:none; border:1px solid var(--line); color:var(--muted); border-radius:6px; padding:2px 10px; cursor:pointer; font-size:13px; margin-left:10px; }
   section { padding:44px 0 8px; }
   h2 { font-size:26px; margin-bottom:18px; letter-spacing:-.01em; }
   .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
@@ -96,6 +98,12 @@
   <a class="btn" href="https://github.com/Wlaeg/antigravity-pet">View on GitHub</a>
 </div>
 <code class="cmd"><button onclick="navigator.clipboard.writeText('agy plugin install https://github.com/Wlaeg/antigravity-pet');this.textContent='Copied';">Copy</button>agy plugin install https://github.com/Wlaeg/antigravity-pet</code>
+
+<section>
+  <h2>Ask your AI agent to install it</h2>
+  <p style="color:var(--muted);margin-bottom:14px;">Copy this prompt and paste it into your agent's chat — it installs the pet for you:</p>
+  <div class="promptbox"><button onclick="navigator.clipboard.writeText(document.getElementById('agent-prompt').innerText);this.textContent='Copied';">Copy</button><span id="agent-prompt">Install Antigravity Pet for me: run agy plugin install https://github.com/Wlaeg/antigravity-pet, confirm the plugin folder exists, build and launch it once, and tell me the toggle shortcut. Windows: %USERPROFILE%\.gemini\config\plugins\antigravity-pet, .\build.ps1 -Launch, Win + Alt + P. macOS: ~/.gemini/config/plugins/antigravity-pet, chmod +x build.sh &amp;&amp; ./build.sh --launch, Option + Command + P. If the install fails, download the latest release or clone the repo and build from source instead.</span></div>
+</section>
 
 <section>
   <h2>Why a pet?</h2>
